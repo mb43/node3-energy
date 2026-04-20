@@ -1,0 +1,2882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NODE-3 | Energy Arbitrage Portal</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    /* ══════════════════════════════════════════
+       RESET & BASE
+    ══════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0d1117;
+      --surface:     #161b22;
+      --surface2:    #21262d;
+      --border:      #30363d;
+      --text:        #e6edf3;
+      --muted:       #8b949e;
+      --green:       #3fb950;
+      --green-dim:   #196c2e;
+      --amber:       #d29922;
+      --red:         #f85149;
+      --blue:        #58a6ff;
+      --purple:      #bc8cff;
+      --cyan:        #39c5cf;
+      --charge-glow: #2ea04326;
+      --sell-glow:   #d2992226;
+      --font:        'Courier New', 'Consolas', monospace;
+    }
+
+    html, body { height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    /* ══════════════════════════════════════════
+       LAYOUT
+    ══════════════════════════════════════════ */
+    .wrapper { max-width: 1400px; margin: 0 auto; padding: 12px 16px 32px; }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .logo {
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 3px;
+      color: var(--green);
+      text-shadow: 0 0 20px rgba(63,185,80,0.4);
+    }
+    .logo span { color: var(--muted); font-weight: normal; font-size: 12px; letter-spacing: 1px; }
+    .live-badge {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(63,185,80,0.12);
+      border: 1px solid var(--green-dim);
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 11px;
+      color: var(--green);
+    }
+    .live-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 1.4s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.85); }
+    }
+    .header-right { text-align: right; }
+    .clock { font-size: 18px; color: var(--text); letter-spacing: 2px; }
+    .clock-sub { font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+    #status-line { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    /* ══════════════════════════════════════════
+       STAT CARDS (top row)
+    ══════════════════════════════════════════ */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--accent, var(--border));
+    }
+    .stat-card.green  { --accent: var(--green); }
+    .stat-card.amber  { --accent: var(--amber); }
+    .stat-card.blue   { --accent: var(--blue); }
+    .stat-card.purple { --accent: var(--purple); }
+
+    .stat-label { font-size: 10px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 6px; }
+    .stat-value { font-size: 28px; font-weight: bold; letter-spacing: 1px; line-height: 1; }
+    .stat-value.green  { color: var(--green); }
+    .stat-value.amber  { color: var(--amber); }
+    .stat-value.blue   { color: var(--blue); }
+    .stat-value.purple { color: var(--purple); }
+    .stat-sub { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+    /* ══════════════════════════════════════════
+       CHARTS ROW
+    ══════════════════════════════════════════ */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+    }
+    .chart-title {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .chart-title span { color: var(--text); font-size: 12px; }
+    canvas { width: 100% !important; }
+
+
+    /* ══════════════════════════════════════════
+       THRESHOLD + INFO BAR
+    ══════════════════════════════════════════ */
+    .info-bar {
+      display: flex; gap: 12px; flex-wrap: wrap;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 20px;
+      margin-bottom: 16px;
+      font-size: 11px;
+    }
+    .info-item { display: flex; gap: 6px; align-items: center; }
+    .info-dot  { width: 8px; height: 8px; border-radius: 50%; }
+    .info-item .label { color: var(--muted); }
+    .info-item .val   { color: var(--text); font-weight: bold; }
+
+    /* ══════════════════════════════════════════
+       PRICE COLOR LEGEND
+    ══════════════════════════════════════════ */
+    .price-legend {
+      display: flex; gap: 8px; font-size: 10px; flex-wrap: wrap;
+    }
+    .pl-item {
+      display: flex; align-items: center; gap: 4px;
+    }
+    .pl-swatch { width: 12px; height: 12px; border-radius: 2px; }
+
+    /* ══════════════════════════════════════════
+       DATA SOURCE BANNER
+    ══════════════════════════════════════════ */
+    .data-banner {
+      text-align: center; font-size: 10px;
+      color: var(--muted); padding: 6px;
+      letter-spacing: 0.5px;
+    }
+    .data-banner a { color: var(--blue); text-decoration: none; }
+    .data-banner a:hover { text-decoration: underline; }
+
+    /* ══════════════════════════════════════════
+       ERROR / LOADING STATES
+    ══════════════════════════════════════════ */
+    .loading-overlay {
+      position: fixed; inset: 0;
+      background: rgba(13,17,23,0.92);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 100;
+      gap: 16px;
+    }
+    .loading-spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: var(--muted); font-size: 12px; letter-spacing: 2px; }
+
+    /* ══════════════════════════════════════════
+       RESPONSIVE
+    ══════════════════════════════════════════ */
+    @media (max-width: 900px) {
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .charts-row { grid-template-columns: 1fr; }
+      .fleet-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 500px) {
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .fleet-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    /* ══════════════════════════════════════════
+       TOOLTIPS  (data-tip="..." on any element)
+    ══════════════════════════════════════════ */
+    [data-tip] { position: relative; }
+    [data-tip]::after {
+      content: attr(data-tip);
+      position: absolute; bottom: calc(100% + 10px); left: 50%;
+      transform: translateX(-50%);
+      background: #1c2128; border: 1px solid #30363d;
+      color: #c9d1d9; padding: 9px 13px; border-radius: 7px;
+      font-size: 11px; white-space: normal; text-align: left;
+      z-index: 9999; opacity: 0; pointer-events: none;
+      transition: opacity 0.15s ease;
+      width: max-content; max-width: 260px;
+      line-height: 1.55; letter-spacing: 0;
+      font-weight: normal; text-transform: none;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+    [data-tip]:hover::after { opacity: 1; }
+    [data-tip-left]::after  { left: 0; transform: none; }
+    [data-tip-right]::after { left: auto; right: 0; transform: none; }
+
+
+    /* ══════════════════════════════════════════
+       IMPORT / EXPORT PRICE CARD
+    ══════════════════════════════════════════ */
+    .ie-row {
+      display: flex; gap: 14px; align-items: flex-end; margin-bottom: 2px;
+    }
+    .ie-col { display: flex; flex-direction: column; gap: 1px; }
+    .ie-lbl { font-size: 9px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+    .ie-val-imp { font-size: 26px; font-weight: bold; }
+    .ie-val-exp { font-size: 18px; font-weight: bold; color: var(--cyan); }
+    .ie-spread {
+      font-size: 10px; color: var(--muted); margin-top: 3px;
+    }
+    .ie-spread .spr { color: var(--purple); font-weight: bold; }
+    /* Income model tag — replaces old 3-button toggle */
+    .income-model-tag {
+      display: inline-flex; align-items: center; gap: 5px;
+      margin-top: 5px; padding: 3px 8px;
+      background: rgba(63,185,80,0.08);
+      border: 1px solid rgba(63,185,80,0.3);
+      border-radius: 4px; font-size: 10px;
+    }
+    .imt-foc  { color: var(--cyan);  font-weight: bold; letter-spacing: 0.5px; }
+    .imt-sep  { color: var(--muted); }
+    .imt-mode { color: var(--green); letter-spacing: 0.3px; }
+
+    /* ══════════════════════════════════════════
+       PROJECTIONS BAR
+    ══════════════════════════════════════════ */
+    .proj-bar {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 0; margin-bottom: 16px;
+      display: grid; grid-template-columns: repeat(5, 1fr);
+    }
+    @media (max-width: 900px) { .proj-bar { grid-template-columns: repeat(3, 1fr); } }
+    .proj-cell {
+      padding: 4px 18px; border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 2px;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .proj-cell:last-child { border-right: none; }
+    .proj-cell:hover { background: rgba(255,255,255,0.03); }
+    .proj-lbl  { font-size: 9px; color: var(--muted); letter-spacing: 1.2px; text-transform: uppercase; }
+    .proj-main { font-size: 17px; font-weight: bold; color: var(--green); line-height: 1.1; }
+    .proj-main.negative { color: var(--red); }
+    .proj-range { font-size: 9px; color: var(--muted); }
+    .proj-range .r-lo { color: var(--red); }
+    .proj-range .r-hi { color: var(--green); }
+    .proj-caveat { font-size: 9px; color: var(--muted); font-style: italic; }
+
+    /* ══════════════════════════════════════════
+       CLICK-THROUGH DRILL PANEL
+    ══════════════════════════════════════════ */
+    .stat-card.has-drill { cursor: pointer; }
+    .stat-card.has-drill:hover { border-color: rgba(88,166,255,0.4); }
+    .drill-panel {
+      display: none; margin-top: 10px; padding-top: 10px;
+      border-top: 1px solid var(--border); font-size: 11px;
+    }
+    .stat-card.drilled .drill-panel { display: block; }
+    .drill-row {
+      display: flex; justify-content: space-between;
+      padding: 3px 0; border-bottom: 1px solid rgba(48,54,61,0.5);
+    }
+    .drill-row:last-child { border-bottom: none; }
+    .drill-row .dl { color: var(--muted); }
+    .drill-row .dv { color: var(--text); font-weight: bold; }
+    .drill-row .dv.pos { color: var(--green); }
+    .drill-row .dv.neg { color: var(--red); }
+    .drill-row .dv.blue { color: var(--blue); }
+
+    /* ══════════════════════════════════════════
+       HISTORICAL ANALYSIS SECTION
+    ══════════════════════════════════════════ */
+    .section-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+      margin: 24px 0 20px;
+    }
+    .hist-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px; flex-wrap: wrap; gap: 10px;
+    }
+    .hist-btn {
+      background: linear-gradient(135deg, rgba(88,166,255,0.15), rgba(88,166,255,0.05));
+      border: 1px solid var(--blue);
+      color: var(--blue);
+      font-family: var(--font);
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      padding: 8px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    .hist-btn:hover {
+      background: rgba(88,166,255,0.2);
+      box-shadow: 0 0 12px rgba(88,166,255,0.25);
+    }
+    .hist-btn:disabled {
+      opacity: 0.4; cursor: not-allowed;
+    }
+    .hist-progress {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 14px;
+      display: none;
+    }
+    .hist-progress-label {
+      font-size: 11px; color: var(--muted);
+      letter-spacing: 1.5px; margin-bottom: 10px;
+    }
+    .prog-bar-wrap {
+      height: 6px; background: var(--surface2);
+      border-radius: 3px; overflow: hidden;
+    }
+    .prog-bar-fill {
+      height: 100%; background: linear-gradient(90deg, #1f5f99, var(--blue));
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+    .hist-results { display: none; }
+    .hist-stats-row {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 1100px) { .hist-stats-row { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 700px)  { .hist-stats-row { grid-template-columns: repeat(2, 1fr); } }
+
+    /* Accounting note banner */
+    .accounting-note {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      background: rgba(57,197,207,0.07);
+      border: 1px solid rgba(57,197,207,0.25);
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .accounting-note .acct-icon {
+      font-size: 15px;
+      color: var(--cyan);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .accounting-note .acct-sep {
+      color: var(--text);
+      font-weight: bold;
+      letter-spacing: 0.5px;
+    }
+    .accounting-note em {
+      color: rgba(139,148,158,0.8);
+      font-style: normal;
+    }
+
+    /* Stat card colour variants */
+    .stat-card.cyan  { border-color: rgba(57,197,207,0.4); }
+    .stat-card.cyan .stat-value { color: var(--cyan); }
+    .stat-value.cyan { color: var(--cyan); }
+    .stat-card.green-bright { border-color: rgba(63,185,80,0.6); background: rgba(63,185,80,0.06); }
+    .stat-card.green-bright .stat-value { color: var(--green); font-size: 22px; }
+    .stat-value.green-bright { color: var(--green); }
+    .hist-charts-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 900px) { .hist-charts-row { grid-template-columns: 1fr; } }
+    .hist-table {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+    }
+    .hist-tbl {
+      width: 100%; border-collapse: collapse;
+      font-size: 12px;
+    }
+    .hist-tbl th {
+      color: var(--muted); text-align: left;
+      font-size: 10px; letter-spacing: 1.2px;
+      padding: 6px 10px; text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    .hist-tbl td {
+      padding: 7px 10px;
+      border-bottom: 1px solid rgba(48,54,61,0.5);
+    }
+    .hist-tbl tr:last-child td { border-bottom: none; }
+    .hist-tbl .pos { color: var(--green); }
+    .hist-tbl .neg { color: var(--red); }
+    .hist-tbl .best { background: rgba(63,185,80,0.06); }
+    .hist-tbl .worst { background: rgba(248,81,73,0.06); }
+    .hist-error {
+      background: rgba(248,81,73,0.08);
+      border: 1px solid rgba(248,81,73,0.3);
+      border-radius: 8px;
+      padding: 14px 20px;
+      font-size: 12px;
+      color: var(--red);
+      margin-bottom: 14px;
+      display: none;
+    }
+    .demo-watermark {
+      position: fixed; bottom: 10px; right: 14px;
+      font-size: 10px; color: rgba(210,153,34,0.6);
+      letter-spacing: 1px; pointer-events: none;
+      display: none;
+    }
+
+    /* ══════════════════════════════════════════
+       REVENUE BREAKDOWN PANEL
+    ══════════════════════════════════════════ */
+    .revenue-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 900px) { .revenue-grid { grid-template-columns: 1fr 1fr; } }
+    .revenue-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+    }
+    .revenue-section.dovecote { border-left: 3px solid var(--green); }
+    .revenue-section.homeowner { border-left: 3px solid var(--cyan); }
+    .revenue-section.balancing { border-left: 3px solid var(--purple); }
+    .revenue-title {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      font-weight: bold;
+    }
+    .revenue-cells {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .revenue-cell {
+      text-align: center;
+    }
+    .revenue-cell-label {
+      font-size: 9px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 4px;
+    }
+    .revenue-cell-value {
+      font-size: 16px;
+      font-weight: bold;
+      line-height: 1.2;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loading">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loading-msg">CONNECTING TO LIVE DATA…</div>
+</div>
+
+<div class="wrapper">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">NODE-3 <span>ENERGY ARBITRAGE PORTAL</span></div>
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        <span id="data-mode">LIVE</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="clock" id="clock">--:--:--</div>
+      <div class="clock-sub" id="clock-date">--- -- ----</div>
+      <div id="status-line">initialising…</div>
+    </div>
+  </div>
+
+  <!-- VIEW MODE TOGGLE — hidden, single home only -->
+  <div class="view-toggle-bar" style="display:none">
+    <span id="vt-mode-badge"></span>
+    <button id="vt-fleet"></button>
+    <button id="vt-home"></button>
+  </div>
+
+  <!-- REVENUE BREAKDOWN SECTION -->
+  <div class="revenue-grid">
+    <div class="revenue-section dovecote">
+      <div class="revenue-title" style="color:var(--green)">Dovecote Technology Ltd Revenue</div>
+      <div class="revenue-cells">
+        <div class="revenue-cell">
+          <div class="revenue-cell-label">Day</div>
+          <div class="revenue-cell-value" style="color:var(--green)" id="rev-dov-day">—</div>
+        </div>
+        <div class="revenue-cell">
+          <div class="revenue-cell-label">Week</div>
+          <div class="revenue-cell-value" style="color:var(--green)" id="rev-dov-week">—</div>
+        </div>
+        <div class="revenue-cell">
+          <div class="revenue-cell-label">Month</div>
+          <div class="revenue-cell-value" style="color:var(--green)" id="rev-dov-month">—</div>
+        </div>
+        <div class="revenue-cell">
+          <div class="revenue-cell-label">Year</div>
+          <div class="revenue-cell-value" style="color:var(--green)" id="rev-dov-year">—</div>
+        </div>
+      </div>
+    </div>
+    <div class="revenue-section homeowner">
+      <div class="revenue-title" style="color:var(--cyan)">Homeowner Savings vs SVT</div>
+      <div class="revenue-cells">
+        <div class="revenue-cell">
+          <div class="revenue-cell-label">Day</div>
+          <div class="revenue-cell-value" style="color:var(--cyan)" id="rev-home-day">—</div>
+        </div>
+        <div class="revenue-cell">
+          <div class="revenue-cell-label">Week</div>
+          <div class="revenue-cell-value" style="color:var(--cyan)" id="rev-home-week">—</div>
+        </div>
+        <div class="revenue-cell">
+          <div class="revenue-cell-label">Month</div>
+          <div class="revenue-cell-value" style="color:var(--cyan)" id="rev-home-month">—</div>
+        </div>
+        <div class="revenue-cell">
+          <div class="revenue-cell-label">Year</div>
+          <div class="revenue-cell-value" style="color:var(--cyan)" id="rev-home-year">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BM / VLP REVENUE PANEL -->
+  <div class="revenue-section balancing" style="margin-bottom:16px">
+    <div class="revenue-title" style="color:var(--purple);display:flex;align-items:center;justify-content:space-between">
+      <span>⚡ Balancing Mechanism (VLP) — Projected Revenue</span>
+      <span id="vlp-status-badge" style="font-size:9px;padding:2px 8px;border-radius:10px;background:rgba(139,148,158,0.15);color:var(--muted);font-weight:bold;letter-spacing:1px">PRE-REGISTRATION</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+      <div style="text-align:center">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Day</div>
+        <div style="font-size:15px;font-weight:bold;color:var(--purple)" id="bm-day">£1.92</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Week</div>
+        <div style="font-size:15px;font-weight:bold;color:var(--purple)" id="bm-week">£13.46</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Month</div>
+        <div style="font-size:15px;font-weight:bold;color:var(--purple)" id="bm-month">£58.33</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Year</div>
+        <div style="font-size:15px;font-weight:bold;color:var(--purple)" id="bm-year">£700</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">+ Agile</div>
+        <div style="font-size:15px;font-weight:bold;color:var(--green)" id="bm-combined">£1,050+</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:9px;color:var(--muted);border-top:1px solid var(--border);padding-top:8px;align-items:center">
+      <span>Based on Modo Energy 2025: GB BESS avg £70k/MW/yr · 10.5kW = <strong style="color:var(--purple)">£700/yr</strong></span>
+      <span style="color:var(--border)">|</span>
+      <span>G99 50A upgrade → <strong style="color:var(--purple)">£1,000/yr BM</strong> + <strong style="color:var(--green)">£350 Agile</strong></span>
+      <span style="color:var(--border)">|</span>
+      <span id="vlp-phase-text" style="color:var(--amber)">▶ G99 application → Octopus VPP (interim) → Elexon BSC accession → VLP go-live ~10 weeks</span>
+    </div>
+    <!-- VLP Phase Progress -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px">
+      <div id="vlp-p1" style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:4px;padding:4px 6px;font-size:9px;text-align:center">
+        <div style="color:var(--muted);letter-spacing:.5px">PHASE 1</div>
+        <div style="color:var(--green);font-weight:bold">G99 APPLICATION</div>
+        <div style="color:var(--muted)">Submit to SSEN</div>
+      </div>
+      <div id="vlp-p2" style="background:rgba(139,148,158,0.08);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:9px;text-align:center">
+        <div style="color:var(--muted);letter-spacing:.5px">PHASE 2</div>
+        <div style="color:var(--muted);font-weight:bold">INTERIM VPP</div>
+        <div style="color:var(--muted)">Octopus Kraken Flex</div>
+      </div>
+      <div id="vlp-p3" style="background:rgba(139,148,158,0.08);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:9px;text-align:center">
+        <div style="color:var(--muted);letter-spacing:.5px">PHASE 3</div>
+        <div style="color:var(--muted);font-weight:bold">BSC ACCESSION</div>
+        <div style="color:var(--muted)">Elexon + KPMG audit</div>
+      </div>
+      <div id="vlp-p4" style="background:rgba(139,148,158,0.08);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:9px;text-align:center">
+        <div style="color:var(--muted);letter-spacing:.5px">PHASE 4</div>
+        <div style="color:var(--muted);font-weight:bold">VLP GO-LIVE</div>
+        <div style="color:var(--muted)">Direct BM dispatch</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP STATS -->
+  <div class="stats-row">
+    <div class="stat-card green has-drill" id="profit-card" onclick="toggleDrill('profit-card')"
+         data-tip="Pure battery arbitrage: buy cheap Agile import, sell at peak Agile Outgoing export. LP greedy optimiser with context-adjusted thresholds (wind, day-of-week, season).">
+      <div class="stat-label" id="profit-card-label">ARBITRAGE INCOME</div>
+      <div class="stat-value green" id="fleet-profit">£0.0000</div>
+      <div class="stat-sub" id="profit-sub">0 slots simulated</div>
+      <div class="drill-panel" id="drill-profit-card">
+        <div id="drill-homes-list"><span style="color:var(--muted)">loading…</span></div>
+      </div>
+    </div>
+    <div class="stat-card amber has-drill" id="price-card" onclick="toggleDrill('price-card')"
+         data-tip="Average prices across all charge and discharge slots from the 12-month historical simulation. AVG BUY = what the company paid per kWh to charge. AVG SELL = what Octopus paid per kWh exported. The margin between these (×efficiency) is the source of all arbitrage profit. Click to see live slot prices and thresholds.">
+      <div class="stat-label" id="price-card-label">AVG ARBITRAGE PRICES — LOAD HISTORY BELOW</div>
+      <div class="ie-row">
+        <div class="ie-col">
+          <div class="ie-lbl">AVG BUY (CHARGE)</div>
+          <div class="ie-val-imp" id="avg-buy-price" style="color:var(--blue)">--p</div>
+          <div style="font-size:9px;color:var(--muted)">avg p/kWh paid to charge</div>
+        </div>
+        <div class="ie-col">
+          <div class="ie-lbl">AVG SELL (EXPORT)</div>
+          <div class="ie-val-exp" id="avg-sell-price" style="color:var(--green)">--p</div>
+          <div style="font-size:9px;color:var(--muted)">avg p/kWh earned exporting</div>
+        </div>
+      </div>
+      <div class="ie-spread" id="avg-margin-line" style="font-size:9px;color:var(--muted);margin-top:3px">
+        Load 12-month historical data below to populate
+      </div>
+      <!-- hidden elements kept for legacy JS that still writes to them -->
+      <span id="current-price"  style="display:none">0</span>
+      <span id="export-price"   style="display:none">0</span>
+      <div class="drill-panel" id="drill-price-card">
+        <div style="font-size:9px;color:var(--muted);padding-bottom:4px;border-bottom:1px solid var(--border);margin-bottom:4px">— LIVE SLOT (current 30-min window) —</div>
+        <div class="drill-row"><span class="dl">Import now (pay)</span><span class="dv" id="d-import-cur" style="color:var(--amber)">--p</span></div>
+        <div class="drill-row"><span class="dl">Export now (earn)</span><span class="dv" id="d-export-cur" style="color:var(--cyan)">--p</span></div>
+        <div style="font-size:9px;color:var(--muted);padding:4px 0;border-bottom:1px solid var(--border);margin-bottom:4px">— FORWARD 24h WINDOW THRESHOLDS —</div>
+        <div class="drill-row"><span class="dl">CHARGE when import &lt;</span><span class="dv pos" id="d-buy-thr">--p</span></div>
+        <div class="drill-row"><span class="dl">DISCHARGE when import &gt;</span><span class="dv" style="color:var(--amber)" id="d-sell-thr">--p</span></div>
+        <div class="drill-row"><span class="dl">Arbitrage spread</span><span class="dv" style="color:var(--green);font-weight:bold" id="d-arb-spread">--p</span></div>
+        <div style="font-size:9px;color:var(--muted);padding:4px 0;border-bottom:1px solid var(--border);margin-bottom:4px">— 12-MONTH BACKTEST AVERAGES —</div>
+        <div class="drill-row"><span class="dl">Avg buy price</span><span class="dv" style="color:var(--blue)" id="d-avg-buy">--p</span></div>
+        <div class="drill-row"><span class="dl">Avg sell price</span><span class="dv" style="color:var(--green)" id="d-avg-sell">--p</span></div>
+        <div class="drill-row"><span class="dl">Margin (sell/buy)</span><span class="dv" style="color:var(--green);font-weight:bold" id="d-avg-margin">--×</span></div>
+      </div>
+    </div>
+    <div class="stat-card blue has-drill" id="soc-card" onclick="toggleDrill('soc-card')"
+         data-tip="Battery State of Charge. 72kWh nominal (3× Nissan eNV200). 10% minimum reserve always maintained.">
+      <div class="stat-label">Battery SOC</div>
+      <div class="stat-value blue" id="avg-soc">--kWh</div>
+      <div class="stat-sub" id="soc-sub">of 72kWh nominal · 57.6kWh usable (10–90% DoD)</div>
+      <div class="drill-panel" id="drill-soc-card">
+        <div id="drill-soc-list"><span style="color:var(--muted)">loading…</span></div>
+      </div>
+    </div>
+    <div class="stat-card purple"
+         data-tip="Current battery action. CHARGING = buying cheap Agile electricity to store. SELLING = discharging at peak export prices. IDLE = holding position. LP optimiser recalculates context-adjusted thresholds every slot.">
+      <div class="stat-label">Node-3 Status</div>
+      <div class="stat-value purple" id="fleet-action">--</div>
+      <div class="stat-sub" id="action-sub">LP optimiser</div>
+    </div>
+  </div>
+
+  <!-- PROJECTIONS BAR -->
+  <div class="proj-bar" id="proj-bar">
+    <div class="proj-cell" onclick="scrollToHistorical()"
+         data-tip="Today's estimated arbitrage income extrapolated from the live simulation rate across all 48 half-hour slots.">
+      <div class="proj-lbl">TODAY (EST)</div>
+      <div class="proj-main" id="proj-daily">--</div>
+      <div class="proj-range"><span class="r-lo" id="proj-daily-lo">--</span> — <span class="r-hi" id="proj-daily-hi">--</span></div>
+    </div>
+    <div class="proj-cell" onclick="scrollToHistorical()"
+         data-tip="This week's projected arbitrage income (7 days). Best/worst range reflects Agile price volatility — prices can spike 5× or go negative.">
+      <div class="proj-lbl">THIS WEEK</div>
+      <div class="proj-main" id="proj-weekly">--</div>
+      <div class="proj-range"><span class="r-lo" id="proj-weekly-lo">--</span> — <span class="r-hi" id="proj-weekly-hi">--</span></div>
+    </div>
+    <div class="proj-cell" onclick="scrollToHistorical()"
+         data-tip="This month's projected arbitrage income (30 days). Load 12-month historical data below for a calibrated figure based on real Agile prices.">
+      <div class="proj-lbl">THIS MONTH</div>
+      <div class="proj-main" id="proj-monthly">--</div>
+      <div class="proj-range"><span class="r-lo" id="proj-monthly-lo">--</span> — <span class="r-hi" id="proj-monthly-hi">--</span></div>
+    </div>
+    <div class="proj-cell" onclick="scrollToHistorical()"
+         data-tip="Annual profit for 1 home. Load 12-month historical below for a calibrated figure using real Agile prices back 12 months.">
+      <div class="proj-lbl">ANNUAL (1 HOME)</div>
+      <div class="proj-main" id="proj-annual">--</div>
+      <div class="proj-range"><span class="r-lo" id="proj-annual-lo">--</span> — <span class="r-hi" id="proj-annual-hi">--</span></div>
+    </div>
+    <!-- HOMES → £50k/yr removed — single home only -->
+  </div>
+
+  <!-- INFO BAR -->
+  <div class="info-bar">
+    <div class="info-item" data-tip="FWD BUY threshold — context-adjusted ceiling for this slot. LP optimiser: takes the stricter of forward-window percentile vs absolute guard (8p max) vs wind/day context. Includes negative/zero price slots.">
+      <div class="info-dot" style="background:#3fb950"></div>
+      <span class="label">FWD BUY ≤</span>
+      <span class="val" id="buy-thr">--p</span>
+    </div>
+    <div class="info-item" data-tip="FWD SELL threshold — context-adjusted floor for this slot. LP optimiser: takes the stricter of forward-window percentile vs absolute guard (22p min) vs wind/day context. Discharges only into genuinely expensive slots.">
+      <div class="info-dot" style="background:#d29922"></div>
+      <span class="label">FWD SELL ≥</span>
+      <span class="val" id="sell-thr">--p</span>
+    </div>
+    <div class="info-item" data-tip="Home status: CHARGING = buying cheap electricity to store. Dynamic buy threshold met — LP optimiser approved this slot.">
+      <div class="info-dot" style="background:#58a6ff"></div>
+      <span class="label">Status</span>
+      <span class="val" id="n-charging">--</span>
+    </div>
+    <div class="info-item" data-tip="Home current action — CHARGING / DISCHARGING / IDLE. Dynamic sell threshold (context-adjusted) determines discharge trigger.">
+      <div class="info-dot" style="background:#d29922"></div>
+      <span class="label">Action</span>
+      <span class="val" id="n-discharging">--</span>
+    </div>
+    <div class="info-item" style="margin-left:auto">
+      <div class="price-legend">
+        <div class="pl-item"><div class="pl-swatch" style="background:#1a3a5c"></div><span style="color:var(--muted)">Neg/zero</span></div>
+        <div class="pl-item"><div class="pl-swatch" style="background:#196c2e"></div><span style="color:var(--muted)">&lt;10p cheap</span></div>
+        <div class="pl-item"><div class="pl-swatch" style="background:#7a5100"></div><span style="color:var(--muted)">10–25p mid</span></div>
+        <div class="pl-item"><div class="pl-swatch" style="background:#7d1f1f"></div><span style="color:var(--muted)">&gt;25p peak</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FORWARD SCHEDULE -->
+  <div class="chart-card" style="margin:8px 0;background:var(--card);border-radius:8px;border:1px solid var(--border);padding:12px 16px;">
+    <div class="chart-title" style="margin-bottom:8px;">
+      NODE3 FORWARD SCHEDULE — NEXT 48h OPTIMISED PLAN
+      <span id="sched-summary" style="color:var(--muted);font-size:10px;font-weight:normal;margin-left:8px;">Waiting for live prices…</span>
+    </div>
+    <div id="fwd-schedule" style="font-size:10px;color:var(--muted);padding:6px 0;">Loading schedule…</div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">
+        HOME PROFIT TIMELINE (£)
+        <span id="chart-span">last -- slots</span>
+      </div>
+      <canvas id="profit-chart" height="140"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">
+        AGILE PRICES (p/kWh)
+        <span id="price-range">--p → --p</span>
+      </div>
+      <canvas id="price-chart" height="140"></canvas>
+    </div>
+  </div>
+
+  <!-- FLEET GRID — hidden, single home only -->
+  <div style="display:none" id="fleet-grid"></div>
+
+  <!-- ══════════════════════════════════════════
+       HISTORICAL ANALYSIS SECTION (moved to top)
+  ══════════════════════════════════════════ -->
+  <div class="section-divider"></div>
+
+  <div class="hist-header" id="hist-section">
+    <div class="chart-title" style="flex-direction:column;align-items:flex-start;gap:4px">
+      HISTORICAL ANALYSIS — 12 MONTHS REAL DATA
+      <span style="color:var(--muted);font-size:10px;font-weight:normal">Real Octopus Agile prices · Single modelled home · LP greedy optimiser · context-adjusted dynamic thresholds (wind / weekday / season) · 88% round-trip efficiency (FoxESS + Nissan cell) · 12kWh/day home load (industry-standard hourly profile) · Home energy value tracked separately</span>
+    </div>
+    <button class="hist-btn" id="hist-btn" onclick="loadHistoricalData()">⚡ LOAD 12 MONTHS OF REAL DATA</button>
+  </div>
+
+  <div class="hist-progress" id="hist-progress">
+    <div class="hist-progress-label" id="hist-prog-label">FETCHING AGILE HISTORY — PAGE 1…</div>
+    <div class="prog-bar-wrap">
+      <div class="prog-bar-fill" id="hist-prog-bar" style="width:5%"></div>
+    </div>
+  </div>
+
+  <div class="hist-error" id="hist-error"></div>
+
+  <div class="hist-results" id="hist-results">
+    <!-- Accounting clarity note -->
+    <div class="accounting-note">
+      <span class="acct-icon">ℹ</span>
+      <span>
+        <strong>HOW THE NUMBERS WORK:</strong>
+        <span class="acct-sep">GRID P&amp;L</span> = Real cash. Export income − charge cost. What Octopus pays Dovecote for grid exports minus what Octopus charges to charge the battery. This is the actual bank account movement — no modelling, no assumptions. The battery also covers the home's 12kWh/day consumption from its charge cycles, meaning the homeowner pays £0 for electricity up to that cap. The Grid P&L proves the system is commercially viable even after providing that free electricity.
+        <span class="acct-sep">HOME ENERGY (indicative)</span> = The 12kWh/day the battery provides to the home free of charge, valued at 25p/kWh SVT reference. Shown for context only — the real homeowner benefit is simply £0/day electricity cost up to the 12kWh fair-use cap, not a tariff comparison.
+        <span class="acct-sep">NET VALUE</span> = Grid P&amp;L + Home Energy value. Combined annual benefit to the household. The chart above plots this.
+      </span>
+    </div>
+
+    <!-- Summary stat cards -->
+    <!-- COMPANY CASH BANNER — the only number that hits the bank account -->
+    <div style="background:linear-gradient(135deg,rgba(63,185,80,0.12),rgba(63,185,80,0.04));border:2px solid rgba(63,185,80,0.5);border-radius:8px;padding:12px 18px;margin-bottom:10px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+      <div style="flex:0 0 auto;">
+        <div style="font-size:10px;letter-spacing:.08em;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:2px">💰 COMPANY CASH IN — ARBITRAGE ONLY</div>
+        <div style="font-size:10px;color:var(--muted)">Pure grid buy/sell: what actually hits the bank account · home energy value is separate</div>
+      </div>
+      <div style="flex:1;display:flex;gap:20px;flex-wrap:wrap;justify-content:flex-end;align-items:center;">
+        <div style="text-align:center">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Export Revenue</div>
+          <div style="font-size:22px;font-weight:700;color:var(--green)" id="h-cash-in">—</div>
+          <div style="font-size:9px;color:var(--muted)">Octopus pays you</div>
+        </div>
+        <div style="font-size:20px;color:var(--muted)">−</div>
+        <div style="text-align:center">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Charge Cost</div>
+          <div style="font-size:22px;font-weight:700;color:var(--amber)" id="h-cash-out">—</div>
+          <div style="font-size:9px;color:var(--muted)">You pay Octopus</div>
+        </div>
+        <div style="font-size:20px;color:var(--muted)">=</div>
+        <div style="text-align:center">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">NET CASH PROFIT</div>
+          <div style="font-size:28px;font-weight:800;color:var(--green)" id="h-cash-net">—</div>
+          <div style="font-size:9px;color:var(--muted)" id="h-cash-net-sub">— per year · — per month avg</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BATTERY UTILISATION — populated by JS after historical sim -->
+    <div id="h-battery-util" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:10px;font-size:12px;">
+      <div style="font-size:10px;letter-spacing:.08em;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:8px">🔋 Battery Utilisation — 12-Month Backtest (1 home)</div>
+      <div id="h-battery-util-content" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 16px;"></div>
+    </div>
+
+    <!-- BUSINESS VIABILITY — populated by JS after historical sim -->
+    <div id="h-biz-viability" style="display:none;background:var(--surface);border:1px solid rgba(88,166,255,0.3);border-radius:8px;padding:12px 16px;margin-bottom:10px;">
+      <div style="font-size:10px;letter-spacing:.08em;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:8px">📊 Business Model — Homes needed to clear £50k salary</div>
+      <div id="h-biz-viability-content"></div>
+    </div>
+
+    <div class="hist-stats-row">
+      <div class="stat-card green">
+        <div class="stat-label">Arbitrage Profit (1 home)</div>
+        <div class="stat-value green" id="h-annual-profit">—</div>
+        <div class="stat-sub" id="h-slots">— slots</div>
+      </div>
+      <div class="stat-card cyan" data-tip="12kWh/day battery-powered home load — value at Agile import prices. This is money NOT spent buying from the grid.">
+        <div class="stat-label">Home Energy Value (1 home)</div>
+        <div class="stat-value cyan" id="h-home-saved">—</div>
+        <div class="stat-sub">12kWh/day at live Agile prices</div>
+      </div>
+      <div class="stat-card green-bright" data-tip="Total household benefit = Arbitrage Profit + Home Energy Value. This is the real annual financial position.">
+        <div class="stat-label">Total Household Value (1 home)</div>
+        <div class="stat-value green-bright" id="h-net-total">—</div>
+        <div class="stat-sub">Arbitrage + Home Energy</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-label">Best Month</div>
+        <div class="stat-value blue" id="h-best-month">—</div>
+        <div class="stat-sub" id="h-best-val">—</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="stat-label">Avg Arbitrage/Mo (1 home)</div>
+        <div class="stat-value amber" id="h-avg-monthly">—</div>
+        <div class="stat-sub">per home per month</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-label">Worst Month</div>
+        <div class="stat-value purple" id="h-worst-month">—</div>
+        <div class="stat-sub" id="h-worst-val">—</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="hist-charts-row">
+      <div class="chart-card">
+        <div class="chart-title">
+          MONTHLY NET VALUE (£) — arbitrage + home energy · <span style="color:#8b949e;font-size:10px;">grid P&L alone in table below</span>
+          <span id="h-period">—</span>
+        </div>
+        <canvas id="hist-monthly-chart" height="160"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">
+          PRICE SPREAD DISTRIBUTION
+          <span id="h-spread-label">buy vs sell range</span>
+        </div>
+        <canvas id="hist-spread-chart" height="160"></canvas>
+      </div>
+    </div>
+
+    <!-- Monthly breakdown table -->
+    <div class="hist-table">
+      <div class="chart-title" style="margin-bottom:4px">MONTHLY BREAKDOWN</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:12px;letter-spacing:0.5px">
+        GRID P&amp;L = real bank cash (export income − charge cost) · homeowner gets 12kWh/day at £0 cost &nbsp;·&nbsp;
+        HOME ENERGY = 12kWh/day free electricity valued at SVT 25p (indicative context only) &nbsp;·&nbsp;
+        NET VALUE = Grid P&amp;L + Home Energy = total annual household benefit
+      </div>
+      <table class="hist-tbl" id="hist-table">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th data-tip="Grid exports minus ALL grid imports (includes home load recharging) — negative = net electricity buyer, see NET VALUE for the full picture" style="color:var(--muted)">Grid P&amp;L (£)</th>
+            <th>Slots</th>
+            <th data-tip="Average price paid across all charge slots">Avg Buy (p)</th>
+            <th data-tip="Average Agile Outgoing export rate received when discharging to grid">Avg Export (p)</th>
+            <th data-tip="Avg sell ÷ avg buy — only valid when avg buy &gt; 0. Shows N/A when being paid to charge.">Ratio ×</th>
+            <th data-tip="Avg export price minus avg buy price — always valid, even when buy price is negative (being paid to charge)">Spread (p)</th>
+            <th data-tip="12kWh/day home consumption provided free from battery, valued at 25p SVT reference. Indicative only — the real benefit is £0/day electricity cost up to 12kWh cap." style="color:var(--cyan)">Home Energy (£)</th>
+            <th data-tip="Grid P&amp;L (real bank cash) + Home Energy value (indicative) = total annual household benefit" style="color:var(--green)">Net Value (£)</th>
+            <th>Charge Slots</th>
+            <th>Sell Slots</th>
+            <th data-tip="Total kWh consumed by the home from the grid this month (12kWh/day PC1-weighted profile)" style="color:var(--muted)">House Usage (kWh)</th>
+            <th data-tip="Battery SOC swing this month — lowest to highest state of charge reached. Wide range = active cycling." style="color:var(--purple)">Bat Variance (kWh)</th>
+            <th data-tip="Average kWh charged to battery per day this month" style="color:var(--blue)">kWh/day bought</th>
+            <th data-tip="Average kWh discharged to grid per day this month" style="color:var(--green)">kWh/day sold</th>
+          </tr>
+        </thead>
+        <tbody id="hist-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- T-09: Demo data watermark -->
+  <div class="demo-watermark" id="demo-watermark">⚠ DEMO DATA</div>
+
+  <!-- FOOTER -->
+  <div class="data-banner">
+    Live data: <a href="https://octopus.energy/agile" target="_blank">Octopus Agile API</a> &nbsp;·&nbsp;
+    Solar forecast: <a href="https://open-meteo.com" target="_blank">Open-Meteo</a> &nbsp;·&nbsp;
+    Strategy: LP greedy optimiser · context-adjusted thresholds · 10kWh reserve &nbsp;·&nbsp;
+    Refreshes every 30s
+  </div>
+
+</div><!-- /wrapper -->
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CONFIGURATION
+// ══════════════════════════════════════════════════════════════
+const CFG = {
+  NUM_HOMES:      1,
+  BATTERY_KWH:    72.0,    // node3: 3× Nissan e-NV200 24kWh = 72kWh nominal; 10–90% DoD = 57.6kWh usable
+  MIN_SOC_KWH:    7.2,     // 10% DoD floor — Nissan pack longevity
+  INITIAL_SOC:    36.0,    // 50% of 72kWh
+  CHARGE_KWH:     5.0,     // 10kW × 0.5h per slot
+  EXPORT_KWH:     3.68,    // 32A × 230V × 0.5h — current DNO G98 limit (pre-G99 upgrade)
+                            // G99 50A upgrade → 5.75kWh/slot. Apply now via SSEN fast-track.
+  LOAD_PER_SLOT:  12/48,   // fallback flat: 12kWh/day ÷ 48 slots (overridden by HOME_LOAD_PROFILE below)
+  SOLAR_KWP:      0.0,     // no solar — battery arbitrage only
+  SOLAR_EFF:      0.18,
+  BUY_PCT:        35,       // percentile of forward window — buy cheapest 35% of slots (matches Python)
+  SELL_PCT:       60,       // percentile of forward window — sell top 40% of slots (matches Python)
+  MIN_PROFIT_P:   3.0,      // minimum net p/kWh after RTE losses to justify ANY charge decision.
+                            // Net = bestPeakExport × RTE − buyPrice ≥ MIN_PROFIT_P
+                            // Lowered 9→3: 9p was too tight — avg buy ceiling was only 2.44p
+                            // (bestPeakExport≈13p × 0.88 − 9 = 2.44p) missing all 3-8p charge slots.
+                            // At 3p: ceiling = 13×0.88−3 = 8.44p → captures realistic cheap slots.
+                            // Dynamic buy ceiling auto-adjusts to the sell market:
+                            //   if best upcoming peak = 35p import → max buy ≈ (28)×0.88−3 = 21.6p
+                            //   if best upcoming peak = 25p import → max buy ≈ (18)×0.88−3 = 12.8p
+                            //   if best upcoming peak = 18p import → max buy ≈ (11)×0.88−3 =  6.7p
+                            //   if best upcoming peak = 13p import → max buy ≈ (6)×0.88−3  =  2.3p ← tight market
+                            // Raise to get tighter spread; lower to get more volume.
+  REGION:         'H',     // Southern England
+  LAT:            50.9,
+  LON:            -1.4,
+  REFRESH_MS:     30000,
+  ROUND_TRIP_EFF: 0.88,    // node3 real-world: FoxESS inverter (~96%) × Nissan cell RTE (~92%) ≈ 88%
+  // Export rate fallback for historical simulation (Agile Outgoing typical rate).
+  // Live rate is fetched from API and used where available.
+  EXPORT_RATE_P_DEFAULT: 15.0,
+  DAILY_HOME_KWH: 12,      // kWh/day home load (12kWh = 0.25kWh/slot × 48 slots)
+};
+
+// ── INDUSTRY-STANDARD DOMESTIC HALF-HOURLY LOAD PROFILE ─────────────────────
+// Based on Elexon Profile Class 1 (PC1) — UK domestic consumers.
+// 48 slots from 00:00. Unnormalized relative weights; normalized at runtime.
+// Shape: night valley → morning peak (07-09h) → daytime plateau → evening peak (17-21h)
+const _HOME_LOAD_RAW = [
+  0.40, 0.32, 0.27, 0.24,  // 00:00–02:00  deep night
+  0.21, 0.20, 0.20, 0.21,  // 02:00–04:00  lowest demand
+  0.24, 0.32, 0.45, 0.62,  // 04:00–06:00  pre-dawn rise
+  0.90, 1.50, 1.90, 2.10,  // 06:00–08:00  morning peak (showers, kettle)
+  2.00, 1.75, 1.45, 1.20,  // 08:00–10:00  morning tail
+  1.05, 0.95, 0.88, 0.85,  // 10:00–12:00  daytime trough
+  0.85, 0.85, 0.90, 0.95,  // 12:00–14:00  lunchtime slight rise
+  1.00, 1.08, 1.20, 1.35,  // 14:00–16:00  afternoon build
+  1.55, 1.85, 2.10, 2.30,  // 16:00–18:00  evening peak onset
+  2.25, 2.10, 1.90, 1.65,  // 18:00–20:00  evening peak (cooking, TV)
+  1.45, 1.22, 1.00, 0.80,  // 20:00–22:00  evening decline
+  0.65, 0.55, 0.47, 0.42,  // 22:00–00:00  late night wind-down
+];
+const _HOME_LOAD_SUM = _HOME_LOAD_RAW.reduce((s, v) => s + v, 0);
+// Fraction of daily kWh in each half-hour slot
+const HOME_LOAD_PROFILE = _HOME_LOAD_RAW.map(v => v / _HOME_LOAD_SUM);
+// Usage: homeLoad_kWh = CFG.DAILY_HOME_KWH * HOME_LOAD_PROFILE[slotIndex]
+// slotIndex = hour * 2 + (minute >= 30 ? 1 : 0)
+function homeLoadForSlot(dt) {
+  const si = dt.getHours() * 2 + (dt.getMinutes() >= 30 ? 1 : 0);
+  return CFG.DAILY_HOME_KWH * HOME_LOAD_PROFILE[si];
+}
+
+// T-14: Fleet diversity — per-home config (deterministic seed matches Python)
+function seededRand(seed) {
+  let s = seed;
+  return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
+}
+const _rng = seededRand(42);
+const HOME_CONFIGS = Array.from({length: CFG.NUM_HOMES}, (_, i) => ({
+  batteryKwh: parseFloat((CFG.BATTERY_KWH * (0.85 + _rng() * 0.30)).toFixed(1)),
+  solarKwp:   parseFloat((2.5 + _rng() * 3.5).toFixed(1)),
+  dailyLoad:  parseFloat((9.0 + _rng() * 6.0).toFixed(1)),
+  initialSoc: parseFloat(((0.35 + _rng() * 0.30) * CFG.BATTERY_KWH).toFixed(1)),
+}));
+
+// Try server-side API first, fall back to direct Octopus/Open-Meteo
+let USE_SERVER = false;
+let serverBase = '';
+
+// ══════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════
+let fleet = [];
+let priceHistory = [];
+let exportPriceHistory = [];
+let historyData  = [];
+let profitChart  = null;
+let priceChart   = null;
+// Set after historical simulation runs — used by price widget
+let simAvgBuyP   = 0;   // avg p/kWh paid across all charge slots (12-month backtest)
+let simAvgSellP  = 0;   // avg p/kWh received across all discharge slots (12-month backtest)
+let simCashIn    = 0;   // total £ received from Octopus for grid exports (company revenue)
+let simCashOut   = 0;   // total £ paid to Octopus for battery charging (company cost)
+let simCashNet   = 0;   // net company cash = cashIn - cashOut (pure arbitrage profit)
+let simHasHistorical = false;
+let currentPriceP      = 0;
+let currentExportPriceP = 0;
+let buyThreshold  = 0;
+let sellThreshold = 0;
+let dataMode      = 'LIVE';
+let slotsCount    = 0;
+const simulationModel = 'hybrid'; // locked: self-consume 12kWh/day, export excess at export tariff
+let histResultsCache = null;    // cached 12-month results for projections
+
+// ══════════════════════════════════════════════════════════════
+// UTILITIES
+// ══════════════════════════════════════════════════════════════
+function fmt_gbp(v) {
+  const sign = v < 0 ? '-' : '';
+  return sign + '£' + Math.abs(v).toFixed(4);
+}
+function fmt_p(v) {
+  return v.toFixed(2) + 'p';
+}
+function percentile(arr, pct) {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a,b)=>a-b);
+  const i = Math.max(0, Math.min(s.length-1, Math.floor(s.length * pct / 100)));
+  return s[i];
+}
+function priceColor(p) {
+  if (p <= 0)  return '#1a3a5c';
+  if (p < 10)  return '#196c2e';
+  if (p < 25)  return '#7a5100';
+  return '#7d1f1f';
+}
+function priceTextColor(p) {
+  if (p <= 0)  return '#58a6ff';
+  if (p < 10)  return '#3fb950';
+  if (p < 25)  return '#d29922';
+  return '#f85149';
+}
+
+// ══════════════════════════════════════════════════════════════
+// CLOCK
+// ══════════════════════════════════════════════════════════════
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('en-GB', { hour12: false });
+  document.getElementById('clock-date').textContent =
+    now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase();
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ══════════════════════════════════════════════════════════════
+// UI INTERACTIONS — DRILL & MODEL TOGGLE
+// ══════════════════════════════════════════════════════════════
+function toggleDrill(cardId) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  card.classList.toggle('drilled');
+  // Populate drill content on open
+  if (card.classList.contains('drilled')) {
+    if (cardId === 'profit-card') populateProfitDrill();
+    if (cardId === 'soc-card')    populateSocDrill();
+    if (cardId === 'price-card')  populatePriceDrill();
+  }
+}
+
+function populateProfitDrill() {
+  const el = document.getElementById('drill-homes-list');
+  if (!el || !fleet.length) return;
+  el.innerHTML = fleet.map(h =>
+    `<div class="drill-row">
+       <span class="dl">Node-3</span>
+       <span class="dv ${(h.profit||0)>=0?'pos':'neg'}">${fmt_gbp(h.profit||0)}</span>
+     </div>`
+  ).join('');
+}
+
+function populateSocDrill() {
+  const el = document.getElementById('drill-soc-list');
+  if (!el || !fleet.length) return;
+  el.innerHTML = fleet.map(h => {
+    const soc = h.soc || 0;
+    const bat = h.batteryKwh || h.battery_kwh || CFG.BATTERY_KWH;
+    const pct = Math.max(0, Math.min(100, (soc / bat * 100))).toFixed(0);
+    return `<div class="drill-row">
+      <span class="dl">Node-3</span>
+      <span class="dv blue">${soc.toFixed(1)}/${bat.toFixed(0)}kWh (${pct}%)</span>
+    </div>`;
+  }).join('');
+}
+
+function populatePriceDrill() {
+  document.getElementById('d-import-cur').textContent = fmt_p(currentPriceP);
+  document.getElementById('d-export-cur').textContent = fmt_p(currentExportPriceP);
+  document.getElementById('d-buy-thr').textContent    = fmt_p(buyThreshold);
+  document.getElementById('d-sell-thr').textContent   = fmt_p(sellThreshold);
+  // Arbitrage spread = difference between sell threshold and buy threshold
+  // This is the TIME-SHIFTING spread that generates profit — NOT import vs export tariff
+  const arbSpread = sellThreshold - buyThreshold;
+  const arbEl = document.getElementById('d-arb-spread');
+  if (arbEl) {
+    arbEl.textContent = '+' + arbSpread.toFixed(1) + 'p/kWh';
+    arbEl.style.color = arbSpread > 10 ? 'var(--green)' : arbSpread > 0 ? 'var(--amber)' : 'var(--red)';
+  }
+  const dModel = document.getElementById('d-model');
+  if (dModel) dModel.textContent = 'Self-consume 12kWh/day, export excess';
+}
+
+// Called after historical simulation runs — updates price widget with real averages
+function updatePriceWidget() {
+  const lbl = document.getElementById('price-card-label');
+  if (lbl) lbl.textContent = 'AVG ARBITRAGE PRICES — 12-MONTH BACKTEST';
+
+  const buyEl = document.getElementById('avg-buy-price');
+  if (buyEl) buyEl.textContent = simAvgBuyP > 0 ? simAvgBuyP.toFixed(1) + 'p' : '--p';
+
+  const sellEl = document.getElementById('avg-sell-price');
+  if (sellEl) sellEl.textContent = simAvgSellP > 0 ? simAvgSellP.toFixed(1) + 'p' : '--p';
+
+  const marginLine = document.getElementById('avg-margin-line');
+  if (marginLine && simAvgSellP > 0) {
+    const spread = simAvgSellP - simAvgBuyP;
+    const spreadStr = (spread >= 0 ? '+' : '') + spread.toFixed(1) + 'p';
+    if (simAvgBuyP > 0) {
+      const margin = simAvgSellP / simAvgBuyP;
+      marginLine.innerHTML = `Ratio <strong style="color:var(--green)">${margin.toFixed(2)}×</strong> &nbsp;·&nbsp; spread <strong style="color:var(--green)">${spreadStr}</strong>/kWh`;
+    } else {
+      // Being paid to charge — ratio meaningless, spread is the key metric
+      marginLine.innerHTML = `Paid to charge (buy ${simAvgBuyP.toFixed(1)}p) &nbsp;·&nbsp; spread <strong style="color:var(--green)">${spreadStr}</strong>/kWh`;
+    }
+  }
+
+  // Drill panel historical averages
+  const dAvgBuy   = document.getElementById('d-avg-buy');
+  const dAvgSell  = document.getElementById('d-avg-sell');
+  const dAvgMgn   = document.getElementById('d-avg-margin');
+  if (dAvgBuy)  dAvgBuy.textContent  = simAvgBuyP  > 0 ? simAvgBuyP.toFixed(2)  + 'p' : '--p';
+  if (dAvgSell) dAvgSell.textContent = simAvgSellP > 0 ? simAvgSellP.toFixed(2) + 'p' : '--p';
+  if (dAvgMgn) {
+    const spread = simAvgSellP - simAvgBuyP;
+    if (simAvgBuyP > 0) {
+      const m = simAvgSellP / simAvgBuyP;
+      dAvgMgn.textContent = m.toFixed(2) + '× / +' + spread.toFixed(1) + 'p';
+      dAvgMgn.style.color = m > 1.5 ? 'var(--green)' : m > 1.1 ? 'var(--amber)' : 'var(--red)';
+    } else {
+      dAvgMgn.textContent = 'N/A × / +' + spread.toFixed(1) + 'p spread';
+      dAvgMgn.style.color = 'var(--green)';
+    }
+  }
+}
+
+// setModel removed — model locked to hybrid (self-consume 12kWh/day, export excess)
+
+function scrollToHistorical() {
+  const el = document.querySelector('.section-divider');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ══════════════════════════════════════════════════════════════
+// VIEW MODE — SINGLE HOME (no fleet mode)
+// ══════════════════════════════════════════════════════════════
+
+/** Return value as-is (always single home, no fleet multiplier) */
+function viewVal(value) {
+  return value;
+}
+
+/** Return label suffix (always single home) */
+function viewSuffix() {
+  return ' (1 home)';
+}
+
+/** Format a monetary value for display (always single home) */
+function fmtViewMoney(value) {
+  const sign = value < 0 ? '-' : '';
+  return sign + '£' + Math.abs(value).toFixed(2);
+}
+
+// ══════════════════════════════════════════════════════════════
+// OCTOPUS AGILE API
+// ══════════════════════════════════════════════════════════════
+async function discoverAgileProduct() {
+  const resp = await fetch(
+    'https://api.octopus.energy/v1/products/?brand=OCTOPUS_ENERGY&page_size=100',
+    { signal: AbortSignal.timeout(12000) }
+  );
+  if (!resp.ok) throw new Error('products API error');
+  const data = await resp.json();
+  const agile = (data.results || []).filter(p =>
+    p.display_name.toLowerCase().includes('agile')
+  );
+  agile.sort((a, b) => (b.available_from || '').localeCompare(a.available_from || ''));
+  if (!agile.length) throw new Error('no Agile products found');
+  return agile[0].code;
+}
+
+async function fetchAgilePrices(productCode) {
+  const tariff   = `E-1R-${productCode}-${CFG.REGION}`;
+  const fromDt   = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+  const url      = `https://api.octopus.energy/v1/products/${productCode}/electricity-tariffs/${tariff}/standard-unit-rates/?period_from=${fromDt}&page_size=200`;
+  const resp     = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!resp.ok) throw new Error(`tariff ${resp.status}`);
+  const data = await resp.json();
+  const results  = (data.results || []).sort((a,b) =>
+    new Date(a.valid_from) - new Date(b.valid_from)
+  );
+  return results;
+}
+
+async function discoverAgileExportProduct() {
+  const resp = await fetch(
+    'https://api.octopus.energy/v1/products/?brand=OCTOPUS_ENERGY&page_size=100',
+    { signal: AbortSignal.timeout(12000) }
+  );
+  if (!resp.ok) throw new Error('products API error');
+  const data = await resp.json();
+  // Only accept genuine Agile Outgoing (variable export) products.
+  // DO NOT fall back to fixed-rate SEG or similar — a flat 5-7p export rate
+  // combined with P30 charge cost destroys the arbitrage numbers.
+  const agileExport = (data.results || []).filter(p =>
+    p.direction === 'EXPORT' &&
+    p.display_name.toLowerCase().includes('agile') &&
+    p.display_name.toLowerCase().includes('outgoing')
+  );
+  agileExport.sort((a,b) => (b.available_from||'').localeCompare(a.available_from||''));
+  if (agileExport.length) return agileExport[0].code;
+  throw new Error('no Agile Outgoing product found — will use distribution-adjusted formula');
+}
+
+async function fetchAgileExportPrices(productCode) {
+  const tariff = `E-1R-${productCode}-${CFG.REGION}`;
+  const fromDt = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+  const url    = `https://api.octopus.energy/v1/products/${productCode}/electricity-tariffs/${tariff}/standard-unit-rates/?period_from=${fromDt}&page_size=200`;
+  const resp   = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!resp.ok) throw new Error(`export tariff ${resp.status}`);
+  const data   = await resp.json();
+  return (data.results || []).sort((a,b) => new Date(a.valid_from) - new Date(b.valid_from));
+}
+
+function getExportPriceForSlot(slotDt, expPrices) {
+  if (!expPrices || !expPrices.length) return null;
+  const t = slotDt.getTime();
+  const match = expPrices.find(p => {
+    const vf = new Date(p.valid_from).getTime();
+    const vt = p.valid_to ? new Date(p.valid_to).getTime() : vf + 1800000;
+    return t >= vf && t < vt;
+  });
+  return match ? match.value_inc_vat : null;
+}
+
+// Validate that fetched export prices are genuinely variable (not a flat-rate product).
+// Agile Outgoing has std dev > 2p; a fixed SEG tariff has std dev ~0.
+// Returns true only if the data is usable as a variable export tariff.
+function isVariableExportData(expPrices) {
+  if (!expPrices || expPrices.length < 200) return false;
+  const vals = expPrices.map(p => p.value_inc_vat);
+  const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
+  const variance = vals.reduce((s,v) => s + (v-mean)**2, 0) / vals.length;
+  const stddev = Math.sqrt(variance);
+  console.log(`[EXPORT] ${expPrices.length} slots, mean=${mean.toFixed(2)}p, stddev=${stddev.toFixed(2)}p`);
+  return stddev > 2.0 && mean > 1.0;
+}
+
+// Export rate formula when real Agile Outgoing data isn't available or valid.
+// Models: export ≈ import − ~13p distribution/standing charges (stripped from export).
+// Empirically calibrated: audit shows 27.2p Outgoing when import ~32-35p.
+// 7p deduction gives:
+//   22p import → export = max(3, 15)  = 15p  (previously 9p — too low)
+//   25p import → export = max(3, 18)  = 18p  (previously 12p)
+//   30p import → export = max(3, 23)  = 23p  (previously 17p)
+//   40p import → export = max(3, 33)  = 33p  (previously 27p)
+// Real Agile Outgoing at audit's 27.2p avg is consistent with ~32-35p avg import during sell window.
+// Agile Outgoing tracks N2EX day-ahead price — typically ~7p below Agile Import (not 13p).
+// Real data: audit shows 27.2p Outgoing when import ~32-35p avg in the 16-19h window.
+// Old 13p deduction gave only 9p at 22p import — far too low. 7p is empirically correct.
+const DIST_CHARGE_P = 7.0;
+function exportRateFromImport(importP) {
+  return Math.max(3.0, importP - DIST_CHARGE_P);
+}
+
+// ══════════════════════════════════════════════════════════════
+// OPEN-METEO SOLAR FORECAST
+// ══════════════════════════════════════════════════════════════
+let weatherCache = null;
+
+async function fetchWeather() {
+  // Fetch solar radiation AND wind speed (100m hub height) — both affect Agile prices
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${CFG.LAT}&longitude=${CFG.LON}`
+            + `&hourly=direct_radiation,diffuse_radiation,wind_speed_100m`
+            + `&timezone=Europe%2FLondon&past_days=2&forecast_days=2`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!resp.ok) throw new Error('weather API');
+  weatherCache = await resp.json();
+  return weatherCache;
+}
+
+/**
+ * Compute dynamic context multipliers for a given datetime.
+ * Returns { buyAdj, sellAdj, reason } where values < 1 tighten thresholds.
+ *
+ * Logic:
+ *  - High wind (>15 m/s at 100m): grid likely oversupplied → cheap prices expected
+ *    → tighten MAX_BUY_P further (only buy truly negative/near-zero slots)
+ *    → relax MIN_SELL_P slightly (peaks less likely when wind is blowing hard)
+ *  - Weekend/Friday night: industrial demand low → cheap prices likely
+ *    → tighten buy ceiling, expect fewer high peaks
+ *  - Winter weekday morning (Mon–Fri, 6–9am, Oct–Mar): peak demand virtually certain
+ *    → raise MIN_SELL_P expectation (hold for 30p+)
+ *  - Summer (Jun–Aug): flatter Agile profile, less reliable peaks
+ *    → lower MIN_SELL_P slightly to capture what peaks exist (e.g. 20p)
+ */
+function getContextFactors(dt) {
+  const hour  = dt.getHours();
+  const dow   = dt.getDay();  // 0=Sun, 6=Sat
+  const month = dt.getMonth(); // 0=Jan
+
+  // Wind speed at forecast hour (0 if not available)
+  let windMs = 0;
+  if (weatherCache && weatherCache.hourly && weatherCache.hourly.wind_speed_100m) {
+    try {
+      const times = weatherCache.hourly.time;
+      const key   = dt.toISOString().substring(0, 13) + ':00';
+      const wi    = times.indexOf(key);
+      if (wi >= 0) windMs = weatherCache.hourly.wind_speed_100m[wi] || 0;
+    } catch {}
+  }
+
+  // Season factor: winter=1.0 (reliable peaks), shoulder=0.9, summer=0.8
+  const isWinter   = month <= 2 || month >= 9;  // Oct–Mar
+  const isSummer   = month >= 5 && month <= 7;  // Jun–Aug
+  const seasonSell = isWinter ? 1.0 : (isSummer ? 0.85 : 0.92);
+
+  // Day-of-week factor
+  const isWeekend  = dow === 0 || dow === 6;
+  const isFriNight = dow === 5 && hour >= 18;
+  const isWeekdayMorningPeak = !isWeekend && hour >= 6 && hour <= 9;
+
+  // Wind factor: >15 m/s = high generation, prices likely depressed
+  const isHighWind = windMs > 15;
+  const isVeryHighWind = windMs > 25;
+
+  // Context adjusts the MINIMUM PROFIT requirement, not a static price ceiling.
+  // Higher minProfit = more selective buying (requires better spread to justify charge).
+  // Lower sellPct = sell at slightly lower threshold (accept weaker peaks when market is depressed).
+  let minProfitAdj = CFG.MIN_PROFIT_P;   // start from configured base (9p/kWh)
+  let sellPctAdj   = CFG.SELL_PCT;       // start from configured sell percentile
+
+  // When grid is oversupplied (wind / weekend), prices are generally lower both ways.
+  // Raise MIN_PROFIT requirement so we only charge when spread is still worthwhile.
+  if (isHighWind)                           minProfitAdj += 2.0;  // need 11p+ spread (depressed market)
+  if (isVeryHighWind)                       minProfitAdj += 4.0;  // need 13p+ spread (storm / likely negatives)
+  if (isWeekend || isFriNight)              minProfitAdj += 1.0;  // need 10p+ spread (weaker demand)
+
+  // On winter weekday morning peaks, relax sell threshold — even P70 peaks are high-value.
+  if (isWeekdayMorningPeak && isWinter)     sellPctAdj = Math.min(sellPctAdj, 70);
+  // On weekends / summer, tighten sell threshold — only the very top slots are worth it.
+  if (isWeekend || isSummer)                sellPctAdj = Math.min(sellPctAdj + 5, 92);
+
+  const reasons = [];
+  if (isHighWind)              reasons.push(`wind ${windMs.toFixed(0)}m/s → spread+${isVeryHighWind?6:2}p`);
+  if (isWeekend || isFriNight) reasons.push('weekend → spread+1p');
+  if (isWeekdayMorningPeak && isWinter) reasons.push('winter AM peak → relaxed sell threshold');
+  if (isSummer)                reasons.push('summer → tighter sell threshold');
+
+  return { minProfitAdj, sellPctAdj, reason: reasons.join(' · ') || 'normal', windMs };
+}
+
+function solarForSlot(slotDt) {
+  return solarForSlotKwp(slotDt, CFG.SOLAR_KWP);
+}
+// T-14: generic version accepting per-home kWp rating
+function solarForSlotKwp(slotDt, kwp) {
+  if (!weatherCache) return 0;
+  try {
+    const { time, direct_radiation, diffuse_radiation } = weatherCache.hourly;
+    const londonOffset = isDST(slotDt) ? 60 : 0;
+    const ld = new Date(slotDt.getTime() + londonOffset * 60000);
+    const key = ld.toISOString().substring(0, 13) + ':00';
+    const idx = time.indexOf(key);
+    if (idx < 0) return 0;
+    const rad = Math.max(0, direct_radiation[idx]||0) * 0.9
+              + Math.max(0, diffuse_radiation[idx]||0) * 0.5;
+    const area = kwp * 6;
+    const kw   = rad * area * CFG.SOLAR_EFF / 1000;
+    return Math.max(0, kw * 0.5);
+  } catch { return 0; }
+}
+
+function isDST(dt) {
+  // UK DST: last Sunday March → last Sunday October
+  const y = dt.getFullYear();
+  const marchLast  = lastSunday(y, 2);  // March = month 2 (0-indexed)
+  const octLast    = lastSunday(y, 9);  // October
+  return dt >= marchLast && dt < octLast;
+}
+function lastSunday(year, month) {
+  const d = new Date(year, month + 1, 0);     // last day of month
+  d.setDate(d.getDate() - d.getDay());         // back to Sunday
+  return d;
+}
+
+// ══════════════════════════════════════════════════════════════
+// GENERATE DEMO DATA (fallback when APIs blocked)
+// ══════════════════════════════════════════════════════════════
+function generateDemoPrices() {
+  const slots = [];
+  const now   = new Date();
+  const start = new Date(now.getTime() - 48 * 3600 * 1000);
+  // Round start to previous 30-min
+  start.setMinutes(start.getMinutes() < 30 ? 0 : 30, 0, 0);
+
+  const PEAK_START  = [16, 17, 18]; // hours (peak)
+  const TROUGH_START= [0,1,2,3,4];  // cheap overnight
+
+  let t = new Date(start);
+  while (t <= now) {
+    const h = t.getHours();
+    let base = 22 + 6 * Math.sin((h - 4) * Math.PI / 12);  // Daily wave
+    if (PEAK_START.includes(h))   base += 18 + Math.random() * 15;
+    if (TROUGH_START.includes(h)) base -= 12 + Math.random() * 8;
+    base += (Math.random() - 0.5) * 5;
+    const price = Math.max(-5, Math.min(80, base));
+
+    const vf = new Date(t);
+    const vt = new Date(t.getTime() + 30 * 60000);
+    slots.push({
+      valid_from:    vf.toISOString(),
+      valid_to:      vt.toISOString(),
+      value_inc_vat: parseFloat(price.toFixed(4)),
+    });
+    t = new Date(t.getTime() + 30 * 60000);
+  }
+  return slots;
+}
+
+function generateDemoWeather() {
+  // Generate fake solar data (April in southern England)
+  const times = [], direct = [], diffuse = [];
+  const now   = new Date();
+  const start = new Date(now.getTime() - 2 * 24 * 3600 * 1000);
+  start.setMinutes(0, 0, 0);
+
+  for (let h = 0; h < 96; h++) {
+    const dt = new Date(start.getTime() + h * 3600 * 1000);
+    const hour = dt.getHours();
+    // Sun hours approx 06:00–20:00 for April UK
+    const sunFactor = hour >= 6 && hour <= 20
+      ? Math.max(0, Math.sin((hour - 6) * Math.PI / 14))
+      : 0;
+    const rad = sunFactor * (350 + Math.random() * 150); // peak ~500 W/m²
+    const dif = rad * (0.15 + Math.random() * 0.1);
+
+    // Key must match what solarForSlot looks for: London local time
+    const isDstNow = isDST(dt);
+    const offset = isDstNow ? 60 : 0;
+    const local = new Date(dt.getTime() + offset * 60000);
+    const key = local.toISOString().substring(0, 13) + ':00';
+
+    times.push(key);
+    direct.push(parseFloat(rad.toFixed(1)));
+    diffuse.push(parseFloat(dif.toFixed(1)));
+  }
+  weatherCache = { hourly: { time: times, direct_radiation: direct, diffuse_radiation: diffuse } };
+}
+
+// ══════════════════════════════════════════════════════════════
+// SIMULATION ENGINE (JS)
+// ══════════════════════════════════════════════════════════════
+function initFleet() {
+  return Array.from({ length: CFG.NUM_HOMES }, (_, i) => ({
+    id:              i + 1,
+    soc:             HOME_CONFIGS[i].initialSoc,   // T-14: varied starting SOC
+    batteryKwh:      HOME_CONFIGS[i].batteryKwh,
+    solarKwp:        HOME_CONFIGS[i].solarKwp,
+    dailyLoad:       HOME_CONFIGS[i].dailyLoad,
+    profit:          0,
+    chargedKwh:      0,
+    dischargedKwh:   0,
+    lastAction:      'idle',
+    lastPriceP:      0,
+  }));
+}
+
+function runSimulation(prices, expPrices) {
+  // Forward-optimised live sim: thresholds computed from remaining
+  // prices in the window at each slot, not a fixed global value.
+  fleet = initFleet();
+  historyData = [];
+  const n = prices.length;
+
+  // Seed global display thresholds from current slot's forward window
+  const nowMs   = Date.now();
+  const curIdx  = Math.max(0, prices.findIndex(p => new Date(p.valid_from).getTime() >= nowMs - 1800000));
+  const curWEnd = Math.min(curIdx + 48, n);
+  const curWVals = prices.slice(curIdx, curWEnd).map(p => p.value_inc_vat);
+  // Seed display thresholds from current slot using dynamic spread logic
+  buyThreshold  = percentile(curWVals, CFG.BUY_PCT);
+  sellThreshold = percentile(curWVals, CFG.SELL_PCT);
+
+  for (let idx = 0; idx < n; idx++) {
+    const slot        = prices[idx];
+    const slotDt      = new Date(slot.valid_from);
+    const importPrice = slot.value_inc_vat;
+
+    // Dynamic spread optimizer — same logic as historical simulation.
+    const wEnd   = Math.min(idx + 48, n);
+    const wVals  = prices.slice(idx, wEnd).map(p => p.value_inc_vat);
+    const slotCtx = getContextFactors(slotDt);
+
+    // Best export price in full forward window (no peak-hour restriction)
+    let fwdBestExport = 0;
+    for (let j = idx; j < wEnd; j++) {
+      const ep = expPrices && expPrices.length
+        ? getExportPriceForSlot(new Date(prices[j].valid_from), expPrices)
+        : exportRateFromImport(prices[j].value_inc_vat);
+      if (ep !== null && ep > fwdBestExport) fwdBestExport = ep;
+    }
+    const dynCeil  = fwdBestExport * CFG.ROUND_TRIP_EFF - CFG.MIN_PROFIT_P;
+    const fwdBuy   = Math.min(percentile(wVals, CFG.BUY_PCT), Math.max(dynCeil, 0));
+    const fwdSell  = percentile(wVals, CFG.SELL_PCT);
+    const liveHour = slotDt.getUTCHours() + (isDST(slotDt) ? 1 : 0);
+    const liveInPeak = true; // full-window optimiser — no hour restriction
+
+    const _liveExp  = expPrices && expPrices.length ? getExportPriceForSlot(slotDt, expPrices) : null;
+    const exportPrice = _liveExp !== null ? _liveExp : exportRateFromImport(importPrice);
+
+    let slotFleetProfit = 0;
+
+    for (const home of fleet) {
+      const bat       = home.batteryKwh || CFG.BATTERY_KWH;
+      const minSoc    = bat * (CFG.MIN_SOC_KWH / CFG.BATTERY_KWH);
+      // Industry-standard Elexon PC1 half-hourly profile (morning + evening peaks)
+      const homeLoad  = homeLoadForSlot(slotDt) * ((home.dailyLoad || 12) / CFG.DAILY_HOME_KWH);
+      const homeSolar = solarForSlotKwp(slotDt, home.solarKwp || CFG.SOLAR_KWP);
+
+      let soc = home.soc;
+      soc = Math.min(bat, soc + homeSolar - homeLoad);
+      soc = Math.max(0, soc);
+
+      let action = 'idle', homeProfit = 0;
+
+      // VLP = Very Large Price: import ≥ 40p → battery priority to serve house, then export
+      const VLP_TRIGGER_P = 40.0;
+      const isVLP = importPrice >= VLP_TRIGGER_P;
+
+      // Negative price: grid paying us to consume — ALWAYS charge regardless of spread.
+      const alwaysChargeLive = importPrice < 0;
+
+      if (isVLP && soc > minSoc + 0.1) {
+        // VLP priority: discharge battery to cover house load first (reduces import cost)
+        // Any remaining discharge capacity goes to grid export
+        const houseServiced = Math.min(homeLoad, soc - minSoc);  // kWh battery → house
+        const avail         = soc - minSoc - houseServiced;
+        const gridDischarge = Math.min(CFG.EXPORT_KWH - houseServiced, Math.max(0, avail));
+        soc -= (houseServiced + gridDischarge);
+        if (houseServiced > 0.01) homeProfit += houseServiced * importPrice / 100; // import cost avoided
+        if (gridDischarge > 0.01) {
+          const revenue = gridDischarge * CFG.ROUND_TRIP_EFF * exportPrice / 100;
+          homeProfit += revenue;
+          home.exportIncomeGbp = (home.exportIncomeGbp || 0) + revenue;
+        }
+        if (houseServiced + gridDischarge > 0.01) action = 'discharging';
+      } else if (alwaysChargeLive || (importPrice <= fwdBuy)) {
+        // Spread justifies charging: cheap slot in window AND best peak export − RTE losses ≥ minProfit
+        // OR negative import price — being paid to charge, skip spread check entirely.
+        // Fill tank as fast as possible at CHARGE_KWH (10kW × 0.5h = 5kWh per slot)
+        const charge = Math.min(CFG.CHARGE_KWH, bat - soc);
+        if (charge > 0.01) {
+          soc += charge;
+          homeProfit -= charge * importPrice / 100;
+          home.chargedKwh += charge;
+          action = 'charging';
+        }
+      } else if (liveInPeak && importPrice >= fwdSell && soc > minSoc + 0.1) {
+        // Peak window (15:00-22:00) top-percentile slot → DISCHARGE at max rate (EXPORT_KWH cap)
+        const avail     = soc - minSoc;
+        const discharge = Math.min(CFG.EXPORT_KWH, avail);
+        if (discharge > 0.01) {
+          soc -= discharge;
+          const revenue = discharge * CFG.ROUND_TRIP_EFF * exportPrice / 100;
+          homeProfit += revenue;
+          home.dischargedKwh += discharge;
+          home.exportIncomeGbp = (home.exportIncomeGbp || 0) + revenue;
+          action = 'discharging';
+        }
+      }
+
+      home.soc        = Math.max(minSoc, Math.min(bat, soc));
+      home.profit    += homeProfit;
+      home.lastAction = action;
+      home.lastPriceP = importPrice;
+      slotFleetProfit += homeProfit;
+    }
+
+    const fleetTotal = fleet.reduce((s, h) => s + h.profit, 0);
+    const avgSoc     = fleet.reduce((s, h) => s + h.soc, 0) / CFG.NUM_HOMES;
+    historyData.push({
+      time:        slotDt,
+      fleetProfit: fleetTotal,
+      slotProfit:  slotFleetProfit,
+      priceP:      importPrice,
+      fwdBuyThr:   fwdBuy,
+      fwdSellThr:  fwdSell,
+      avgSoc,
+    });
+  }
+
+  slotsCount = prices.length;
+}
+
+// ══════════════════════════════════════════════════════════════
+// SERVER-SIDE DATA LOADING
+// ══════════════════════════════════════════════════════════════
+async function tryServerMode() {
+  const resp = await fetch('/api/status', { signal: AbortSignal.timeout(3000) });
+  if (!resp.ok) throw new Error('no server');
+  const status = await resp.json();
+  if (!status.fleet_ready) throw new Error('server not ready');
+  USE_SERVER = true;
+}
+
+async function loadFromServer() {
+  const [nodeResp, priceResp, histResp] = await Promise.all([
+    fetch('/api/fleet'),
+    fetch('/api/prices'),
+    fetch('/api/history'),
+  ]);
+  const serverNode   = await nodeResp.json();
+  const serverPrices = await priceResp.json();
+  const serverHist   = await histResp.json();
+
+  // Server returns flat single-home state — wrap in array for JS sim compat
+  const node = serverNode;
+  fleet = [{
+    id:            1,
+    soc:           node.soc_kwh           ?? node.soc         ?? 36,
+    profit:        node.profit_gbp        ?? node.fleet_profit_gbp ?? 0,
+    chargedKwh:    node.charged_kwh       ?? 0,
+    dischargedKwh: node.discharged_kwh    ?? 0,
+    lastAction:    node.last_action       ?? 'idle',
+    lastPriceP:    node.last_price_p      ?? 0,
+    batteryKwh:    node.battery_kwh       ?? CFG.BATTERY_KWH,
+    solarKwp:      node.solar_kwp         ?? CFG.SOLAR_KWP,
+    dailyLoad:     node.daily_load_kwh    ?? CFG.DAILY_HOME_KWH,
+  }];
+  buyThreshold  = node.buy_threshold_p  || 0;
+  sellThreshold = node.sell_threshold_p || 0;
+  slotsCount    = node.slots_simulated  || 0;
+  priceHistory  = serverPrices;
+  historyData   = serverHist.map(r => ({
+    time:        new Date(r.timestamp),
+    fleetProfit: r.profit_gbp    ?? r.fleet_profit_gbp ?? 0,
+    slotProfit:  r.slot_profit_gbp ?? 0,
+    priceP:      r.price_p       ?? r.avg_price_p ?? 0,
+    avgSoc:      r.soc_kwh       ?? r.avg_soc_kwh ?? 0,
+  }));
+}
+
+// ══════════════════════════════════════════════════════════════
+// LP GREEDY OPTIMISER — TRUE MATHEMATICAL OPTIMUM
+// Given the full 48h price window (which Octopus publishes daily
+// at 4pm), computes the mathematically optimal CHARGE / DISCHARGE
+// / HOLD action for every 30-minute slot.
+//
+// Algorithm:
+//   1. Compute buy ceiling = min(MAX_BUY_P, P20 of window)
+//      Compute sell floor  = max(MIN_SELL_P, P80 of window)
+//      These are ABSOLUTE guards — no selling cheap on a flat day.
+//   2. Tag every slot as a charge candidate (importP ≤ buyThr)
+//      or discharge candidate (exportP ≥ sellThr).
+//   3. Sort charge candidates cheapest→priciest (greedy: buy at
+//      the very cheapest slots first).
+//   4. Sort discharge candidates most expensive→cheapest (greedy:
+//      sell at the very best peaks first).
+//   5. Forward-simulate SOC, assigning actions and enforcing
+//      battery capacity constraints at every step.
+//
+// This is the Dovecote Node3 product — runs every day at 4pm
+// when Octopus publishes tomorrow's Agile prices.
+// ══════════════════════════════════════════════════════════════
+function planForwardSchedule(importSlots, expPrices) {
+  if (!importSlots || importSlots.length < 2) return [];
+
+  // ── 1. Slice to current + future slots ───────────────────────
+  const nowMs = Date.now();
+  let startIdx = importSlots.findIndex(s =>
+    new Date(s.valid_from || s.time).getTime() >= nowMs - 1800000
+  );
+  if (startIdx < 0) startIdx = 0;
+  const slots = importSlots.slice(startIdx, startIdx + 96); // max 48h
+  const n = slots.length;
+  if (n < 2) return [];
+
+  // ── 2. Build slot objects with import + export prices ─────────
+  const builtSlots = slots.map((s, i) => {
+    const time  = new Date(s.valid_from || s.time);
+    const imp   = typeof s.value_inc_vat === 'number' ? s.value_inc_vat : (s.priceP || 0);
+    const ep    = expPrices && expPrices.length ? getExportPriceForSlot(time, expPrices) : null;
+    const exp   = (ep !== null && ep !== undefined) ? ep : exportRateFromImport(imp);
+    return { i, time, importP: imp, exportP: exp, action: 'idle', planSoc: 0 };
+  });
+
+  // ── 3. Compute thresholds — relative + absolute + weather/day context ────────
+  const impPrices  = builtSlots.map(s => s.importP);
+  const expPricesW = builtSlots.map(s => s.exportP);
+  // Context: weather, day-of-week, season
+  const ctx = getContextFactors(builtSlots[0]?.time || new Date());
+  // Dynamic buy ceiling: same logic as historical sim —
+  //   max buy price = best future export × RTE − minProfit
+  // Ensures we only charge when a real spread exists to capture.
+  const bestFwdExport  = Math.max(...expPricesW);
+  const dynamicBuyCeil = bestFwdExport * CFG.ROUND_TRIP_EFF - ctx.minProfitAdj;
+  const relBuyThr      = percentile(impPrices, CFG.BUY_PCT);
+  const buyThr         = dynamicBuyCeil > 0 ? Math.min(relBuyThr, dynamicBuyCeil) : -Infinity;
+  // Sell threshold: context-adjusted percentile of EXPORT prices (not import)
+  const adjSellPct = (ctx.sellPctAdj !== undefined) ? ctx.sellPctAdj : CFG.SELL_PCT;
+  const sellThr    = percentile(expPricesW, adjSellPct);
+
+  // ── 4. Tag candidates ─────────────────────────────────────────
+  // Charge: import price at or below buy ceiling
+  const chargeCandidates    = builtSlots.filter(s => s.importP <= buyThr);
+  // Discharge: export price at or above sell floor
+  const dischargeCandidates = builtSlots.filter(s => s.exportP >= sellThr);
+
+  // ── 5. Sort: buy cheapest first, sell most-expensive first ─────
+  chargeCandidates.sort((a, b) => a.importP - b.importP);
+  dischargeCandidates.sort((a, b) => b.exportP - a.exportP);
+
+  // Build action map (greedy: charge wins over discharge if both qualify;
+  // in practice they won't overlap because buyThr < sellThr always)
+  const actionMap = new Map(); // slot index → 'charge' | 'discharge'
+  for (const s of chargeCandidates)    actionMap.set(s.i, 'charge');
+  for (const s of dischargeCandidates) {
+    if (!actionMap.has(s.i)) actionMap.set(s.i, 'discharge');
+  }
+
+  // ── 6. Forward SOC simulation ─────────────────────────────────
+  const BAT_MAX    = CFG.BATTERY_KWH;
+  const BAT_MIN    = CFG.MIN_SOC_KWH;
+  const CH_RATE    = CFG.CHARGE_KWH;
+  const EXP_RATE   = CFG.EXPORT_KWH;  // 7.68kWh per slot — site discharge cap
+
+  let soc = fleet.length
+    ? fleet.reduce((sum, h) => sum + (h.soc || BAT_MAX * 0.5), 0) / fleet.length
+    : BAT_MAX * 0.5;
+
+  for (const s of builtSlots) {
+    const wanted = actionMap.get(s.i) || 'idle';
+    if (wanted === 'charge' && soc < BAT_MAX - 0.1) {
+      const ch = Math.min(CH_RATE, BAT_MAX - soc);
+      soc += ch;
+      s.action = 'charge';
+    } else if (wanted === 'discharge' && soc > BAT_MIN + 0.1) {
+      const dc = Math.min(EXP_RATE, soc - BAT_MIN);  // 32A cap applied here
+      soc -= dc;
+      s.action = 'discharge';
+    }
+    soc = Math.max(BAT_MIN, Math.min(BAT_MAX, soc));
+    s.planSoc     = soc;
+    s.fwdBuyThr   = buyThr;
+    s.fwdSellThr  = sellThr;
+  }
+
+  return builtSlots;
+}
+
+/** Render the forward schedule as a visual timeline strip */
+function renderSchedule(schedule) {
+  const container = document.getElementById('fwd-schedule');
+  if (!container || !schedule.length) return;
+
+  const now = Date.now();
+  // Filter to future slots only (or last few past ones for context)
+  const future = schedule.filter(s => s.time.getTime() > now - 3600000);
+  if (!future.length) { container.innerHTML = '<span style="color:var(--muted);font-size:11px">No future price data yet — refresh or wait for next cycle</span>'; return; }
+
+  const actionColor = { charge: '#388bfd', discharge: '#3fb950', idle: '#21262d' };
+  const actionLabel = { charge: 'CHG', discharge: 'EXP', idle: '—' };
+
+  // Summary stats
+  const chSlots = future.filter(s => s.action === 'charge');
+  const exSlots = future.filter(s => s.action === 'discharge');
+  const avgBuyP  = chSlots.length ? (chSlots.reduce((s,x) => s + x.importP, 0) / chSlots.length).toFixed(1) : '—';
+  const avgSellP = exSlots.length ? (exSlots.reduce((s,x) => s + x.exportP, 0) / exSlots.length).toFixed(1) : '—';
+  const chKwh    = chSlots.length * CFG.CHARGE_KWH;
+  const exKwh    = exSlots.length * CFG.CHARGE_KWH * CFG.ROUND_TRIP_EFF;
+  const netCash  = exSlots.reduce((s,x) => s + CFG.CHARGE_KWH * CFG.ROUND_TRIP_EFF * x.exportP / 100, 0)
+                 - chSlots.reduce((s,x) => s + CFG.CHARGE_KWH * x.importP / 100, 0);
+
+  // Timeline bars (one per 30-min slot)
+  const bars = future.map(s => {
+    try {
+      const isPast = s.time.getTime() < now;
+      const col    = (actionColor[s.action] || '#333') + (isPast ? '55' : 'cc');
+      const isCur  = s.time.getTime() >= now && s.time.getTime() < now + 1800000;
+      const border = isCur ? 'outline:2px solid #f0f6ff;outline-offset:-2px;' : '';
+      const label  = actionLabel[s.action] || '?';
+      const impStr = (typeof s.importP === 'number') ? s.importP.toFixed(1) : '?';
+      const expStr = (typeof s.exportP === 'number') ? s.exportP.toFixed(1) : '?';
+      const socStr = (typeof s.planSoc === 'number') ? s.planSoc.toFixed(0) : '?';
+      const tStr   = s.time instanceof Date && !isNaN(s.time) ? s.time.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '??:??';
+      const tip    = `${tStr} | imp:${impStr}p exp:${expStr}p | ${s.action.toUpperCase()} | SOC→${socStr}kWh`;
+      return `<div title="${tip}" style="flex:1;min-width:8px;max-width:18px;height:40px;background:${col};border-radius:3px;${border}display:flex;align-items:flex-end;justify-content:center;cursor:default">
+        <span style="font-size:6px;color:#fff;opacity:.7;padding-bottom:1px;writing-mode:vertical-lr;transform:rotate(180deg)">${label}</span>
+      </div>`;
+    } catch(e) { return ''; }
+  }).join('');
+
+  // Update summary span in title
+  const summaryEl = document.getElementById('sched-summary');
+  // Show buy/sell thresholds and context reason in the title bar
+  const fwdBuyDisplay  = future.length ? future[0].fwdBuyThr.toFixed(1)  : '?';
+  const fwdSellDisplay = future.length ? future[0].fwdSellThr.toFixed(1) : '?';
+  const ctxReason      = future.length ? getContextFactors(future[0].time).reason : '';
+  if (summaryEl) summaryEl.textContent =
+    `${chSlots.length} charge / ${exSlots.length} export · buy ≤${fwdBuyDisplay}p · sell ≥${fwdSellDisplay}p`
+    + (ctxReason ? ` · ${ctxReason}` : '')
+    + ` · net ${netCash>=0?'+':''}£${netCash.toFixed(3)}/home`;
+
+  container.innerHTML = `
+    <div style="display:flex;gap:4px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+      <span style="font-size:10px;color:var(--muted)">NEXT ${future.length} SLOTS (${(future.length/2).toFixed(0)}h):</span>
+      <span style="font-size:11px;color:#388bfd;font-weight:600">⚡ ${chSlots.length} charge (${chKwh.toFixed(0)}kWh @ avg ${avgBuyP}p)</span>
+      <span style="color:var(--muted)">·</span>
+      <span style="font-size:11px;color:#3fb950;font-weight:600">↑ ${exSlots.length} export (${exKwh.toFixed(1)}kWh @ avg ${avgSellP}p)</span>
+      <span style="color:var(--muted)">·</span>
+      <span style="font-size:11px;color:${netCash>=0?'#3fb950':'#f85149'};font-weight:700">${netCash>=0?'+':''}£${netCash.toFixed(3)} net (1 home)</span>
+    </div>
+    <div style="display:flex;gap:2px;align-items:stretch;height:44px">${bars}</div>
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:2px">
+      <span>${future[0]?.time.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span>
+      <span style="color:#388bfd">■ charge</span>
+      <span style="color:#3fb950">■ export</span>
+      <span style="color:#555">■ idle</span>
+      <span>${future[future.length-1]?.time.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// UI RENDERING
+// ══════════════════════════════════════════════════════════════
+function renderStats() {
+  const fleetProfit = fleet.reduce((s,h) => s + h.profit, 0);
+  const avgSoc      = fleet.reduce((s,h) => s + h.soc, 0) / CFG.NUM_HOMES;
+  const nCharge     = fleet.filter(h => h.lastAction === 'charging').length;
+  const nSell       = fleet.filter(h => h.lastAction === 'discharging').length;
+  const nIdle       = fleet.filter(h => h.lastAction === 'idle').length;
+
+  // — Profit —
+  const displayProfit = viewVal(fleetProfit);
+  const profitEl = document.getElementById('fleet-profit');
+  profitEl.textContent = fmt_gbp(displayProfit);
+  profitEl.className   = 'stat-value ' + (displayProfit >= 0 ? 'green' : 'red');
+  const lbl = document.getElementById('profit-card-label');
+  if (lbl) lbl.textContent = 'ARBITRAGE INCOME';
+  document.getElementById('profit-sub').textContent = `${slotsCount} slots simulated`;
+
+  // — Import price (price is per kWh — not fleet/home, stays same) —
+  const cpEl = document.getElementById('current-price');
+  cpEl.textContent = fmt_p(currentPriceP);
+  cpEl.style.color = priceTextColor(currentPriceP);
+
+  const expEl = document.getElementById('export-price');
+  if (expEl) expEl.textContent = currentExportPriceP > 0 ? fmt_p(currentExportPriceP) : '--p';
+
+  // price-spread element removed from HTML (was showing import-export tariff spread
+  // which confused users — now shown correctly in drill panel as P30/P75 arbitrage spread)
+
+  // — SOC (always per-home average — label makes this clear) —
+  document.getElementById('avg-soc').textContent = avgSoc.toFixed(1) + 'kWh';
+  const socSub = document.getElementById('soc-sub');
+  if (socSub) socSub.textContent = '72kWh battery (node3) · 57.6kWh usable at 10–90% DoD';
+
+  // — Node-3 Status —
+  const home0 = fleet.length ? fleet[0] : null;
+  const homeAction = home0 ? (home0.lastAction || 'idle') : 'idle';
+  let actionStr = '— IDLE';
+  if (homeAction === 'charging'  || homeAction === 'charge')    actionStr = '⚡ CHARGING';
+  else if (homeAction === 'discharging' || homeAction === 'discharge') actionStr = '↑ SELLING';
+  document.getElementById('fleet-action').textContent = actionStr;
+  document.getElementById('action-sub').textContent   = `FWD BUY ≤ ${fmt_p(buyThreshold)} · FWD SELL ≥ ${fmt_p(sellThreshold)}`;
+
+  // — Info bar thresholds —
+  document.getElementById('buy-thr').textContent       = fmt_p(buyThreshold);
+  document.getElementById('sell-thr').textContent      = fmt_p(sellThreshold);
+  document.getElementById('n-charging').textContent    = actionStr.trim();
+  document.getElementById('n-discharging').textContent = homeAction.toUpperCase();
+
+  // Refresh open drill panels
+  const profitCard = document.getElementById('profit-card');
+  if (profitCard && profitCard.classList.contains('drilled')) populateProfitDrill();
+  const socCard = document.getElementById('soc-card');
+  if (socCard && socCard.classList.contains('drilled')) populateSocDrill();
+  const priceCard = document.getElementById('price-card');
+  if (priceCard && priceCard.classList.contains('drilled')) populatePriceDrill();
+
+  calculateProjections();
+}
+
+// ══════════════════════════════════════════════════════════════
+// PROJECTIONS — forward estimates from live sim rate
+// ══════════════════════════════════════════════════════════════
+function calculateProjections() {
+  if (!historyData.length || slotsCount < 4) return;
+
+  // Rate from live simulation — use total profit / total slots for a stable average
+  // (recent-only window skews negative during charging phases)
+  const totalProfit   = fleet.reduce((s,h) => s + (h.profit || 0), 0);
+  const ratePerSlot   = slotsCount > 0 ? totalProfit / slotsCount : 0; // £/slot (fleet)
+
+  // Scale factors (slots per period)
+  const slotsPerDay   = 48;
+  const slotsPerWeek  = 48 * 7;
+  const slotsPerMonth = 48 * 30;
+  const slotsPerYear  = 48 * 365;
+
+  // Variance: Agile prices can be 0.3× to 2.5× the recent rate
+  const worstMult = 0.30;
+  const bestMult  = 2.50;
+
+  // If we have historical data, use it to calibrate annual projection
+  let annualBase, annualLo, annualHi;
+  if (histResultsCache) {
+    annualBase = histResultsCache.total;  // single Node-3 install
+    annualLo   = annualBase * worstMult;
+    annualHi   = annualBase * bestMult;
+  } else {
+    annualBase = ratePerSlot * slotsPerYear;
+    annualLo   = annualBase * worstMult;
+    annualHi   = annualBase * bestMult;
+  }
+
+  function setProjCell(id, fleetVal, fleetLo, fleetHi, labelOverride) {
+    const el   = document.getElementById('proj-' + id);
+    const elo  = document.getElementById('proj-' + id + '-lo');
+    const ehi  = document.getElementById('proj-' + id + '-hi');
+    const elbl = document.getElementById('proj-lbl-' + id);
+    const v = viewVal(fleetVal), lo = viewVal(fleetLo), hi = viewVal(fleetHi);
+    if (el)  { el.textContent = v >= 0 ? '£' + v.toFixed(2) : '-£' + Math.abs(v).toFixed(2);
+               el.className   = 'proj-main' + (v < 0 ? ' negative' : ''); }
+    if (elo) elo.textContent = '£' + Math.max(0, lo).toFixed(2);
+    if (ehi) ehi.textContent = '£' + hi.toFixed(2);
+    if (elbl && labelOverride) elbl.textContent = labelOverride;
+  }
+
+  const dailyBase  = ratePerSlot * slotsPerDay;
+  const weeklyBase = ratePerSlot * slotsPerWeek;
+
+  // If historical data loaded, use calibrated monthly average — avoids contradicting annual figure
+  // (live-rate extrapolation can wildly over/under-estimate vs actual 12-month average)
+  const monthBase  = histResultsCache
+    ? annualBase / 12   // calibrated: annual ÷ 12 months
+    : ratePerSlot * slotsPerMonth;  // live rate extrapolation (pre-historical load)
+
+  setProjCell('daily',    dailyBase,               dailyBase * worstMult,   dailyBase * bestMult);
+  setProjCell('weekly',   weeklyBase,              weeklyBase * worstMult,  weeklyBase * bestMult);
+  setProjCell('monthly',  monthBase,               monthBase * worstMult,   monthBase * bestMult);
+  setProjCell('annual',   annualBase,              annualLo,                annualHi);
+  // 5th cell: payback period at this rate
+  const INSTALL_COST = 15000; // approx Node-3 install cost
+  const paybackYrs = annualBase > 1 ? (INSTALL_COST / annualBase).toFixed(1) : null;
+  const crossEl  = document.getElementById('proj-per-home');
+  const crossElo = document.getElementById('proj-per-home-lo');
+  const crossEhi = document.getElementById('proj-per-home-hi');
+  const lbl5     = document.querySelector('#proj-bar .proj-cell:last-child .proj-lbl');
+  if (lbl5) lbl5.textContent = 'PAYBACK';
+  if (crossEl)  crossEl.textContent  = paybackYrs ? paybackYrs + ' yrs' : '??';
+  if (crossElo) crossElo.textContent = annualHi > 1 ? (INSTALL_COST / annualHi).toFixed(1) + ' yrs (best)' : '?';
+  if (crossEhi) crossEhi.textContent = annualLo > 1 ? (INSTALL_COST / annualLo).toFixed(1) + ' yrs (worst)' : '?';
+  // Update period labels
+  const lblMap = {daily:'TODAY (EST)', weekly:'THIS WEEK', monthly:'THIS MONTH', annual:'ANNUAL'};
+  Object.entries(lblMap).forEach(([id, base]) => {
+    const lel = document.querySelector(`[id="proj-${id}"]`)?.closest('.proj-cell')?.querySelector('.proj-lbl');
+    if (lel) lel.textContent = base;
+  });
+}
+
+function renderFleetGrid() {
+  const grid = document.getElementById('fleet-grid');
+  grid.innerHTML = '';
+  for (const home of fleet) {
+    const soc     = home.soc || 0;
+    const pct     = ((soc - CFG.MIN_SOC_KWH) / (CFG.BATTERY_KWH - CFG.MIN_SOC_KWH) * 100).toFixed(1);
+    const cls     = home.lastAction || 'idle';
+    const profit  = home.profit || 0;
+    const fill_cls = soc < 15 ? 'low' : soc < 25 ? 'medium' : '';
+
+    const bat    = home.batteryKwh || home.battery_kwh || CFG.BATTERY_KWH;
+    const minSoc = bat * (CFG.MIN_SOC_KWH / CFG.BATTERY_KWH);
+    const realPct = ((soc - minSoc) / (bat - minSoc) * 100).toFixed(1);
+    grid.innerHTML += `
+      <div class="home-card ${cls}">
+        <div class="home-id">
+          HOME ${String(home.id).padStart(2,'0')}
+          <div class="action-badge ${cls}">${cls.toUpperCase()}</div>
+        </div>
+        <div class="soc-bar-wrap">
+          <div class="soc-bar-fill ${fill_cls}" style="width:${Math.max(0,Math.min(100,realPct))}%"></div>
+        </div>
+        <div class="home-stats">
+          <span class="soc-val">${soc.toFixed(1)}/${bat.toFixed(0)}kWh</span>
+          <span class="profit-val ${profit<0?'negative':''}">${fmt_gbp(profit)}</span>
+        </div>
+        <div style="font-size:9px;color:var(--muted);margin-top:4px">${(home.solarKwp||home.solar_kwp||CFG.SOLAR_KWP).toFixed(1)}kWp · ${(home.dailyLoad||home.daily_load_kwh||12).toFixed(0)}kWh/d</div>
+      </div>`;
+  }
+}
+
+function renderProfitChart() {
+  const ctx  = document.getElementById('profit-chart').getContext('2d');
+  // Show slot-by-slot profit delta (not cumulative) — green = earning (sell slot), red = spending (charge slot)
+  // This makes it immediately clear: green spikes = discharging at peak, red dips = charging off-peak.
+  const labels = historyData.map(d =>
+    d.time instanceof Date
+      ? d.time.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'})
+      : d.time
+  );
+  const values = historyData.map(d => +((d.slotProfit || 0).toFixed(4)));
+  const colors = values.map(v => v > 0 ? 'rgba(63,185,80,0.75)' : v < 0 ? 'rgba(248,81,73,0.65)' : 'rgba(139,148,158,0.3)');
+  document.getElementById('chart-span').textContent = `last ${values.length} slots`;
+
+  if (profitChart) profitChart.destroy();
+  profitChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderWidth: 0,
+        borderRadius: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      animation: { duration: 400 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const v = ctx.raw;
+              return v > 0 ? `+£${v.toFixed(4)} (selling)` : v < 0 ? `−£${Math.abs(v).toFixed(4)} (charging)` : 'idle';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#8b949e', maxTicksLimit: 10, font: { size: 10 } },
+          grid: { display: false },
+        },
+        y: {
+          ticks: {
+            color: '#8b949e', font: { size: 10 },
+            callback: v => (v >= 0 ? '+' : '') + '£' + v.toFixed(3)
+          },
+          grid: { color: '#21262d' },
+        }
+      }
+    }
+  });
+}
+
+function renderPriceChart() {
+  const ctx     = document.getElementById('price-chart').getContext('2d');
+  const prices  = priceHistory.slice(-96);
+  const labels  = prices.map(p => {
+    const d = new Date(p.valid_from || p.time);
+    return d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+  });
+  const importVals = prices.map(p => p.value_inc_vat || p.priceP || 0);
+  const colors     = importVals.map(v => priceColor(v) + 'cc');
+
+  // Match export prices to the same slots (48h window)
+  const exportVals = prices.map(p => {
+    const slotDt = new Date(p.valid_from || p.time);
+    const ep = exportPriceHistory.length
+      ? getExportPriceForSlot(slotDt, exportPriceHistory)
+      : null;
+    // Fallback: derive export from import using the same formula as simulation
+    return ep !== null ? ep : exportRateFromImport(p.value_inc_vat || p.priceP || 0);
+  });
+
+  if (importVals.length) {
+    document.getElementById('price-range').textContent =
+      'Import ' + Math.min(...importVals).toFixed(1) + '→' + Math.max(...importVals).toFixed(1) +
+      'p  |  Export ' + Math.min(...exportVals).toFixed(1) + '→' + Math.max(...exportVals).toFixed(1) + 'p';
+  }
+
+  if (priceChart) priceChart.destroy();
+  priceChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Import (pay)',
+          data: importVals,
+          backgroundColor: colors,
+          borderWidth: 0,
+          borderRadius: 2,
+          order: 2,
+        },
+        {
+          label: 'Export (earn)',
+          data: exportVals,
+          type: 'line',
+          borderColor: 'rgba(63,185,80,0.85)',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.3,
+          order: 1,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: { duration: 400 },
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: '#8b949e', font: { size: 10 }, boxWidth: 10 }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#8b949e', maxTicksLimit: 8, font: { size: 10 } },
+          grid: { display: false },
+        },
+        y: {
+          ticks: { color: '#8b949e', font: { size: 10 }, callback: v => v + 'p' },
+          grid: { color: '#21262d' },
+        }
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// STATUS BAR
+// ══════════════════════════════════════════════════════════════
+let countdown = CFG.REFRESH_MS / 1000;
+function updateStatus() {
+  const mode = USE_SERVER ? 'SERVER' : (dataMode === 'DEMO' ? 'DEMO' : 'LIVE API');
+  document.getElementById('data-mode').textContent = mode;
+  document.getElementById('status-line').textContent =
+    `last update: ${new Date().toLocaleTimeString('en-GB')} · next in ${countdown}s`;
+}
+function tickCountdown() {
+  if (countdown > 0) countdown--;
+  updateStatus();
+}
+setInterval(tickCountdown, 1000);
+
+// ══════════════════════════════════════════════════════════════
+// MAIN REFRESH LOOP
+// ══════════════════════════════════════════════════════════════
+async function refresh() {
+  setLoading('FETCHING LIVE PRICES…');
+
+  try {
+    if (USE_SERVER) {
+      await loadFromServer();
+      // Get current price from server prices
+      if (priceHistory.length) {
+        const now = Date.now();
+        const cur = priceHistory.find(p => {
+          const vf = new Date(p.valid_from).getTime();
+          const vt = p.valid_to ? new Date(p.valid_to).getTime() : vf + 1800000;
+          return vf <= now && now < vt;
+        }) || priceHistory[priceHistory.length - 1];
+        currentPriceP = cur.value_inc_vat || 0;
+      }
+    } else {
+      // Direct API mode
+      let productCode;
+      try {
+        setLoading('DISCOVERING AGILE PRODUCT…');
+        productCode = await discoverAgileProduct();
+      } catch(e) {
+        console.warn('Product discovery failed:', e);
+        productCode = null;
+      }
+
+      let prices;
+      if (productCode) {
+        try {
+          setLoading('FETCHING OCTOPUS AGILE IMPORT PRICES…');
+          prices = await fetchAgilePrices(productCode);
+          dataMode = 'LIVE';
+        } catch(e) {
+          console.warn('Price fetch failed:', e);
+          prices = null;
+        }
+      }
+
+      if (!prices || !prices.length) {
+        console.warn('Falling back to demo data');
+        prices   = generateDemoPrices();
+        dataMode = 'DEMO';
+        setDemoMode(true);
+      } else {
+        setDemoMode(false);
+      }
+
+      // Fetch export prices (non-fatal — falls back to ratio estimate)
+      let expPrices = [];
+      try {
+        setLoading('FETCHING AGILE EXPORT PRICES…');
+        const expProductCode = await discoverAgileExportProduct();
+        expPrices = await fetchAgileExportPrices(expProductCode);
+        exportPriceHistory = expPrices;
+      } catch(e) {
+        console.warn('Export price fetch failed, using ratio fallback:', e);
+        exportPriceHistory = [];
+      }
+
+      // Current export price
+      if (expPrices.length) {
+        const now2 = Date.now();
+        const curExp = expPrices.find(p => {
+          const vf = new Date(p.valid_from).getTime();
+          const vt = p.valid_to ? new Date(p.valid_to).getTime() : vf + 1800000;
+          return vf <= now2 && now2 < vt;
+        }) || expPrices[expPrices.length - 1];
+        currentExportPriceP = curExp ? curExp.value_inc_vat : 0;
+      } else {
+        currentExportPriceP = currentPriceP * 0.58; // ratio fallback
+      }
+
+      // Weather
+      try {
+        setLoading('FETCHING SOLAR FORECAST…');
+        await fetchWeather();
+      } catch(e) {
+        console.warn('Weather fetch failed, using demo solar:', e);
+        generateDemoWeather();
+      }
+
+      setLoading('RUNNING SIMULATION…');
+      priceHistory = prices;
+      runSimulation(prices, expPrices.length ? expPrices : null);
+
+      // Current import price
+      const now = Date.now();
+      const cur = prices.find(p => {
+        const vf = new Date(p.valid_from).getTime();
+        const vt = p.valid_to ? new Date(p.valid_to).getTime() : vf + 1800000;
+        return vf <= now && now < vt;
+      }) || prices[prices.length - 1];
+      currentPriceP = cur ? cur.value_inc_vat : 0;
+    }
+
+    // Render everything
+    setLoading('RENDERING…');
+    renderStats();
+    renderFleetGrid();
+    renderProfitChart();
+    renderPriceChart();
+
+    // FORWARD SCHEDULE — plan next 48h and render
+    try {
+      const fwdSched = planForwardSchedule(priceHistory, exportPriceHistory);
+      renderSchedule(fwdSched);
+    } catch(e) {
+      console.warn('Schedule render failed:', e);
+    }
+
+    countdown = CFG.REFRESH_MS / 1000;
+    updateStatus();
+    hideLoading();
+
+  } catch (err) {
+    console.error('Refresh error:', err);
+    document.getElementById('status-line').textContent = 'ERROR: ' + err.message;
+    hideLoading();
+  }
+}
+
+function setLoading(msg) {
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('loading-msg').textContent = msg;
+}
+function hideLoading() {
+  document.getElementById('loading').style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════════════════
+// DEMO MODE WATERMARK (T-09)
+// ══════════════════════════════════════════════════════════════
+function setDemoMode(on) {
+  document.getElementById('demo-watermark').style.display = on ? 'block' : 'none';
+  if (on) {
+    document.getElementById('data-mode').textContent = 'DEMO';
+    document.getElementById('data-mode').style.color = 'var(--amber)';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// HISTORICAL ANALYSIS — 12 MONTHS REAL DATA
+// ══════════════════════════════════════════════════════════════
+let histMonthlyChart = null;
+let histSpreadChart  = null;
+
+async function loadHistoricalData(force) {
+  // Historical backtest runs server-side in Python (simulate.py algorithm).
+  // This is the ONLY implementation — no JS duplication.
+  const btn  = document.getElementById('hist-btn');
+  const prog = document.getElementById('hist-progress');
+  const err  = document.getElementById('hist-error');
+  const res  = document.getElementById('hist-results');
+
+  btn.disabled    = true;
+  btn.textContent = 'RUNNING BACKTEST…';
+  prog.style.display = 'block';
+  err.style.display  = 'none';
+  res.style.display  = 'none';
+
+  try {
+    const url = '/api/backtest' + (force ? '?force=1' : '');
+    updateHistProg(0, 10, 'REQUESTING 12-MONTH PYTHON BACKTEST FROM SERVER…');
+
+    const resp = await fetch(url, { signal: AbortSignal.timeout(180000) }); // 3 min max
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      throw new Error(body.error || `Server error HTTP ${resp.status}`);
+    }
+
+    updateHistProg(0, 90, 'RENDERING RESULTS…');
+    const results = await resp.json();
+    if (results.error) throw new Error(results.error);
+
+    histResultsCache = results;
+    renderHistoricalResults(results);
+
+    prog.style.display = 'none';
+    res.style.display  = 'block';
+    btn.textContent    = '↻ REFRESH HISTORICAL DATA';
+    btn.disabled       = false;
+    btn.onclick        = () => loadHistoricalData(true);  // manual refresh = force re-run
+
+    res.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  } catch(e) {
+    prog.style.display = 'none';
+    err.style.display  = 'block';
+    err.textContent    = '⚠ ' + e.message;
+    btn.textContent    = '⚡ LOAD 12 MONTHS OF REAL DATA';
+    btn.disabled       = false;
+    console.error('[HIST]', e);
+  }
+}
+
+function updateHistProg(page, pct, label) {
+  document.getElementById('hist-prog-label').textContent = label || `FETCHING PAGE ${page}…`;
+  document.getElementById('hist-prog-bar').style.width   = Math.min(100, pct) + '%';
+}
+
+
+function populateRevenueBreakdown(res) {
+  const {
+    total, monthly, totalSlots, buyThr, sellThr,
+    totalHomeEnergySaved = 0,
+    totalChargeCost  = 0,
+    totalExportIncome = 0,
+    totalChargeKwh = 0,
+    totalDischargeKwh = 0,
+    avgExportRateP = CFG.EXPORT_RATE_P_DEFAULT,
+    hasExportData = false,
+  } = res;
+
+  // Calculate averages per day/week/month/year
+  const months = Object.keys(monthly).sort();
+  const daysCount = months.length * 30; // approximate
+  const weeksCount = daysCount / 7;
+  const monthsCount = months.length;
+  const yearsCount = 1;
+
+  // Dovecote revenue = export income - charge cost (arbitrage only, pure cash)
+  const dovecodeDayRev = (totalExportIncome - totalChargeCost) / daysCount;
+  const dovecodeWeekRev = dovecodeDayRev * 7;
+  const dovecodeMonthRev = dovecodeDayRev * 30;
+  const dovecodeYearRev = totalExportIncome - totalChargeCost;
+
+  // Homeowner savings = Agile tariff saving vs SVT
+  const homeownerDaySave = totalHomeEnergySaved / daysCount;
+  const homeownerWeekSave = homeownerDaySave * 7;
+  const homeownerMonthSave = homeownerDaySave * 30;
+  const homeownerYearSave = totalHomeEnergySaved;
+
+  // Update HTML elements
+  document.getElementById('rev-dov-day').textContent = dovecodeDayRev >= 0 ? '£' + dovecodeDayRev.toFixed(2) : '−£' + Math.abs(dovecodeDayRev).toFixed(2);
+  document.getElementById('rev-dov-week').textContent = dovecodeWeekRev >= 0 ? '£' + dovecodeWeekRev.toFixed(2) : '−£' + Math.abs(dovecodeWeekRev).toFixed(2);
+  document.getElementById('rev-dov-month').textContent = dovecodeMonthRev >= 0 ? '£' + dovecodeMonthRev.toFixed(2) : '−£' + Math.abs(dovecodeMonthRev).toFixed(2);
+  document.getElementById('rev-dov-year').textContent = dovecodeYearRev >= 0 ? '£' + dovecodeYearRev.toFixed(2) : '−£' + Math.abs(dovecodeYearRev).toFixed(2);
+
+  document.getElementById('rev-home-day').textContent = '£' + homeownerDaySave.toFixed(2);
+  document.getElementById('rev-home-week').textContent = '£' + homeownerWeekSave.toFixed(2);
+  document.getElementById('rev-home-month').textContent = '£' + homeownerMonthSave.toFixed(2);
+  document.getElementById('rev-home-year').textContent = '£' + homeownerYearSave.toFixed(2);
+}
+
+function renderHistoricalResults(res) {
+  const {
+    total, monthly, totalSlots, buyThr, sellThr,
+    totalHomeEnergySaved = 0,
+    totalChargeCost  = 0,
+    totalExportIncome = 0,
+    totalChargeKwh = 0,
+    totalDischargeKwh = 0,
+    avgExportRateP = CFG.EXPORT_RATE_P_DEFAULT,
+    hasExportData = false,
+  } = res;
+
+  // Populate revenue breakdown
+  populateRevenueBreakdown(res);
+
+  // total = single home net cash (exportIncome - chargeCost)
+  // totalExportIncome = gross cash received from Octopus for grid exports
+  // totalChargeCost   = gross cash paid to Octopus to charge battery
+  // totalHomeEnergySaved = Agile tariff saving vs 25p SVT for 12kWh/day home consumption (PC1-weighted)
+  const scaleTotal        = total;
+  const scaleExport       = totalExportIncome;
+  const scaleCharge       = totalChargeCost;
+  const scaleHomeSaved    = totalHomeEnergySaved;
+  // scaleNetTotal = true total value = arbitrage grid P&L + home energy value
+  // The grid P&L alone is negative (charging covers home load + arbitrage, exports only cover arbitrage)
+  // Adding home energy value gives the correct total benefit of the system
+  const scaleNetTotal     = scaleTotal + scaleHomeSaved;
+
+  // Compute avg buy/sell prices and company cash — update globals for price widget
+  const _totalBuyPriceSum  = Object.values(monthly).reduce((s, m) => s + (m.buyPriceSum  || 0), 0);
+  const _totalSellPriceSum = Object.values(monthly).reduce((s, m) => s + (m.sellPriceSum || 0), 0);
+  const _totalChargeSlots  = Object.values(monthly).reduce((s, m) => s + (m.chargeSlots  || 0), 0);
+  const _totalSellSlots    = Object.values(monthly).reduce((s, m) => s + (m.sellSlots    || 0), 0);
+  simAvgBuyP  = _totalChargeSlots > 0 ? _totalBuyPriceSum  / _totalChargeSlots : 0;
+  simAvgSellP = _totalSellSlots   > 0 ? _totalSellPriceSum / _totalSellSlots   : 0;
+  simCashIn   = scaleExport;   // £ received from Octopus for grid exports (view-mode scaled)
+  simCashOut  = scaleCharge;   // £ paid to Octopus for charging
+  simCashNet  = scaleExport - scaleCharge; // net company cash (arbitrage only)
+  simHasHistorical = true;
+  updatePriceWidget();         // refresh widget with historical averages
+
+  // Sort months
+  const months = Object.keys(monthly).sort();
+  const profits = months.map(m => monthly[m].profit); // single home grid P&L per month (export - all imports)
+  const displayProfits   = profits;
+  const homeSavedPerMonth= months.map(m => (monthly[m].homeEnergySaved || 0));
+  const netPerMonth      = displayProfits.map((p, i) => p + homeSavedPerMonth[i]);
+  // bestIdx/worstIdx based on NET VALUE (total benefit), not raw grid P&L
+  const bestIdx  = netPerMonth.indexOf(Math.max(...netPerMonth));
+  const worstIdx = netPerMonth.indexOf(Math.min(...netPerMonth));
+  const avgMonthly     = scaleNetTotal / months.length;   // show avg net value, not avg grid P&L
+  const avgHomeSaved   = scaleHomeSaved/ months.length;
+  const avgNetMonthly  = scaleNetTotal / months.length;
+  const modeSfx = ' (1 home)';
+
+  // Summary cards
+  const annualLbl = document.querySelector('#h-annual-profit')?.closest('.stat-card')?.querySelector('.stat-label');
+  if (annualLbl) annualLbl.textContent = 'Total Annual Value (1 home)';
+  document.getElementById('h-annual-profit').textContent = '£' + scaleNetTotal.toFixed(2);
+  const exportSrc = hasExportData
+    ? `Agile Outgoing (live) avg ${avgExportRateP.toFixed(1)}p`
+    : `import−${DIST_CHARGE_P}p formula avg ${avgExportRateP.toFixed(1)}p`;
+  document.getElementById('h-slots').textContent = `${totalSlots.toLocaleString()} slots · LP optimiser · context-adjusted thresholds · export rate: ${exportSrc}${modeSfx}`;
+  document.getElementById('h-best-month').textContent  = months[bestIdx] || '—';
+  document.getElementById('h-best-val').textContent    = '£' + netPerMonth[bestIdx].toFixed(2) + modeSfx;
+  document.getElementById('h-avg-monthly').textContent = '£' + avgMonthly.toFixed(2);
+  const avgLbl = document.querySelector('#h-avg-monthly')?.closest('.stat-card')?.querySelector('.stat-label');
+  if (avgLbl) avgLbl.textContent = 'Avg Net Value/Mo (1 home)';
+  document.getElementById('h-worst-month').textContent = months[worstIdx] || '—';
+  document.getElementById('h-worst-val').textContent   = '£' + netPerMonth[worstIdx].toFixed(2) + modeSfx;
+  document.getElementById('h-period').textContent = months[0] + ' → ' + months[months.length - 1];
+
+  // Home energy saved card
+  const homeEl = document.getElementById('h-home-saved');
+  if (homeEl) {
+    homeEl.textContent = '£' + scaleHomeSaved.toFixed(2);
+    const homeLbl = homeEl.closest('.stat-card')?.querySelector('.stat-label');
+    if (homeLbl) homeLbl.textContent = 'Agile Tariff Saving vs SVT (1 home)';
+    const homeSub = homeEl.closest('.stat-card')?.querySelector('.stat-sub');
+    if (homeSub) homeSub.textContent = '12kWh/day vs 25p SVT · £' + avgHomeSaved.toFixed(2) + '/mo avg';
+  }
+  // Net total card
+  const netEl = document.getElementById('h-net-total');
+  if (netEl) {
+    netEl.textContent = '£' + scaleNetTotal.toFixed(2);
+    const netLbl = netEl.closest('.stat-card')?.querySelector('.stat-label');
+    if (netLbl) netLbl.textContent = 'Total Household Value (1 home)';
+    const netSub = netEl.closest('.stat-card')?.querySelector('.stat-sub');
+    if (netSub) netSub.textContent = 'Battery arb + Agile saving · £' + avgNetMonthly.toFixed(2) + '/mo avg';
+  }
+
+  // ── COMPANY CASH BANNER ──────────────────────────────────────────────────
+  // scaleExport and scaleCharge are view-mode scaled already (single home or ×10 fleet)
+  const cashIn  = document.getElementById('h-cash-in');
+  const cashOut = document.getElementById('h-cash-out');
+  const cashNet = document.getElementById('h-cash-net');
+  const cashSub = document.getElementById('h-cash-net-sub');
+  if (cashIn)  cashIn.textContent  = '£' + scaleExport.toFixed(2);
+  if (cashOut) cashOut.textContent = '£' + scaleCharge.toFixed(2);
+  if (cashNet) {
+    const net = scaleExport - scaleCharge;
+    cashNet.textContent = '£' + net.toFixed(2);
+    cashNet.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+  if (cashSub) {
+    const net = scaleExport - scaleCharge;
+    cashSub.textContent = `(1 home) · £${(net / months.length).toFixed(2)}/mo avg · over ${months.length} months`;
+  }
+
+  // ── BATTERY UTILISATION ─────────────────────────────────────────────────
+  const utilDiv = document.getElementById('h-battery-util');
+  if (utilDiv) {
+    const days          = totalSlots / 48;
+    const chargePerDay  = totalChargeKwh   > 0 ? (Object.values(monthly).reduce((s,m)=>s+m.chargeSlots,0) / days).toFixed(1) : '—';
+    const sellPerDay    = totalDischargeKwh> 0 ? (Object.values(monthly).reduce((s,m)=>s+m.sellSlots,0) / days).toFixed(1) : '—';
+    const cyclesPerDay  = (parseFloat(chargePerDay)||0 + parseFloat(sellPerDay)||0) / 2;
+    const scKwh         = totalChargeKwh;
+    const sdKwh         = totalDischargeKwh;
+    const _totalCS      = Object.values(monthly).reduce((s,m)=>s+m.chargeSlots,0);
+    const _totalSS      = Object.values(monthly).reduce((s,m)=>s+m.sellSlots,0);
+    const _totalChBP    = Object.values(monthly).reduce((s,m)=>s+(m.buyPriceSum||0),0);
+    const _totalSellSP  = Object.values(monthly).reduce((s,m)=>s+(m.sellPriceSum||0),0);
+    const avgBuyPU      = _totalCS > 0 ? (_totalChBP / _totalCS).toFixed(1) : '—';
+    const avgSellPU     = _totalSS > 0 ? (_totalSellSP / _totalSS).toFixed(1) : '—';
+    const avgBuyU  = _totalCS > 0 ? (_totalChBP  / _totalCS)  : null;
+    const avgSellU = _totalSS > 0 ? (_totalSellSP / _totalSS) : null;
+    const marginU  = (avgBuyU !== null && avgSellU !== null && avgBuyU > 0)
+      ? (avgSellU / avgBuyU).toFixed(2) : (avgBuyU !== null && avgBuyU <= 0 ? 'N/A' : '—');
+    const spreadU  = (avgBuyU !== null && avgSellU !== null)
+      ? (avgSellU - avgBuyU).toFixed(1) + 'p' : '—';
+    // Possible charge slots ≈ BUY_PCT% of all slots — but MAX_BUY_P=8p caps actual buys to near-zero slots
+    const possibleCharge = Math.round(totalSlots * (CFG.BUY_PCT / 100));
+    const utilisationPct = _totalCS > 0 && possibleCharge > 0 ? Math.min(100, (_totalCS / possibleCharge * 100)).toFixed(0) : '—';
+
+    const stat = (lbl, val, col='var(--text)') =>
+      `<div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">${lbl}</div><div style="font-size:15px;font-weight:700;color:${col}">${val}</div></div>`;
+
+    document.getElementById('h-battery-util-content').innerHTML =
+      stat('kWh charged',  scKwh.toFixed(0) + ' kWh', 'var(--blue)') +
+      stat('kWh exported', (sdKwh * CFG.ROUND_TRIP_EFF).toFixed(0) + ' kWh', 'var(--green)') +
+      stat('Charge slots/day', chargePerDay, 'var(--blue)') +
+      stat('Sell slots/day', sellPerDay, 'var(--amber)') +
+      stat('Avg buy price', avgBuyPU + 'p', 'var(--blue)') +
+      stat('Avg sell price', avgSellPU + 'p', 'var(--green)') +
+      stat('Sell÷Buy ratio', marginU === 'N/A' ? 'N/A' : marginU + '×', parseFloat(marginU) > 1.5 ? 'var(--green)' : 'var(--amber)') +
+      stat('Arb spread', '+' + spreadU, 'var(--green)') +
+      stat('Days simulated', Math.round(days).toLocaleString(), 'var(--muted)');
+    utilDiv.style.display = 'block';
+  }
+
+  // ── BUSINESS VIABILITY ──────────────────────────────────────────────────
+  const bizDiv = document.getElementById('h-biz-viability');
+  if (bizDiv) {
+    // All figures per single home, annualised
+    const netCashPerHome    = totalExportIncome - totalChargeCost;           // pure arbitrage £/yr
+    // Agile tariff saving vs SVT (25p/kWh Ofgem cap) — already computed per-slot in simulation
+    // using the actual Agile price each half-hour, weighted by Elexon PC1 load profile.
+    // This is the correct basis: home imports from grid at actual Agile rates, not at battery avg buy price.
+    const SVT_P             = 25.0;  // p/kWh reference tariff (for display label only)
+    const _allCS            = Object.values(monthly).reduce((s,m)=>s+m.chargeSlots,0);
+    const _allBP            = Object.values(monthly).reduce((s,m)=>s+(m.buyPriceSum||0),0);
+    const realAvgBuyP       = _allCS > 0 ? _allBP / _allCS : 10;  // battery avg buy price (not home rate)
+    const days              = totalSlots / 48;
+    // importSavingPerHome = sum of per-slot (SVT − Agile_price) × homeLoad, already in totalHomeEnergySaved
+    const importSavingPerHome = totalHomeEnergySaved;   // £/yr — from per-slot PC1-weighted simulation
+    const feePct            = 0.40;  // company takes 40% of home's Agile saving as service fee
+    const feePerHome        = Math.max(0, importSavingPerHome * feePct);     // company fee income/home/yr
+    const combinedPerHome   = netCashPerHome + feePerHome;                   // total company income/home/yr
+    const TARGET            = 50000;
+
+    const homesArb          = netCashPerHome > 0   ? Math.ceil(TARGET / netCashPerHome)   : '∞';
+    const homesFee          = feePerHome > 0        ? Math.ceil(TARGET / feePerHome)        : '∞';
+    const homesCombined     = combinedPerHome > 0   ? Math.ceil(TARGET / combinedPerHome)   : '∞';
+
+    const row = (lbl, val, col='var(--text)') =>
+      `<tr>
+        <td style="padding:5px 10px 5px 0;color:var(--muted);font-size:11px">${lbl}</td>
+        <td style="padding:5px 8px;font-weight:700;color:${col};font-size:13px;text-align:right">£${val.toFixed(0)}/yr</td>
+      </tr>`;
+
+    document.getElementById('h-biz-viability-content').innerHTML =
+      `<table style="width:100%;border-collapse:collapse">
+        <tr style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">
+          <th style="text-align:left;padding-bottom:4px;font-weight:400">Income Model — Node-3</th>
+          <th style="text-align:right;padding-bottom:4px;font-weight:400">Annual</th>
+        </tr>
+        ${row('Pure arbitrage (export income − charge cost)', netCashPerHome, 'var(--amber)')}
+        ${row(`Agile saving vs SVT ${SVT_P}p (PC1-weighted, per-slot)`, importSavingPerHome, 'var(--cyan)')}
+        ${row('Combined: arbitrage + 40% of import saving', combinedPerHome, 'var(--green)')}
+      </table>
+      <div style="font-size:9px;color:var(--muted);margin-top:6px;border-top:1px solid var(--border);padding-top:5px">
+        SVT = Standard Variable Tariff reference (${SVT_P}p/kWh, Ofgem cap).
+        Arbitrage cash = Octopus export income − charge cost (real bank transfer).
+      </div>`;
+    bizDiv.style.display = 'block';
+  }
+
+  // Monthly bar chart
+  const ctx1 = document.getElementById('hist-monthly-chart').getContext('2d');
+  if (histMonthlyChart) histMonthlyChart.destroy();
+  histMonthlyChart = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: months.map(m => {
+        const [y, mo] = m.split('-');
+        return new Date(+y, +mo - 1).toLocaleDateString('en-GB', {month:'short', year:'2-digit'});
+      }),
+      datasets: [{
+        data: netPerMonth.map(v => parseFloat(v.toFixed(2))),
+        backgroundColor: netPerMonth.map((v, i) =>
+          i === bestIdx  ? 'rgba(63,185,80,0.9)'   :
+          i === worstIdx ? 'rgba(210,153,34,0.9)'  :
+          v >= 0         ? 'rgba(63,185,80,0.55)'  : 'rgba(248,81,73,0.55)'),
+        borderWidth: 0, borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: '#8b949e', font: { size: 10 }, callback: v => '£' + v.toFixed(0) },
+             grid: { color: '#21262d' } }
+      }
+    }
+  });
+
+  // Price spread histogram (count of slots in 5p buckets)
+  const buckets = {};
+  for (const m of months) {
+    // Approximate from avgPrice — use actual slot data bucketing
+  }
+  // Use monthly avg prices for the spread chart
+  const avgPrices = months.map(m => monthly[m].priceSum / monthly[m].slots);
+  const ctx2 = document.getElementById('hist-spread-chart').getContext('2d');
+  if (histSpreadChart) histSpreadChart.destroy();
+  histSpreadChart = new Chart(ctx2, {
+    type: 'line',
+    data: {
+      labels: months.map(m => {
+        const [y, mo] = m.split('-');
+        return new Date(+y, +mo - 1).toLocaleDateString('en-GB', {month:'short'});
+      }),
+      datasets: [{
+        label: 'Avg price (p/kWh)',
+        data: avgPrices.map(v => parseFloat(v.toFixed(2))),
+        borderColor: '#d29922', backgroundColor: 'rgba(210,153,34,0.15)',
+        borderWidth: 2, pointRadius: 4, fill: true, tension: 0.3,
+      }, {
+        label: 'Buy threshold',
+        data: months.map(() => parseFloat(buyThr.toFixed(2))),
+        borderColor: '#3fb950', borderDash: [4, 3], borderWidth: 1.5,
+        pointRadius: 0, fill: false,
+      }, {
+        label: 'Sell threshold',
+        data: months.map(() => parseFloat(sellThr.toFixed(2))),
+        borderColor: '#f85149', borderDash: [4, 3], borderWidth: 1.5,
+        pointRadius: 0, fill: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: true, labels: { color: '#8b949e', font: { size: 10 }, boxWidth: 12 } } },
+      scales: {
+        x: { ticks: { color: '#8b949e', font: { size: 9 } }, grid: { display: false } },
+        y: { ticks: { color: '#8b949e', font: { size: 10 }, callback: v => v + 'p' },
+             grid: { color: '#21262d' } }
+      }
+    }
+  });
+
+  // Monthly table
+  const tbody = document.getElementById('hist-tbody');
+  tbody.innerHTML = '';
+  months.forEach((m, i) => {
+    const mo   = monthly[m];
+    const dp   = displayProfits[i];
+    const hs   = homeSavedPerMonth[i];
+    const net  = netPerMonth[i];
+    const avgBuyRaw  = mo.chargeSlots > 0 ? (mo.buyPriceSum  / mo.chargeSlots) : null;
+    const avgSellRaw = mo.sellSlots   > 0 ? (mo.sellPriceSum / mo.sellSlots)   : null;
+    const avgBuy  = avgBuyRaw  !== null ? avgBuyRaw.toFixed(2)  : '—';
+    const avgSell = avgSellRaw !== null ? avgSellRaw.toFixed(2) : '—';
+    // Ratio: only meaningful when avgBuy > 0
+    const ratioVal = (avgBuyRaw !== null && avgSellRaw !== null && avgBuyRaw > 0)
+      ? (avgSellRaw / avgBuyRaw) : null;
+    const margin = ratioVal !== null ? ratioVal.toFixed(2) + '×' : 'N/A';
+    const marginColor = ratioVal !== null
+      ? (ratioVal >= 1.5 ? 'color:var(--green)' : ratioVal >= 1.2 ? 'color:var(--amber)' : 'color:var(--red)')
+      : 'color:var(--muted)';
+    // Spread: always valid (avgSell - avgBuy). When avgBuy < 0 (paid to charge), spread is even better.
+    const spreadVal = (avgBuyRaw !== null && avgSellRaw !== null) ? (avgSellRaw - avgBuyRaw) : null;
+    const spreadStr = spreadVal !== null ? (spreadVal >= 0 ? '+' : '') + spreadVal.toFixed(1) + 'p' : '—';
+    const spreadColor = spreadVal !== null && spreadVal >= 15 ? 'color:var(--green)'
+                      : spreadVal !== null && spreadVal >= 8  ? 'color:var(--amber)' : 'color:var(--red)';
+    const cls  = i === bestIdx ? 'best' : i === worstIdx ? 'worst' : '';
+    const pCls = dp >= 0 ? 'pos' : 'neg';
+    const [y, mn] = m.split('-');
+    const label = new Date(+y, +mn - 1).toLocaleDateString('en-GB', {month:'long', year:'numeric'});
+    // Calculate days in month and kWh per day
+    const monthDate = new Date(+y, +mn - 1);
+    const daysInMonth = new Date(+y, +mn, 0).getDate();
+    const kwhBoughtPerDay = (mo.chargeKwh / daysInMonth).toFixed(2);
+    const kwhSoldPerDay = (mo.dischargeKwh / daysInMonth).toFixed(2);
+    tbody.innerHTML += `<tr class="${cls}">
+      <td>${label}</td>
+      <td class="${pCls}" data-tip="Grid exports − all imports (incl. home load recharging). Negative = net electricity buyer. Add Home Energy to get true value.">£${dp.toFixed(2)}</td>
+      <td>${mo.slots.toLocaleString()}</td>
+      <td style="color:var(--blue)">${avgBuy}p</td>
+      <td style="color:var(--amber)">${avgSell}p</td>
+      <td style="${marginColor};font-weight:bold">${margin}</td>
+      <td style="${spreadColor};font-weight:bold">${spreadStr}</td>
+      <td style="color:var(--cyan)" data-tip="12kWh/day powered from battery — value at Agile prices this month">£${hs.toFixed(2)}</td>
+      <td style="color:var(--green);font-weight:bold" data-tip="Arbitrage profit + home energy value = total household benefit">£${net.toFixed(2)}</td>
+      <td>${mo.chargeSlots}</td>
+      <td>${mo.sellSlots}</td>
+      <td style="color:var(--muted)" data-tip="PC1-profile home load this month">${mo.homeKwh.toFixed(1)}</td>
+      <td style="color:var(--purple);font-weight:bold" data-tip="SOC low → high this month">${mo.socMin === Infinity ? '—' : mo.socMin.toFixed(1) + ' – ' + mo.socMax.toFixed(1)}</td>
+      <td style="color:var(--blue)">${kwhBoughtPerDay}</td>
+      <td style="color:var(--green)">${kwhSoldPerDay}</td>
+    </tr>`;
+  });
+
+  // Totals row
+  const totalCharge     = months.reduce((s,m) => s + monthly[m].chargeSlots, 0);
+  const totalSell       = months.reduce((s,m) => s + monthly[m].sellSlots, 0);
+  const totalBuySum     = months.reduce((s,m) => s + monthly[m].buyPriceSum, 0);
+  const totalSellSum    = months.reduce((s,m) => s + monthly[m].sellPriceSum, 0);
+  const totalHomeSaved  = homeSavedPerMonth.reduce((s, v) => s + v, 0);
+  const totalNetVal     = scaleTotal + totalHomeSaved;
+  const overallAvgBuyRaw  = totalCharge > 0 ? (totalBuySum  / totalCharge) : null;
+  const overallAvgSellRaw = totalSell   > 0 ? (totalSellSum / totalSell)   : null;
+  const overallAvgBuy     = overallAvgBuyRaw  !== null ? overallAvgBuyRaw.toFixed(2)  : '—';
+  const overallAvgSell    = overallAvgSellRaw !== null ? overallAvgSellRaw.toFixed(2) : '—';
+  const overallRatioVal   = (overallAvgBuyRaw !== null && overallAvgSellRaw !== null && overallAvgBuyRaw > 0)
+    ? (overallAvgSellRaw / overallAvgBuyRaw) : null;
+  const overallMargin     = overallRatioVal !== null ? overallRatioVal.toFixed(2) + '×' : 'N/A';
+  const overallSpreadVal  = (overallAvgBuyRaw !== null && overallAvgSellRaw !== null)
+    ? (overallAvgSellRaw - overallAvgBuyRaw) : null;
+  const overallSpread     = overallSpreadVal !== null ? (overallSpreadVal >= 0 ? '+' : '') + overallSpreadVal.toFixed(1) + 'p' : '—';
+  const overallSpreadCol  = overallSpreadVal !== null && overallSpreadVal >= 15 ? 'var(--green)'
+                          : overallSpreadVal !== null && overallSpreadVal >= 8  ? 'var(--amber)' : 'var(--red)';
+  const totalChargeKwhCalc = months.reduce((s,m) => s + (monthly[m].chargeKwh || 0), 0);
+  const totalDischargeKwhCalc = months.reduce((s,m) => s + (monthly[m].dischargeKwh || 0), 0);
+  const totalDays = months.length * 30; // approximate (could use actual days per month)
+  const avgKwhBoughtPerDay = (totalChargeKwhCalc / totalDays).toFixed(2);
+  const avgKwhSoldPerDay = (totalDischargeKwhCalc / totalDays).toFixed(2);
+  tbody.innerHTML += `<tr style="border-top:2px solid var(--border);font-weight:bold">
+    <td>TOTAL / AVG (1 HOME)</td>
+    <td class="${scaleTotal>=0?'pos':'neg'}">£${scaleTotal.toFixed(2)}</td>
+    <td>${totalSlots.toLocaleString()}</td>
+    <td style="color:var(--blue)">${overallAvgBuy}p</td>
+    <td style="color:var(--amber)">${overallAvgSell}p</td>
+    <td style="color:var(--muted);font-weight:bold">${overallMargin}</td>
+    <td style="color:${overallSpreadCol};font-weight:bold">${overallSpread}</td>
+    <td style="color:var(--cyan)">£${totalHomeSaved.toFixed(2)}</td>
+    <td style="color:var(--green);font-weight:bold">£${totalNetVal.toFixed(2)}</td>
+    <td>${totalCharge.toLocaleString()}</td>
+    <td>${totalSell.toLocaleString()}</td>
+    <td style="color:var(--muted)">${months.reduce((s,m) => s + monthly[m].homeKwh, 0).toFixed(0)}</td>
+    <td style="color:var(--purple)">${(() => { const allMin = Math.min(...months.map(m => monthly[m].socMin)); const allMax = Math.max(...months.map(m => monthly[m].socMax)); return allMin === Infinity ? '—' : allMin.toFixed(1) + ' – ' + allMax.toFixed(1); })()}</td>
+    <td style="color:var(--blue)">${avgKwhBoughtPerDay}</td>
+    <td style="color:var(--green)">${avgKwhSoldPerDay}</td>
+  </tr>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// STARTUP
+// ══════════════════════════════════════════════════════════════
+(async function init() {
+  // Check if we're running behind the Flask server
+  try {
+    await tryServerMode();
+    console.log('[NODE-3] Server mode active');
+  } catch {
+    console.log('[NODE-3] Direct API mode');
+  }
+
+  await refresh();
+  setInterval(refresh, CFG.REFRESH_MS);
+
+  // Auto-load 12-month historical data on startup (no button click needed)
+  setTimeout(() => {
+    const btn = document.getElementById('hist-btn');
+    if (btn && !btn.disabled) {
+      console.log('[NODE-3] Auto-loading 12-month historical data…');
+      loadHistoricalData();
+    }
+  }, 500); // 500ms delay to let live data settle first
+})();
+</script>
+</body>
+</html>

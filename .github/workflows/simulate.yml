@@ -1,0 +1,105 @@
+name: NODE-3 Arbitrage Simulation
+
+on:
+  schedule:
+    # Every 30 minutes (GitHub Actions cron minimum is 5 mins, 30 is fine)
+    - cron: '*/30 * * * *'
+
+  # Allow manual trigger from GitHub UI or API
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Simulation mode'
+        required: false
+        default: 'single'
+        type: choice
+        options:
+          - single
+          - backfill
+
+# Only run one job at a time to avoid race conditions on fleet_state.json
+concurrency:
+  group: node3-simulate
+  cancel-in-progress: false
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          # Need full history for the CSV append & commit
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run simulation
+        env:
+          AGILE_REGION:  ${{ vars.AGILE_REGION  || 'H' }}   # Southern England
+          LATITUDE:      ${{ vars.LATITUDE       || '50.9' }}
+          LONGITUDE:     ${{ vars.LONGITUDE      || '-1.4' }}
+        run: |
+          if [ "${{ github.event.inputs.mode }}" == "backfill" ]; then
+            echo "Running backfill mode (48h replay)..."
+            python simulate.py --backfill
+          else
+            echo "Running single-slot simulation..."
+            python simulate.py
+          fi
+
+      - name: Commit updated data files
+        run: |
+          git config user.name  "NODE-3 Bot"
+          git config user.email "node3-bot@users.noreply.github.com"
+
+          # Stage only the data files (never source code changes)
+          git add fleet_state.json prices.json weather.json history.csv || true
+
+          # Only commit if there are actual changes
+          if git diff --staged --quiet; then
+            echo "No data changes to commit."
+          else
+            SLOT_TIME=$(date -u '+%Y-%m-%d %H:%M UTC')
+            git commit -m "chore(data): arbitrage simulation ${SLOT_TIME}"
+            # T-11: pull --rebase to handle any concurrent push conflicts
+            git pull --rebase origin HEAD
+            # T-10: explicit branch to avoid detached-HEAD push failures
+            git push origin HEAD:main
+          fi
+
+  # Separate job: deploy the live dashboard to GitHub Pages (always)
+  deploy-dashboard:
+    needs: simulate
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'   # Serve from repo root → dashboard.html is the index
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

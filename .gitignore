@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+*.tmp
+*.bak
+.env
+.DS_Store
+*.log
+
+# Runtime-generated files — never commit these
+backtest_cache.json
+dispatch_plan.json
+export_prices.json
+weather.json
+
+# Output documents — not part of the codebase
+*.docx
+*.xlsx
+node3_full_export.md
+Dovecote_*.txt

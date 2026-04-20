@@ -1,0 +1,15 @@
+{
+  "soc_kwh": 23.470000000000006,
+  "profit_gbp": 11.128849493999997,
+  "charged_kwh": 150.3,
+  "discharged_kwh": 138.76000000000013,
+  "last_action": "charging",
+  "last_price_p": 14.3535,
+  "buy_threshold_p": 16.695,
+  "sell_threshold_p": 20.0865,
+  "last_updated": "2026-04-20T21:30:00+00:00",
+  "slots_simulated": 113,
+  "battery_kwh": 72.0,
+  "solar_kwp": 0.0,
+  "daily_load_kwh": 12.0
+}
