@@ -298,10 +298,12 @@ def _run_backtest(months=12):
         home_load     = _bt_home_load(dt)
 
         if is_vlp and soc > _BT_MIN_SOC_KWH + 0.1:
-            # VLP: serve house first, then export remainder
+            # VLP: serve house first, then export remainder up to DNO export cap.
+            # DNO cap (_BT_EXPORT_KWH) is a GRID export limit only — house serving
+            # is local (behind the meter) and does NOT reduce the export headroom.
             avail     = soc - _BT_MIN_SOC_KWH
             house     = min(home_load, avail)
-            grid_disc = min(_BT_EXPORT_KWH - house, max(0.0, avail - house))
+            grid_disc = min(_BT_EXPORT_KWH, max(0.0, avail - house))
             moved     = house + grid_disc
             if moved > 0.01:
                 soc -= moved
@@ -550,13 +552,23 @@ def api_plan():
 
     net_g98 = total_revenue_g98 - total_cost
 
-    # G99 net (same cost, larger export cap)
+    # G99 net — run independent SOC simulation with 5.75kWh export cap
+    # (same dispatch plan actions, same charge cost, but larger discharge per slot)
     EXPORT_KWH_G99 = 5.75
-    rev_g99 = sum(
-        min(EXPORT_KWH_G99, BAT_KWH) * RTE * s["exportP"] / 100
-        for s in ex_slots
-    )
-    net_g99 = rev_g99 - total_cost
+    soc_g99 = float(state.get("soc_kwh", BAT_KWH * 0.5))
+    total_revenue_g99 = 0.0
+    total_cost_g99    = 0.0
+    for s in slots:
+        if s["action"] == "charge":
+            ch = min(CHARGE_KWH, BAT_KWH - soc_g99)
+            soc_g99 = min(BAT_KWH, soc_g99 + ch)
+            total_cost_g99 += ch * s["importP"] / 100
+        elif s["action"] == "discharge":
+            dc = min(EXPORT_KWH_G99, soc_g99 - MIN_SOC)
+            dc = max(0, dc)
+            soc_g99 = max(MIN_SOC, soc_g99 - dc)
+            total_revenue_g99 += dc * RTE * s["exportP"] / 100
+    net_g99 = total_revenue_g99 - total_cost_g99
 
     return jsonify({
         "slots":    slots,
@@ -567,6 +579,7 @@ def api_plan():
             "net_g99":        round(net_g99, 4),
             "total_cost":     round(total_cost, 4),
             "total_rev_g98":  round(total_revenue_g98, 4),
+            "total_rev_g99":  round(total_revenue_g99, 4),
         }
     })
 

@@ -486,7 +486,8 @@ def percentile(values, pct):
 
 
 def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
-                          min_soc_kwh=MIN_SOC_KWH, historical_stats=None):
+                          min_soc_kwh=MIN_SOC_KWH, historical_stats=None,
+                          export_kwh_cap=None):
     """
     Intelligent lookahead optimizer using 12-month historical context.
 
@@ -509,7 +510,7 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
         return {}
 
     charge_per_slot    = CHARGE_RATE_KW * 0.5
-    discharge_per_slot = EXPORT_KWH
+    discharge_per_slot = export_kwh_cap if export_kwh_cap is not None else EXPORT_KWH
     load_per_slot      = DAILY_LOAD_KWH / 48.0
 
     prices_vals = [s['value_inc_vat'] for s in price_slots]
@@ -537,6 +538,14 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
         p       = s['value_inc_vat']
         slot_dt = datetime.fromisoformat(s['valid_from'].replace('Z', '+00:00'))
 
+        # Profitability: revenue per discharge slot must exceed cost per charge slot.
+        # revenue = discharge_per_slot × RTE × exportP / 100
+        # cost    = charge_per_slot × importP / 100
+        # Break-even export price: importP × charge_per_slot / (discharge_per_slot × RTE)
+        # G98: 5.25 × importP / (3.68 × 0.88) = 1.62 × importP
+        # G99: 5.25 × importP / (5.75 × 0.88) = 1.04 × importP
+        breakeven_export_p = (charge_per_slot * min_buy) / (discharge_per_slot * ROUND_TRIP_EFF)
+
         if using_history:
             hist_score   = score_price_vs_history(p, slot_dt, historical_stats)
             window_score = price_rank_in_window(p, prices_vals)
@@ -546,7 +555,7 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
             if composite <= 35:
                 tentative.append('charge')
             elif composite >= 65:
-                if p * ROUND_TRIP_EFF > min_buy:
+                if p > breakeven_export_p:
                     tentative.append('discharge')
                 else:
                     tentative.append('idle')
@@ -557,7 +566,7 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
             if p <= buy_thr:
                 tentative.append('charge')
             elif p >= sell_thr:
-                if p * ROUND_TRIP_EFF > min_buy:
+                if p > breakeven_export_p:
                     tentative.append('discharge')
                 else:
                     tentative.append('idle')
@@ -723,23 +732,20 @@ def simulate_slot(state, price_p, slot_dt, weather, buy_thr, sell_thr,
     action      = "idle"
     slot_profit = 0.0
 
-    # VLP override always takes priority: very high price -> serve house + export
+    # VLP override always takes priority: very high price -> export to grid.
+    # NOTE: home load already deducted from SOC at line 720 above. Do NOT
+    # re-deduct house_served here — that was the previous double-deduction bug.
+    # Just export whatever battery capacity is available above the reserve floor.
     if price_p >= VLP_PRICE_P and soc > min_soc + 0.1:
         available      = soc - min_soc
-        house_served   = min(slot_load_kwh, available)
-        export_avail   = max(0.0, available - house_served)
-        grid_discharge = min(export_kwh_slot - house_served, max(0.0, export_avail))
+        grid_discharge = min(export_kwh_slot, available)
         grid_discharge = max(0.0, grid_discharge)
 
-        total_moved = house_served + grid_discharge
-        if total_moved > 0.01:
-            soc -= total_moved
-            if house_served > 0.01:
-                slot_profit += house_served * price_p / 100.0
-            if grid_discharge > 0.01:
-                export_rate  = get_export_rate_p(export_prices or [], slot_dt)
-                slot_profit += grid_discharge * ROUND_TRIP_EFF * export_rate / 100.0
-                state['discharged_kwh'] += grid_discharge
+        if grid_discharge > 0.01:
+            soc             -= grid_discharge
+            export_rate      = get_export_rate_p(export_prices or [], slot_dt)
+            slot_profit     += grid_discharge * ROUND_TRIP_EFF * export_rate / 100.0
+            state['discharged_kwh'] += grid_discharge
             action = "discharging"
 
     # Follow the pre-computed plan if available
@@ -904,13 +910,15 @@ def run_backfill():
     hist_stats = get_or_refresh_historical_stats(product_code)
 
     # Run dual dispatch plans: G98 (32A current) and G99 (50A target)
-    print("[PLAN] --- G98 (32A, current) ---")
+    print("[PLAN] --- G98 (32A, 3.68kWh/slot) ---")
     dispatch_plan = plan_optimal_dispatch(prices, INITIAL_SOC_KWH,
-                                          historical_stats=hist_stats)
+                                          historical_stats=hist_stats,
+                                          export_kwh_cap=EXPORT_KWH_G98)
     save_dispatch_plan(dispatch_plan)
-    print("[PLAN] --- G99 (50A, upgrade target) ---")
+    print("[PLAN] --- G99 (50A, 5.75kWh/slot) ---")
     dispatch_plan_g99 = plan_optimal_dispatch(prices, INITIAL_SOC_KWH,
-                                              historical_stats=hist_stats)
+                                              historical_stats=hist_stats,
+                                              export_kwh_cap=EXPORT_KWH_G99)
 
     vals = [p['value_inc_vat'] for p in prices]
     buy_thr  = percentile(vals, BUY_PERCENTILE)
@@ -1049,9 +1057,11 @@ def run_single():
 
     # Dual dispatch plans: G98 and G99
     dispatch_plan     = plan_optimal_dispatch(prices, state['soc_kwh'],
-                                              historical_stats=hist_stats)
+                                              historical_stats=hist_stats,
+                                              export_kwh_cap=EXPORT_KWH_G98)
     dispatch_plan_g99 = plan_optimal_dispatch(prices, state_g99['soc_kwh'],
-                                              historical_stats=hist_stats)
+                                              historical_stats=hist_stats,
+                                              export_kwh_cap=EXPORT_KWH_G99)
     save_dispatch_plan(dispatch_plan)
 
     vals = [p['value_inc_vat'] for p in prices]
