@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Site Plan — DSL-SP-001 Rev A — 179 King Georges Avenue</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #fff; font-family: Arial, Helvetica, sans-serif; padding: 20px; }
+  .page { width: 297mm; min-height: 210mm; margin: 0 auto; border: 1px solid #000; position: relative; }
+  .drawing-area { padding: 10mm 10mm 0 10mm; }
+  svg text { font-family: Arial, Helvetica, sans-serif; }
+
+  /* Title block */
+  .title-block { border-top: 1px solid #000; display: grid; grid-template-columns: 1fr 60mm; height: 45mm; }
+  .tb-left { border-right: 1px solid #000; display: grid; grid-template-rows: 1fr 1fr; }
+  .tb-project { border-bottom: 1px solid #000; padding: 3mm 4mm; }
+  .tb-project .label { font-size: 7pt; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+  .tb-project .value { font-size: 9pt; font-weight: bold; margin-top: 1mm; }
+  .tb-address { padding: 3mm 4mm; }
+  .tb-address .label { font-size: 7pt; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+  .tb-address .value { font-size: 9pt; font-weight: bold; margin-top: 1mm; }
+  .tb-right { display: grid; grid-template-rows: repeat(5, 1fr); }
+  .tb-cell { border-bottom: 1px solid #000; padding: 1.5mm 3mm; display: flex; flex-direction: column; justify-content: center; }
+  .tb-cell:last-child { border-bottom: none; }
+  .tb-cell .label { font-size: 6.5pt; color: #555; text-transform: uppercase; }
+  .tb-cell .value { font-size: 8pt; font-weight: bold; }
+
+  @media print {
+    body { padding: 0; }
+    .page { border: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="drawing-area">
+    <svg width="100%" viewBox="0 0 740 430" xmlns="http://www.w3.org/2000/svg">
+
+      <!-- Drawing border / frame -->
+      <rect x="0" y="0" width="740" height="430" fill="white" stroke="#000" stroke-width="0.5"/>
+
+      <!-- ═══════════════ PLAN VIEW ═══════════════ -->
+
+      <!-- Street / road label -->
+      <rect x="10" y="10" width="720" height="28" fill="#e8e8e8" stroke="#999" stroke-width="0.5"/>
+      <text x="370" y="28" text-anchor="middle" font-size="11" fill="#444" font-style="italic">King Georges Avenue — carriageway</text>
+
+      <!-- Pavement -->
+      <rect x="10" y="38" width="720" height="18" fill="#d4d4d4" stroke="#999" stroke-width="0.5"/>
+      <text x="370" y="50" text-anchor="middle" font-size="8" fill="#555">pavement</text>
+
+      <!-- ─── Property boundary ─── -->
+      <!-- Full property outline: front at y=56, rear at y=360, left x=100, right x=640 -->
+      <rect x="100" y="56" width="540" height="304" fill="none" stroke="#000" stroke-width="2.5" stroke-dasharray="none"/>
+      <!-- boundary label -->
+      <text x="370" y="72" text-anchor="middle" font-size="8" fill="#555" font-style="italic">property boundary</text>
+
+      <!-- Front garden / forecourt (y=56 to y=120) -->
+      <rect x="100" y="56" width="540" height="64" fill="#f0f4e8" stroke="none"/>
+      <!-- Driveway gap in front boundary wall (left side) -->
+      <rect x="100" y="56" width="140" height="64" fill="#e8e4d8" stroke="none"/>
+      <!-- Front boundary wall -->
+      <line x1="240" y1="56" x2="640" y2="56" stroke="#555" stroke-width="3"/>
+      <text x="490" y="68" text-anchor="middle" font-size="7.5" fill="#666">front boundary wall / garden</text>
+
+      <!-- Driveway entrance label -->
+      <text x="168" y="75" text-anchor="middle" font-size="8" fill="#555" font-style="italic">driveway</text>
+      <text x="168" y="85" text-anchor="middle" font-size="8" fill="#555" font-style="italic">entrance</text>
+
+      <!-- ─── Building footprint ─── -->
+      <!-- Building: x=240 to x=640, y=120 to y=300 (front wall to rear wall) -->
+      <rect x="240" y="120" width="400" height="180" fill="#c8cfc8" stroke="#000" stroke-width="2"/>
+      <!-- Hatch lines to indicate building -->
+      <line x1="260" y1="120" x2="240" y2="140" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="290" y1="120" x2="240" y2="170" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="320" y1="120" x2="240" y2="200" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="350" y1="120" x2="240" y2="230" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="380" y1="120" x2="240" y2="260" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="410" y1="120" x2="240" y2="290" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="440" y1="120" x2="250" y2="300" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="470" y1="120" x2="280" y2="300" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="500" y1="120" x2="310" y2="300" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="530" y1="120" x2="340" y2="300" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="560" y1="120" x2="370" y2="300" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="590" y1="120" x2="400" y2="300" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="620" y1="120" x2="430" y2="300" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="640" y1="130" x2="460" y2="300" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="640" y1="160" x2="490" y2="300" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="640" y1="190" x2="520" y2="300" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="640" y1="220" x2="550" y2="300" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="640" y1="250" x2="580" y2="300" stroke="#aaa" stroke-width="0.5"/>
+      <line x1="640" y1="280" x2="610" y2="300" stroke="#aaa" stroke-width="0.5"/>
+
+      <!-- Building label -->
+      <text x="440" y="200" text-anchor="middle" font-size="12" fill="#333" font-weight="bold">DWELLING</text>
+      <text x="440" y="217" text-anchor="middle" font-size="9" fill="#555">179 King Georges Avenue</text>
+      <text x="440" y="230" text-anchor="middle" font-size="9" fill="#555">Southampton SO15 4LD</text>
+
+      <!-- Front wall of building / threshold -->
+      <rect x="240" y="115" width="400" height="8" fill="#888" stroke="#000" stroke-width="1"/>
+      <text x="440" y="113" text-anchor="middle" font-size="7.5" fill="#555">front wall of dwelling</text>
+
+      <!-- Rear wall label -->
+      <text x="440" y="316" text-anchor="middle" font-size="7.5" fill="#555">rear wall of dwelling</text>
+
+      <!-- ─── Left-side driveway / access run ─── -->
+      <!-- Driveway: x=100 to x=240, from front (y=56) to rear (y=360) -->
+      <rect x="100" y="56" width="140" height="304" fill="#e8e4d8" stroke="none"/>
+      <text x="170" y="195" text-anchor="middle" font-size="9" fill="#666" transform="rotate(-90, 170, 195)">driveway / side access</text>
+
+      <!-- Driveway boundary lines -->
+      <line x1="100" y1="56" x2="100" y2="360" stroke="#000" stroke-width="2.5"/>
+      <line x1="240" y1="120" x2="240" y2="360" stroke="#888" stroke-width="1" stroke-dasharray="6,3"/>
+
+      <!-- ─── Rear garden ─── -->
+      <rect x="100" y="300" width="540" height="60" fill="#e4f0d8" stroke="none"/>
+      <text x="370" y="338" text-anchor="middle" font-size="8.5" fill="#666" font-style="italic">rear garden</text>
+
+      <!-- Rear boundary wall -->
+      <line x1="100" y1="360" x2="640" y2="360" stroke="#555" stroke-width="2.5"/>
+      <text x="370" y="373" text-anchor="middle" font-size="7.5" fill="#666">rear boundary</text>
+
+      <!-- ═══════════════ KEY POINTS ═══════════════ -->
+
+      <!-- Meter location: front of building, right of front door (approx x=300 y=120) -->
+      <!-- Marked with a circle + X -->
+      <circle cx="310" cy="120" r="10" fill="white" stroke="#0055aa" stroke-width="2"/>
+      <line x1="303" y1="113" x2="317" y2="127" stroke="#0055aa" stroke-width="2.5"/>
+      <line x1="317" y1="113" x2="303" y2="127" stroke="#0055aa" stroke-width="2.5"/>
+      <text x="330" y="110" font-size="9" fill="#0055aa" font-weight="bold">Electricity meter</text>
+      <text x="330" y="121" font-size="8.5" fill="#0055aa">(MPAN 2000022678841)</text>
+      <text x="330" y="131" font-size="8" fill="#0055aa">SMETS2 — front elevation</text>
+
+      <!-- BESS install location: left driveway, halfway down building depth (y=120 to y=300, midpoint = y=210) -->
+      <!-- Red square + X for install location -->
+      <rect x="130" y="195" width="55" height="35" fill="#fff3e8" stroke="#cc4400" stroke-width="2" rx="3"/>
+      <line x1="130" y1="195" x2="185" y2="230" stroke="#cc4400" stroke-width="1.5"/>
+      <line x1="185" y1="195" x2="130" y2="230" stroke="#cc4400" stroke-width="1.5"/>
+      <!-- Arrow from label to box -->
+      <text x="92" y="180" text-anchor="middle" font-size="9" fill="#cc4400" font-weight="bold">BESS</text>
+      <text x="92" y="191" text-anchor="middle" font-size="8.5" fill="#cc4400">install</text>
+      <text x="92" y="201" text-anchor="middle" font-size="8" fill="#cc4400">location</text>
+      <!-- connector line from label to box edge -->
+      <line x1="100" y1="200" x2="130" y2="210" stroke="#cc4400" stroke-width="1" stroke-dasharray="3,2"/>
+
+      <!-- BESS label callout on right side -->
+      <line x1="185" y1="212" x2="240" y2="212" stroke="#cc4400" stroke-width="1" stroke-dasharray="3,2"/>
+      <line x1="240" y1="212" x2="280" y2="212" stroke="#cc4400" stroke-width="1"/>
+      <text x="282" y="208" font-size="8.5" fill="#cc4400" font-weight="bold">FoxESS KH10.5 HV</text>
+      <text x="282" y="219" font-size="8" fill="#cc4400">10.5kW / 72kWh BESS</text>
+
+      <!-- Dimension: building depth midpoint indicator -->
+      <!-- Building depth: y=120 to y=300 = 180 units. Midpoint = y=210 -->
+      <line x1="96" y1="120" x2="96" y2="300" stroke="#777" stroke-width="0.8" stroke-dasharray="4,2"/>
+      <line x1="88" y1="120" x2="104" y2="120" stroke="#777" stroke-width="1"/>
+      <line x1="88" y1="300" x2="104" y2="300" stroke="#777" stroke-width="1"/>
+      <line x1="88" y1="210" x2="104" y2="210" stroke="#cc4400" stroke-width="1.5"/>
+      <text x="66" y="168" text-anchor="middle" font-size="7" fill="#777" transform="rotate(-90, 66, 168)">building depth</text>
+      <text x="84" y="172" text-anchor="right" font-size="6.5" fill="#cc4400" transform="rotate(-90, 84, 172)">½ depth</text>
+
+      <!-- ═══════════════ LEGEND ═══════════════ -->
+      <rect x="500" y="320" width="230" height="95" fill="white" stroke="#000" stroke-width="1"/>
+      <text x="615" y="333" text-anchor="middle" font-size="9" font-weight="bold" fill="#000">LEGEND</text>
+      <line x1="500" y1="336" x2="730" y2="336" stroke="#000" stroke-width="0.8"/>
+
+      <!-- Legend item: meter -->
+      <circle cx="515" cy="349" r="7" fill="white" stroke="#0055aa" stroke-width="1.5"/>
+      <line x1="509" y1="343" x2="521" y2="355" stroke="#0055aa" stroke-width="1.5"/>
+      <line x1="521" y1="343" x2="509" y2="355" stroke="#0055aa" stroke-width="1.5"/>
+      <text x="528" y="353" font-size="8.5" fill="#000">Electricity meter location</text>
+
+      <!-- Legend item: BESS -->
+      <rect x="508" y="360" width="14" height="10" fill="#fff3e8" stroke="#cc4400" stroke-width="1.5" rx="1"/>
+      <line x1="508" y1="360" x2="522" y2="370" stroke="#cc4400" stroke-width="1"/>
+      <line x1="522" y1="360" x2="508" y2="370" stroke="#cc4400" stroke-width="1"/>
+      <text x="528" y="369" font-size="8.5" fill="#000">BESS install location (G99 plant)</text>
+
+      <!-- Legend item: property boundary -->
+      <line x1="508" y1="382" x2="522" y2="382" stroke="#000" stroke-width="2.5"/>
+      <text x="528" y="386" font-size="8.5" fill="#000">Property boundary</text>
+
+      <!-- Legend item: building -->
+      <rect x="508" y="392" width="14" height="10" fill="#c8cfc8" stroke="#000" stroke-width="1"/>
+      <text x="528" y="401" font-size="8.5" fill="#000">Dwelling footprint</text>
+
+      <!-- ═══════════════ NORTH ARROW ═══════════════ -->
+      <g transform="translate(480, 350)">
+        <circle cx="0" cy="0" r="22" fill="white" stroke="#000" stroke-width="1"/>
+        <!-- North arrow: street is top, so north is approximate -->
+        <polygon points="0,-16 -6,8 0,4 6,8" fill="#000"/>
+        <polygon points="0,-16 -6,8 0,4 6,8" fill="white" clip-path="url(#half)"/>
+        <text x="0" y="-18" text-anchor="middle" font-size="9" font-weight="bold" fill="#000" dy="0">N</text>
+        <!-- Half fill for arrow -->
+        <path d="M0,-16 L0,4 L6,8 Z" fill="white" opacity="0.0"/>
+        <path d="M0,-16 L-6,8 L0,4 Z" fill="#000"/>
+        <text x="0" y="28" text-anchor="middle" font-size="7" fill="#555">(indicative)</text>
+      </g>
+
+      <!-- ═══════════════ SCALE NOTE ═══════════════ -->
+      <text x="370" y="420" text-anchor="middle" font-size="8" fill="#555" font-style="italic">Note: This plan is schematic and not drawn to exact scale. All dimensions and boundaries are indicative. An aerial view from Google Maps / OS should accompany this plan for formal submission.</text>
+
+    </svg>
+  </div>
+
+  <!-- Title block -->
+  <div class="title-block">
+    <div class="tb-left">
+      <div class="tb-project">
+        <div class="label">Project</div>
+        <div class="value">G99 Formal Application — 10.5kW BESS Installation</div>
+      </div>
+      <div class="tb-address">
+        <div class="label">Site Address</div>
+        <div class="value">179 King Georges Avenue, Southampton SO15 4LD &nbsp;|&nbsp; MPAN: 2000022678841 &nbsp;|&nbsp; Dovecote Systems Ltd, Company No. 17160178</div>
+      </div>
+    </div>
+    <div class="tb-right">
+      <div class="tb-cell">
+        <span class="label">Drawing No.</span>
+        <span class="value">DSL-SP-001</span>
+      </div>
+      <div class="tb-cell">
+        <span class="label">Revision</span>
+        <span class="value">Rev A</span>
+      </div>
+      <div class="tb-cell">
+        <span class="label">Date</span>
+        <span class="value">29 April 2026</span>
+      </div>
+      <div class="tb-cell">
+        <span class="label">Scale</span>
+        <span class="value">Not to Scale (NTS)</span>
+      </div>
+      <div class="tb-cell">
+        <span class="label">Prepared by</span>
+        <span class="value">Dovecote Systems Ltd</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

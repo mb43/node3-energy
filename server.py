@@ -15,6 +15,7 @@ import time
 import argparse
 import subprocess
 import sys
+import threading
 from datetime import datetime, timedelta, timezone
 from flask import Flask, jsonify, send_file, Response, request
 from flask_cors import CORS
@@ -62,13 +63,19 @@ def load_history(max_rows=200):
                 soc    = float(row.get("soc_kwh")    or row.get("avg_soc_kwh")      or 0)
                 price  = float(row.get("price_p")    or row.get("avg_price_p")      or 0)
                 action = row.get("action", "idle")
+                g99_profit = row.get("g99_profit_gbp", "")
+                g99_soc    = row.get("g99_soc_kwh", "")
                 records.append({
-                    "timestamp":     row["timestamp"],
-                    "profit_gbp":    profit,
-                    "slot_profit_gbp": float(row.get("slot_profit_gbp", 0)),
-                    "price_p":       price,
-                    "soc_kwh":       soc,
-                    "action":        action,
+                    "timestamp":          row["timestamp"],
+                    "profit_gbp":         profit,
+                    "slot_profit_gbp":    float(row.get("slot_profit_gbp", 0)),
+                    "price_p":            price,
+                    "soc_kwh":            soc,
+                    "action":             action,
+                    "g99_profit_gbp":     float(g99_profit) if g99_profit else None,
+                    "g99_slot_profit_gbp": float(row.get("g99_slot_profit_gbp", 0) or 0),
+                    "g99_soc_kwh":        float(g99_soc) if g99_soc else None,
+                    "g99_action":         row.get("g99_action", ""),
                 })
     except Exception as e:
         print("[WARN] history.csv read error: " + str(e))
@@ -395,6 +402,11 @@ def index():
     return send_file(os.path.join(BASE_DIR, "dashboard.html"))
 
 
+@app.route("/NODE3_Schematic.html")
+def schematic():
+    return send_file(os.path.join(BASE_DIR, "NODE3_Schematic.html"))
+
+
 @app.route("/api/node")
 @app.route("/api/fleet")   # keep old path for compat
 def api_node():
@@ -447,6 +459,19 @@ def api_status():
         "profit_gbp":       state.get("profit_gbp") if state else None,
         "slots_simulated":  state.get("slots_simulated") if state else None,
     })
+
+
+@app.route("/api/run-now", methods=["POST"])
+def api_run_now():
+    """Trigger simulate.py immediately (useful after a restart or when prices go stale)."""
+    try:
+        rc, err = _run_simulate()
+        if rc == 0:
+            return jsonify({"status": "ok", "message": "simulate.py completed successfully"})
+        else:
+            return jsonify({"status": "error", "message": err[:500]}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route("/api/backtest")
@@ -548,6 +573,62 @@ def api_debug_compile():
 
 
 # ─────────────────────────────────────────────
+# BACKGROUND SIMULATION SCHEDULER
+# Mirrors the GitHub Actions 30-min cron so the
+# local portal stays live without manual triggers.
+# ─────────────────────────────────────────────
+_SIMULATE_INTERVAL_S = 1800  # 30 minutes
+
+def _next_slot_delay() -> float:
+    """Seconds until the next Agile half-hour slot boundary (HH:00 or HH:30)."""
+    now = datetime.now(timezone.utc)
+    minute = now.minute
+    second = now.second
+    if minute < 30:
+        return (30 - minute) * 60 - second
+    else:
+        return (60 - minute) * 60 - second
+
+def _run_simulate():
+    """Run simulate.py once and return (returncode, stderr)."""
+    cmd = [sys.executable, os.path.join(BASE_DIR, "simulate.py")]
+    result = subprocess.run(cmd, timeout=120, capture_output=True, text=True)
+    return result.returncode, result.stderr
+
+
+def _simulation_loop():
+    """
+    Background thread: run simulate.py immediately on startup, then again
+    at each 30-minute Agile slot boundary (HH:00 / HH:30).
+    """
+    # Run immediately on startup so prices.json is fresh from the first request.
+    print("[NODE-3 scheduler] Startup run — fetching fresh prices…", flush=True)
+    try:
+        rc, err = _run_simulate()
+        if rc == 0:
+            print("[NODE-3 scheduler] Startup simulate.py OK", flush=True)
+        else:
+            print(f"[NODE-3 scheduler] Startup simulate.py error: {err[:200]}", flush=True)
+    except Exception as exc:
+        print(f"[NODE-3 scheduler] Startup exception: {exc}", flush=True)
+
+    # Then align to slot boundaries for subsequent runs.
+    while True:
+        delay = _next_slot_delay()
+        print(f"[NODE-3 scheduler] Next slot boundary in {delay:.0f}s", flush=True)
+        time.sleep(max(5, delay))
+        try:
+            print("[NODE-3 scheduler] Running simulate.py …", flush=True)
+            rc, err = _run_simulate()
+            if rc == 0:
+                print("[NODE-3 scheduler] simulate.py OK", flush=True)
+            else:
+                print(f"[NODE-3 scheduler] simulate.py error: {err[:200]}", flush=True)
+        except Exception as exc:
+            print(f"[NODE-3 scheduler] Exception: {exc}", flush=True)
+
+
+# ─────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────
 if __name__ == "__main__":
@@ -560,5 +641,10 @@ if __name__ == "__main__":
     print("  NODE-3 ARBITRAGE PORTAL")
     print("  http://localhost:" + str(args.port))
     print("="*55 + "\n")
+
+    # Start background simulation scheduler (daemon so it dies with the server)
+    sim_thread = threading.Thread(target=_simulation_loop, daemon=True, name="sim-scheduler")
+    sim_thread.start()
+    print("[NODE-3 scheduler] Started — will run simulate.py at each 30-min slot boundary", flush=True)
 
     app.run(host=args.host, port=args.port, debug=False, threaded=True)

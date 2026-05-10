@@ -37,8 +37,9 @@ SOLAR_EFFICIENCY   = 0.18    # panel efficiency
 BUY_PERCENTILE     = 35      # charge when price < 35th percentile of window
 SELL_PERCENTILE    = 60      # discharge when price > 60th percentile of window
 ROUND_TRIP_EFF     = 0.88    # FoxESS + Nissan cell round-trip efficiency
-EXPORT_KWH         = 3.68    # 32A x 230V x 0.5h = G98 single-phase DNO export cap
-                              # G99 50A upgrade -> 5.75 kWh/slot (apply via SSEN fast-track)
+EXPORT_KWH_G98     = 3.68    # 32A x 230V x 0.5h = G98 current cap (pending G99)
+EXPORT_KWH_G99     = 5.75    # 50A x 230V x 0.5h = G99 target (ref 260420-000198)
+EXPORT_KWH         = EXPORT_KWH_G98  # active cap — update to G99 once SSEN approves
 EXPORT_RATE_P_DEF  = 15.0    # Conservative Octopus Outgoing default (p/kWh) when live
                               # export prices unavailable; live prices preferred
 VLP_PRICE_P        = 40.0    # VLP activation threshold: serve house first when >= 40p
@@ -64,7 +65,203 @@ PRICES_FILE         = os.path.join(BASE_DIR, "prices.json")
 EXPORT_PRICES_FILE  = os.path.join(BASE_DIR, "export_prices.json")
 WEATHER_FILE        = os.path.join(BASE_DIR, "weather.json")
 HISTORY_FILE        = os.path.join(BASE_DIR, "history.csv")
-DISPATCH_PLAN_FILE  = os.path.join(BASE_DIR, "dispatch_plan.json")
+DISPATCH_PLAN_FILE       = os.path.join(BASE_DIR, "dispatch_plan.json")
+HISTORICAL_STATS_FILE    = os.path.join(BASE_DIR, "historical_stats.json")
+HISTORICAL_REFRESH_DAYS  = 7   # Re-fetch 12 months of history weekly
+
+
+# ---------------------------------------------
+# HISTORICAL PRICE INTELLIGENCE
+# ---------------------------------------------
+def fetch_historical_prices(product_code, region=REGION):
+    """
+    Fetch 12 months of historical Agile prices from Octopus API in monthly chunks.
+    Returns flat list of price records.
+    """
+    end_dt   = datetime.now(timezone.utc)
+    start_dt = end_dt - timedelta(days=365)
+    tariff_code = "E-1R-" + product_code + "-" + region
+    url = ("https://api.octopus.energy/v1/products/" + product_code
+           + "/electricity-tariffs/" + tariff_code + "/standard-unit-rates/")
+    all_prices = []
+    from_dt = start_dt
+    while from_dt < end_dt:
+        to_dt = min(from_dt + timedelta(days=31), end_dt)
+        try:
+            resp = requests.get(url, params={
+                'period_from': from_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'period_to':   to_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'page_size':   1500,
+            }, timeout=30)
+            resp.raise_for_status()
+            results = resp.json().get("results", [])
+            all_prices.extend(results)
+            print("[HIST] " + from_dt.strftime("%Y-%m") + ": " + str(len(results)) + " slots")
+        except Exception as e:
+            print("[WARN] Historical fetch failed for "
+                  + from_dt.strftime("%Y-%m") + ": " + str(e))
+        from_dt = to_dt
+    return all_prices
+
+
+def build_historical_stats(prices):
+    """
+    Build percentile tables from 12 months of prices.
+    Indexed by: overall | month-of-year | hour-of-day | month+hour (most specific).
+    This gives the engine genuine seasonal + time-of-day context.
+    """
+    from collections import defaultdict
+    overall        = []
+    by_month       = defaultdict(list)
+    by_hour        = defaultdict(list)
+    by_month_hour  = defaultdict(list)
+
+    for p in prices:
+        val = p.get('value_inc_vat')
+        if val is None:
+            continue
+        val = float(val)
+        if val < -20 or val > 100:   # exclude extreme outliers / plunge pricing
+            continue
+        ts = p.get('valid_from', '')
+        try:
+            dt    = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+            month = dt.month
+            hour  = dt.hour
+        except Exception:
+            continue
+        overall.append(val)
+        by_month[month].append(val)
+        by_hour[hour].append(val)
+        by_month_hour[(month, hour)].append(val)
+
+    def pcts(values):
+        if not values:
+            return None
+        s = sorted(values)
+        n = len(s)
+        return {
+            'p5':  s[max(0, int(n * 0.05))],
+            'p15': s[max(0, int(n * 0.15))],
+            'p25': s[max(0, int(n * 0.25))],
+            'p35': s[max(0, int(n * 0.35))],
+            'p50': s[max(0, int(n * 0.50))],
+            'p65': s[max(0, int(n * 0.65))],
+            'p75': s[max(0, int(n * 0.75))],
+            'p85': s[max(0, int(n * 0.85))],
+            'p95': s[max(0, int(n * 0.95))],
+            'n':   n,
+        }
+
+    return {
+        'cached_at':     datetime.now(timezone.utc).isoformat(),
+        'total_slots':   len(overall),
+        'region':        REGION,
+        'overall':       pcts(overall),
+        'by_month':      {str(m): pcts(v) for m, v in by_month.items()},
+        'by_hour':       {str(h): pcts(v) for h, v in by_hour.items()},
+        'by_month_hour': {
+            str(m) + '_' + str(h): pcts(v)
+            for (m, h), v in by_month_hour.items()
+        },
+    }
+
+
+def load_historical_stats():
+    """Return cached stats if fresh (< HISTORICAL_REFRESH_DAYS old), else None."""
+    if not os.path.exists(HISTORICAL_STATS_FILE):
+        return None
+    try:
+        with open(HISTORICAL_STATS_FILE) as f:
+            stats = json.load(f)
+        cached_at = datetime.fromisoformat(stats['cached_at'])
+        if (datetime.now(timezone.utc) - cached_at).days >= HISTORICAL_REFRESH_DAYS:
+            return None
+        return stats
+    except Exception:
+        return None
+
+
+def save_historical_stats(stats):
+    with open(HISTORICAL_STATS_FILE, 'w') as f:
+        json.dump(stats, f, indent=2)
+
+
+def get_or_refresh_historical_stats(product_code):
+    """
+    Return historical stats, refreshing from API if stale or missing.
+    Returns None if API unavailable and no cache exists.
+    """
+    stats = load_historical_stats()
+    if stats:
+        print("[HIST] Cached stats: " + str(stats.get('total_slots', '?'))
+              + " slots, age < " + str(HISTORICAL_REFRESH_DAYS) + " days")
+        return stats
+    if not product_code:
+        return None
+    print("[HIST] Fetching 12-month historical Agile prices (region " + REGION + ")…")
+    prices = fetch_historical_prices(product_code)
+    if not prices:
+        print("[WARN] No historical prices retrieved — using window-only thresholds")
+        return None
+    stats = build_historical_stats(prices)
+    save_historical_stats(stats)
+    print("[HIST] Built stats from " + str(stats['total_slots']) + " slots  "
+          + "overall p25=" + str(round(stats['overall']['p25'], 2)) + "p  "
+          + "p75=" + str(round(stats['overall']['p75'], 2)) + "p")
+    return stats
+
+
+def score_price_vs_history(price_p, slot_dt, stats):
+    """
+    Score a price 0–100 against 12 months of history for the same month+hour.
+    0  = historically cheapest (strong buy signal)
+    100 = historically most expensive (strong sell signal)
+    Uses month+hour context first, falls back to month, then overall.
+    """
+    if not stats:
+        return 50
+
+    month = str(slot_dt.month)
+    hour  = str(slot_dt.hour)
+    ctx   = (stats.get('by_month_hour', {}).get(month + '_' + hour)
+             or stats.get('by_month',      {}).get(month)
+             or stats.get('overall'))
+    if not ctx:
+        return 50
+
+    ladder = [
+        (ctx.get('p5',  -999),  5),
+        (ctx.get('p15', -999), 15),
+        (ctx.get('p25', -999), 25),
+        (ctx.get('p35', -999), 35),
+        (ctx.get('p50', -999), 50),
+        (ctx.get('p65', -999), 65),
+        (ctx.get('p75', -999), 75),
+        (ctx.get('p85', -999), 85),
+        (ctx.get('p95', -999), 95),
+    ]
+    if price_p <= ladder[0][0]:
+        return 0
+    if price_p >= ladder[-1][0]:
+        return 100
+    for i in range(len(ladder) - 1):
+        lo_p, lo_s = ladder[i]
+        hi_p, hi_s = ladder[i + 1]
+        if lo_p <= price_p <= hi_p:
+            if hi_p == lo_p:
+                return lo_s
+            frac = (price_p - lo_p) / (hi_p - lo_p)
+            return lo_s + frac * (hi_s - lo_s)
+    return 50
+
+
+def price_rank_in_window(price_p, all_prices_vals):
+    """Percentile rank of price within the current window (0–100)."""
+    if not all_prices_vals:
+        return 50
+    below = sum(1 for v in all_prices_vals if v < price_p)
+    return (below / len(all_prices_vals)) * 100
 
 
 # ---------------------------------------------
@@ -289,57 +486,83 @@ def percentile(values, pct):
 
 
 def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
-                          min_soc_kwh=MIN_SOC_KWH):
+                          min_soc_kwh=MIN_SOC_KWH, historical_stats=None):
     """
-    Lookahead optimizer: plan charge/discharge for all available price slots.
-    No time-of-day restrictions. Works on any window — overnight, midday solar
-    dumps, morning spikes, all treated equally.
+    Intelligent lookahead optimizer using 12-month historical context.
 
     Algorithm:
-      1. Compute buy/sell thresholds from the actual price distribution of this window
-      2. Label each slot tentatively: charge (cheap) / discharge (expensive) / idle
-      3. For discharge slots, only discharge if it's profitable after round-trip losses
-         (i.e. sell_price * eff > buy_price of the cheapest available charge slot)
-      4. Walk slots in time order, enforcing SOC constraints:
-         - Can't discharge more than available above MIN_SOC
-         - Can't charge above BATTERY_KWH
-         - Skip action if SOC constraint would be violated
-      5. VLP override: always discharge when price >= VLP_PRICE_P regardless of plan
+      1. For each slot, compute a composite score (0–100) blending:
+           - 70% historical score: where does this price sit vs the same month+hour
+             over the last 12 months? (seasonal and time-of-day aware)
+           - 30% window rank: where does it sit in today's available prices?
+         This means: a 14p price at 3am in May is scored against May 3am prices
+         historically — not against midday winter prices.
+      2. Label slots: score ≤ 35 → charge, score ≥ 65 → discharge, else idle
+      3. Discharge only if profitable after round-trip losses vs cheapest charge slot
+      4. Walk in time order enforcing SOC constraints throughout
+      5. VLP override: always discharge when price >= VLP_PRICE_P
 
+    Falls back to window-only percentiles if no historical data available.
     Returns: dict mapping valid_from string -> 'charge' | 'discharge' | 'idle'
     """
     if not price_slots:
         return {}
 
-    charge_per_slot  = CHARGE_RATE_KW * 0.5   # 5.25 kWh max
-    discharge_per_slot = EXPORT_KWH            # 3.68 kWh (G98 cap)
-    load_per_slot    = DAILY_LOAD_KWH / 48.0   # ~0.25 kWh/slot
+    charge_per_slot    = CHARGE_RATE_KW * 0.5
+    discharge_per_slot = EXPORT_KWH
+    load_per_slot      = DAILY_LOAD_KWH / 48.0
 
     prices_vals = [s['value_inc_vat'] for s in price_slots]
-    buy_thr  = percentile(prices_vals, BUY_PERCENTILE)
-    sell_thr = percentile(prices_vals, SELL_PERCENTILE)
-    min_buy  = min(prices_vals) if prices_vals else 0.0
+    min_buy     = min(prices_vals) if prices_vals else 0.0
+
+    using_history = historical_stats is not None
+    if using_history:
+        print("[PLAN] Intelligent mode: 70% historical context + 30% window rank")
+    else:
+        buy_thr  = percentile(prices_vals, BUY_PERCENTILE)
+        sell_thr = percentile(prices_vals, SELL_PERCENTILE)
+        print("[PLAN] Window-only mode (no historical stats): "
+              + "buy<" + str(round(buy_thr, 2)) + "p  "
+              + "sell>" + str(round(sell_thr, 2)) + "p")
 
     print("[PLAN] Window: " + str(len(price_slots)) + " slots  "
-          + "buy<" + str(round(buy_thr, 2)) + "p  "
-          + "sell>" + str(round(sell_thr, 2)) + "p  "
-          + "min=" + str(round(min_buy, 2)) + "p")
+          + "min=" + str(round(min_buy, 2)) + "p  "
+          + "max=" + str(round(max(prices_vals), 2)) + "p  "
+          + "avg=" + str(round(sum(prices_vals)/len(prices_vals), 2)) + "p")
 
-    # Phase 1: tentative labels based purely on price
+    # Phase 1: score and label each slot
     tentative = []
+    scores    = []
     for s in price_slots:
-        p = s['value_inc_vat']
-        if p <= buy_thr:
-            tentative.append('charge')
-        elif p >= sell_thr:
-            # Only worth discharging if: sell_price * eff > cheapest_buy_price
-            # This filters out cases where the spread doesn't cover round-trip losses
-            if p * ROUND_TRIP_EFF > min_buy:
-                tentative.append('discharge')
+        p       = s['value_inc_vat']
+        slot_dt = datetime.fromisoformat(s['valid_from'].replace('Z', '+00:00'))
+
+        if using_history:
+            hist_score   = score_price_vs_history(p, slot_dt, historical_stats)
+            window_score = price_rank_in_window(p, prices_vals)
+            composite    = 0.7 * hist_score + 0.3 * window_score
+            scores.append(composite)
+
+            if composite <= 35:
+                tentative.append('charge')
+            elif composite >= 65:
+                if p * ROUND_TRIP_EFF > min_buy:
+                    tentative.append('discharge')
+                else:
+                    tentative.append('idle')
             else:
                 tentative.append('idle')
         else:
-            tentative.append('idle')
+            scores.append(50)
+            if p <= buy_thr:
+                tentative.append('charge')
+            elif p >= sell_thr:
+                if p * ROUND_TRIP_EFF > min_buy:
+                    tentative.append('discharge')
+                else:
+                    tentative.append('idle')
+            else:
+                tentative.append('idle')
 
     # Phase 2: walk in time order, enforce SOC constraints
     soc = initial_soc_kwh
@@ -390,9 +613,11 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
     discharged = sum(1 for v in plan.values() if v == 'discharge')
     idle       = sum(1 for v in plan.values() if v == 'idle')
     total      = len(plan)
+    avg_score  = round(sum(scores) / len(scores), 1) if scores else 0
     print("[PLAN] charge=" + str(charged) + " (" + str(round(100*charged/total)) + "%)"
           + "  discharge=" + str(discharged) + " (" + str(round(100*discharged/total)) + "%)"
-          + "  idle=" + str(idle) + " (" + str(round(100*idle/total)) + "%)")
+          + "  idle=" + str(idle) + " (" + str(round(100*idle/total)) + "%)"
+          + "  avg_hist_score=" + str(avg_score) + "/100")
 
     return plan
 
@@ -471,7 +696,7 @@ def save_state(state):
 # SIMULATION CORE
 # ---------------------------------------------
 def simulate_slot(state, price_p, slot_dt, weather, buy_thr, sell_thr,
-                  export_prices=None, planned_action=None):
+                  export_prices=None, planned_action=None, export_kwh_cap=None):
     """
     Run one 30-min slot for Node-3 following the pre-computed dispatch plan.
     Falls back to threshold heuristic when no plan is available.
@@ -479,7 +704,8 @@ def simulate_slot(state, price_p, slot_dt, weather, buy_thr, sell_thr,
     No time-of-day restrictions. The plan (or threshold logic) decides
     charge/discharge based on price rank within the full window.
     """
-    charge_kwh_max = CHARGE_RATE_KW * 0.5    # 5.25 kWh max charge/slot
+    charge_kwh_max  = CHARGE_RATE_KW * 0.5    # 5.25 kWh max charge/slot
+    export_kwh_slot = export_kwh_cap if export_kwh_cap is not None else EXPORT_KWH
 
     bat_kwh      = state.get("battery_kwh",    BATTERY_KWH)
     solar_kwp    = state.get("solar_kwp",      SOLAR_KWP)
@@ -502,7 +728,7 @@ def simulate_slot(state, price_p, slot_dt, weather, buy_thr, sell_thr,
         available      = soc - min_soc
         house_served   = min(slot_load_kwh, available)
         export_avail   = max(0.0, available - house_served)
-        grid_discharge = min(EXPORT_KWH - house_served, max(0.0, export_avail))
+        grid_discharge = min(export_kwh_slot - house_served, max(0.0, export_avail))
         grid_discharge = max(0.0, grid_discharge)
 
         total_moved = house_served + grid_discharge
@@ -529,7 +755,7 @@ def simulate_slot(state, price_p, slot_dt, weather, buy_thr, sell_thr,
 
     elif planned_action == 'discharge':
         available  = soc - min_soc
-        discharge  = min(EXPORT_KWH, available)
+        discharge  = min(export_kwh_slot, available)
         if discharge > 0.01:
             soc         -= discharge
             export_rate  = get_export_rate_p(export_prices or [], slot_dt)
@@ -550,9 +776,8 @@ def simulate_slot(state, price_p, slot_dt, weather, buy_thr, sell_thr,
             action = "charging"
 
     elif price_p > sell_thr and soc > min_soc + 0.1:
-        # No peak window restriction — discharge whenever price > sell threshold
         available  = soc - min_soc
-        discharge  = min(EXPORT_KWH, available)
+        discharge  = min(export_kwh_slot, available)
         if discharge > 0.01:
             soc         -= discharge
             export_rate  = get_export_rate_p(export_prices or [], slot_dt)
@@ -573,9 +798,15 @@ def simulate_slot(state, price_p, slot_dt, weather, buy_thr, sell_thr,
     return slot_profit
 
 
-def append_history(ts, profit_gbp, slot_profit, price_p, soc_kwh, action):
-    """Append one row to history.csv (read-modify-write for VirtioFS compat)."""
-    fieldnames = ["timestamp", "profit_gbp", "slot_profit_gbp", "price_p", "soc_kwh", "action"]
+HISTORY_FIELDS = [
+    "timestamp", "profit_gbp", "slot_profit_gbp", "price_p", "soc_kwh", "action",
+    "g99_profit_gbp", "g99_slot_profit_gbp", "g99_soc_kwh", "g99_action",
+]
+
+
+def append_history(ts, profit_gbp, slot_profit, price_p, soc_kwh, action,
+                   g99_profit=None, g99_slot_profit=None, g99_soc=None, g99_action=None):
+    """Append one row to history.csv including G98 and G99 parallel values."""
     rows = []
     if os.path.exists(HISTORY_FILE):
         try:
@@ -586,27 +817,30 @@ def append_history(ts, profit_gbp, slot_profit, price_p, soc_kwh, action):
         except Exception:
             pass
     nr = {
-        'timestamp':       ts,
-        'profit_gbp':      round(profit_gbp, 6),
-        'slot_profit_gbp': round(slot_profit, 6),
-        'price_p':         round(price_p, 4),
-        'soc_kwh':         round(soc_kwh, 3),
-        'action':          action,
+        'timestamp':            ts,
+        'profit_gbp':           round(profit_gbp, 6),
+        'slot_profit_gbp':      round(slot_profit, 6),
+        'price_p':              round(price_p, 4),
+        'soc_kwh':              round(soc_kwh, 3),
+        'action':               action,
+        'g99_profit_gbp':       round(g99_profit, 6)       if g99_profit      is not None else '',
+        'g99_slot_profit_gbp':  round(g99_slot_profit, 6)  if g99_slot_profit is not None else '',
+        'g99_soc_kwh':          round(g99_soc, 3)           if g99_soc         is not None else '',
+        'g99_action':           g99_action or '',
     }
     rows.append(nr)
     rows = rows[-200:]
     with open(HISTORY_FILE, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=HISTORY_FIELDS, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(rows)
 
 
 def write_history_batch(history_rows):
     """Write a full list of history rows at once (used by backfill)."""
-    fieldnames = ["timestamp", "profit_gbp", "slot_profit_gbp", "price_p", "soc_kwh", "action"]
     rows = history_rows[-200:]
     with open(HISTORY_FILE, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=HISTORY_FIELDS, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(rows)
 
@@ -619,20 +853,30 @@ def run_backfill():
     Simulate the last 48 hours of real Agile prices.
     Uses full lookahead optimizer across all 48 slots — no time restrictions.
     Resets state and replays all slots in order.
+    Falls back to cached prices when the API is unreachable.
     """
     print("[NODE-3] BACKFILL mode - optimising last 48 hours")
 
     product_code = discover_agile_product()
     if not product_code:
-        print("[ERROR] Cannot discover Agile product. Aborting backfill.")
-        sys.exit(1)
-    print("[OK] Agile import product: " + product_code)
-
-    prices = fetch_agile_prices(product_code, hours=48)
-    if not prices:
-        print("[ERROR] No price data returned. Aborting.")
-        sys.exit(1)
-    print("[OK] Fetched " + str(len(prices)) + " import price slots")
+        print("[WARN] API unavailable. Trying cached prices for backfill.")
+        prices = load_cached_prices()
+        if not prices:
+            print("[ERROR] No cached prices available. Aborting backfill.")
+            sys.exit(1)
+        print("[OK] Using " + str(len(prices)) + " cached import price slots (offline mode)")
+    else:
+        print("[OK] Agile import product: " + product_code)
+        prices = fetch_agile_prices(product_code, hours=48)
+        if not prices:
+            print("[WARN] API returned no data. Trying cached prices.")
+            prices = load_cached_prices()
+            if not prices:
+                print("[ERROR] No price data available. Aborting.")
+                sys.exit(1)
+            print("[OK] Using " + str(len(prices)) + " cached import price slots")
+        else:
+            print("[OK] Fetched " + str(len(prices)) + " import price slots")
     save_prices(prices)
 
     weather = fetch_solar_forecast()
@@ -656,32 +900,55 @@ def run_backfill():
         else:
             print("[WARN] No export prices available - using flat " + str(EXPORT_RATE_P_DEF) + "p default")
 
-    # Run the lookahead optimizer across the full 48-slot window
-    dispatch_plan = plan_optimal_dispatch(prices, INITIAL_SOC_KWH)
+    # Fetch 12-month historical stats for intelligent thresholds
+    hist_stats = get_or_refresh_historical_stats(product_code)
+
+    # Run dual dispatch plans: G98 (32A current) and G99 (50A target)
+    print("[PLAN] --- G98 (32A, current) ---")
+    dispatch_plan = plan_optimal_dispatch(prices, INITIAL_SOC_KWH,
+                                          historical_stats=hist_stats)
     save_dispatch_plan(dispatch_plan)
+    print("[PLAN] --- G99 (50A, upgrade target) ---")
+    dispatch_plan_g99 = plan_optimal_dispatch(prices, INITIAL_SOC_KWH,
+                                              historical_stats=hist_stats)
 
     vals = [p['value_inc_vat'] for p in prices]
     buy_thr  = percentile(vals, BUY_PERCENTILE)
     sell_thr = percentile(vals, SELL_PERCENTILE)
 
-    state = _fresh_state()
+    state      = _fresh_state()
+    state_g99  = _fresh_state()
     history_rows = []
 
     for price_slot in prices:
         slot_dt     = datetime.fromisoformat(price_slot['valid_from'].replace('Z', '+00:00'))
-        price_p     = price_slot['value_inc_vat']
-        planned     = dispatch_plan.get(price_slot['valid_from'], None)
+        price_p       = price_slot['value_inc_vat']
+        planned       = dispatch_plan.get(price_slot['valid_from'], None)
+        planned_g99   = dispatch_plan_g99.get(price_slot['valid_from'], None)
+
+        # G98 simulation (current, 32A cap)
         slot_profit = simulate_slot(state, price_p, slot_dt, weather,
                                     buy_thr, sell_thr,
                                     export_prices=export_prices,
-                                    planned_action=planned)
+                                    planned_action=planned,
+                                    export_kwh_cap=EXPORT_KWH_G98)
+        # G99 simulation (target, 50A cap)
+        g99_profit = simulate_slot(state_g99, price_p, slot_dt, weather,
+                                   buy_thr, sell_thr,
+                                   export_prices=export_prices,
+                                   planned_action=planned_g99,
+                                   export_kwh_cap=EXPORT_KWH_G99)
         r = {
-            'timestamp':       slot_dt.isoformat(),
-            'profit_gbp':      round(state['profit_gbp'], 6),
-            'slot_profit_gbp': round(slot_profit, 6),
-            'price_p':         round(price_p, 4),
-            'soc_kwh':         round(state['soc_kwh'], 3),
-            'action':          state['last_action'],
+            'timestamp':           slot_dt.isoformat(),
+            'profit_gbp':          round(state['profit_gbp'], 6),
+            'slot_profit_gbp':     round(slot_profit, 6),
+            'price_p':             round(price_p, 4),
+            'soc_kwh':             round(state['soc_kwh'], 3),
+            'action':              state['last_action'],
+            'g99_profit_gbp':      round(state_g99['profit_gbp'], 6),
+            'g99_slot_profit_gbp': round(g99_profit, 6),
+            'g99_soc_kwh':         round(state_g99['soc_kwh'], 3),
+            'g99_action':          state_g99['last_action'],
         }
         history_rows.append(r)
 
@@ -691,9 +958,14 @@ def run_backfill():
     charged    = sum(1 for r in history_rows if r['action'] == 'charging')
     discharged = sum(1 for r in history_rows if r['action'] == 'discharging')
     total      = len(history_rows)
+    g99_final  = history_rows[-1]['g99_profit_gbp'] if history_rows else 0
+    g98_final  = history_rows[-1]['profit_gbp']     if history_rows else 0
 
     print("[DONE] Backfill complete.")
-    print("       Profit:     GBP " + str(round(state['profit_gbp'], 4)))
+    print("       G98 Profit: GBP " + str(round(state['profit_gbp'], 4))
+          + "  (32A current)")
+    print("       G99 Profit: GBP " + str(round(state_g99['profit_gbp'], 4))
+          + "  (50A upgrade)  +" + str(round(state_g99['profit_gbp'] - state['profit_gbp'], 4)) + " delta")
     print("       Slots:      " + str(state['slots_simulated']))
     print("       Charged:    " + str(charged) + "/" + str(total)
           + " slots (" + str(round(100*charged/total)) + "%)")
@@ -708,6 +980,7 @@ def run_single():
     Fetches up to 24h of forward prices to (re)generate the dispatch plan.
     Follows the plan for the current slot.
     Auto-promotes to full backfill if history.csv is empty or missing.
+    Falls back to cached prices when the API is unreachable.
     """
     history_empty = True
     if os.path.exists(HISTORY_FILE):
@@ -726,39 +999,66 @@ def run_single():
 
     print('[NODE-3] SINGLE mode - fetching prices and refreshing plan')
     product_code = discover_agile_product()
-    if not product_code:
-        print('[ERROR] Cannot discover Agile product. Aborting.')
-        sys.exit(1)
+    offline_mode = False
 
-    # Fetch from 2h ago to cover current slot + all future published prices (up to 24h ahead)
-    from_dt = datetime.now(timezone.utc) - timedelta(hours=2)
-    prices = fetch_agile_prices(product_code, from_dt=from_dt, hours=26)
-    if not prices:
-        print('[ERROR] No price data returned. Aborting.')
-        sys.exit(1)
-    print('[OK] Fetched ' + str(len(prices)) + ' slots for lookahead planning')
+    if not product_code:
+        print('[WARN] API unavailable. Falling back to cached prices (offline mode).')
+        prices = load_cached_prices()
+        if not prices:
+            print('[ERROR] No cached prices available. Aborting.')
+            sys.exit(1)
+        print('[OK] Using ' + str(len(prices)) + ' cached price slots')
+        offline_mode = True
+    else:
+        # Fetch from 2h ago to cover current slot + all future published prices (up to 24h ahead)
+        from_dt = datetime.now(timezone.utc) - timedelta(hours=2)
+        prices = fetch_agile_prices(product_code, from_dt=from_dt, hours=26)
+        if not prices:
+            print('[WARN] API returned no data. Falling back to cached prices.')
+            prices = load_cached_prices()
+            if not prices:
+                print('[ERROR] No price data available. Aborting.')
+                sys.exit(1)
+            print('[OK] Using ' + str(len(prices)) + ' cached price slots')
+            offline_mode = True
+        else:
+            print('[OK] Fetched ' + str(len(prices)) + ' slots for lookahead planning')
 
     weather = fetch_solar_forecast()
     if not weather:
         weather = load_cached_weather()
 
     export_prices = fetch_agile_outgoing_prices(hours=26)
-    if not export_prices:
+    if export_prices:
+        save_export_prices(export_prices)
+    else:
         export_prices = load_cached_export_prices()
+
+    # CRITICAL: persist fresh prices so /api/prices returns current + future slots
+    save_prices(prices)
 
     state = load_state()
     if state is None:
         state = _fresh_state()
+    state_g99 = load_state()
+    if state_g99 is None:
+        state_g99 = _fresh_state()
 
-    # Regenerate the dispatch plan from current SOC across all available future slots
-    dispatch_plan = plan_optimal_dispatch(prices, state['soc_kwh'])
+    # Fetch 12-month historical stats for intelligent thresholds
+    hist_stats = get_or_refresh_historical_stats(product_code if not offline_mode else None)
+
+    # Dual dispatch plans: G98 and G99
+    dispatch_plan     = plan_optimal_dispatch(prices, state['soc_kwh'],
+                                              historical_stats=hist_stats)
+    dispatch_plan_g99 = plan_optimal_dispatch(prices, state_g99['soc_kwh'],
+                                              historical_stats=hist_stats)
     save_dispatch_plan(dispatch_plan)
 
     vals = [p['value_inc_vat'] for p in prices]
     buy_thr  = percentile(vals, BUY_PERCENTILE)
     sell_thr = percentile(vals, SELL_PERCENTILE)
 
-    last_updated = state.get('last_updated')
+    last_updated = None if offline_mode else state.get('last_updated')
     new_prices = []
     for ps in prices:
         slot_from = ps['valid_from'].replace('Z', '+00:00')
@@ -770,21 +1070,38 @@ def run_single():
         return
 
     for price_slot in new_prices:
-        slot_dt     = datetime.fromisoformat(price_slot['valid_from'].replace('Z', '+00:00'))
-        price_p     = price_slot['value_inc_vat']
+        slot_dt   = datetime.fromisoformat(price_slot['valid_from'].replace('Z', '+00:00'))
+        price_p   = price_slot['value_inc_vat']
         planned     = dispatch_plan.get(price_slot['valid_from'], None)
+        planned_g99 = dispatch_plan_g99.get(price_slot['valid_from'], None)
+
         slot_profit = simulate_slot(state, price_p, slot_dt, weather,
                                     buy_thr, sell_thr,
                                     export_prices=export_prices,
-                                    planned_action=planned)
+                                    planned_action=planned,
+                                    export_kwh_cap=EXPORT_KWH_G98)
+        g99_profit = simulate_slot(state_g99, price_p, slot_dt, weather,
+                                   buy_thr, sell_thr,
+                                   export_prices=export_prices,
+                                   planned_action=planned_g99,
+                                   export_kwh_cap=EXPORT_KWH_G99)
         append_history(slot_dt.isoformat(), state['profit_gbp'], slot_profit,
-                       price_p, state['soc_kwh'], state['last_action'])
+                       price_p, state['soc_kwh'], state['last_action'],
+                       g99_profit=state_g99['profit_gbp'],
+                       g99_slot_profit=g99_profit,
+                       g99_soc=state_g99['soc_kwh'],
+                       g99_action=state_g99['last_action'])
 
     save_state(state)
-    print('[DONE] Single update. Action: ' + state['last_action']
-          + '  Price: ' + str(round(state['last_price_p'], 2)) + 'p'
-          + '  SOC: ' + str(round(state['soc_kwh'], 1)) + 'kWh'
-          + '  Profit: GBP ' + str(round(state['profit_gbp'], 4)))
+    delta = state_g99['profit_gbp'] - state['profit_gbp']
+    print('[DONE] G98: ' + state['last_action']
+          + '  ' + str(round(state['last_price_p'], 2)) + 'p'
+          + '  SOC ' + str(round(state['soc_kwh'], 1)) + 'kWh'
+          + '  £' + str(round(state['profit_gbp'], 4)))
+    print('       G99: ' + state_g99['last_action']
+          + '  SOC ' + str(round(state_g99['soc_kwh'], 1)) + 'kWh'
+          + '  £' + str(round(state_g99['profit_gbp'], 4))
+          + '  (delta +£' + str(round(delta, 4)) + ')')
 
 
 if __name__ == '__main__':
