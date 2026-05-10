@@ -2162,13 +2162,14 @@ async function loadFromServer() {
 function planForwardSchedule(importSlots, expPrices) {
   if (!importSlots || importSlots.length < 2) return [];
 
-  // ── 1. Slice to current + future slots ───────────────────────
-  const nowMs = Date.now();
+  // ── 1. Anchor to today's Agile midnight window — always 48 slots ──
+  const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+  const midnightMs = midnight.getTime();
   let startIdx = importSlots.findIndex(s =>
-    new Date(s.valid_from || s.time).getTime() >= nowMs - 1800000
+    new Date(s.valid_from || s.time).getTime() >= midnightMs
   );
   if (startIdx < 0) startIdx = 0;
-  const slots = importSlots.slice(startIdx, startIdx + 96); // max 48h
+  const slots = importSlots.slice(startIdx, startIdx + 48); // exactly 48 slots = 24hr
   const n = slots.length;
   if (n < 2) return [];
 
@@ -2251,16 +2252,16 @@ function renderSchedule(schedule) {
   if (!container || !schedule.length) return;
 
   const now = Date.now();
-  // Filter to future slots only (or last few past ones for context)
-  const future = schedule.filter(s => s.time.getTime() > now - 3600000);
-  if (!future.length) { container.innerHTML = '<span style="color:var(--muted);font-size:11px">No future price data yet — refresh or wait for next cycle</span>'; return; }
+  // Always show the full 48-slot Agile day (00:00–23:30) — dim past slots
+  const allSlots = schedule.slice(0, 48);
+  if (!allSlots.length) { container.innerHTML = '<span style="color:var(--muted);font-size:11px">No price data yet — refresh or wait for next cycle</span>'; return; }
 
   const actionColor = { charge: '#388bfd', discharge: '#3fb950', idle: '#21262d' };
   const actionLabel = { charge: 'CHG', discharge: 'EXP', idle: '—' };
 
-  // Summary stats
-  const chSlots = future.filter(s => s.action === 'charge');
-  const exSlots = future.filter(s => s.action === 'discharge');
+  // Summary stats over full 48-slot day
+  const chSlots = allSlots.filter(s => s.action === 'charge');
+  const exSlots = allSlots.filter(s => s.action === 'discharge');
   const avgBuyP  = chSlots.length ? (chSlots.reduce((s,x) => s + x.importP, 0) / chSlots.length).toFixed(1) : '—';
   const avgSellP = exSlots.length ? (exSlots.reduce((s,x) => s + x.exportP, 0) / exSlots.length).toFixed(1) : '—';
   const chKwh    = chSlots.length * CFG.CHARGE_KWH;
@@ -2268,31 +2269,33 @@ function renderSchedule(schedule) {
   const netCash  = exSlots.reduce((s,x) => s + CFG.CHARGE_KWH * CFG.ROUND_TRIP_EFF * x.exportP / 100, 0)
                  - chSlots.reduce((s,x) => s + CFG.CHARGE_KWH * x.importP / 100, 0);
 
-  // Timeline bars (one per 30-min slot)
-  const bars = future.map(s => {
+  // Count remaining (future) slots
+  const remaining = allSlots.filter(s => s.time.getTime() >= now).length;
+
+  // Timeline bars — all 48 slots, past ones dimmed
+  const bars = allSlots.map(s => {
     try {
-      const isPast = s.time.getTime() < now;
-      const col    = (actionColor[s.action] || '#333') + (isPast ? '55' : 'cc');
-      const isCur  = s.time.getTime() >= now && s.time.getTime() < now + 1800000;
+      const isPast = s.time.getTime() + 1800000 <= now;
+      const isCur  = s.time.getTime() <= now && s.time.getTime() + 1800000 > now;
+      const col    = (actionColor[s.action] || '#333') + (isPast ? '33' : 'cc');
       const border = isCur ? 'outline:2px solid #f0f6ff;outline-offset:-2px;' : '';
       const label  = actionLabel[s.action] || '?';
       const impStr = (typeof s.importP === 'number') ? s.importP.toFixed(1) : '?';
       const expStr = (typeof s.exportP === 'number') ? s.exportP.toFixed(1) : '?';
       const socStr = (typeof s.planSoc === 'number') ? s.planSoc.toFixed(0) : '?';
       const tStr   = s.time instanceof Date && !isNaN(s.time) ? s.time.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '??:??';
-      const tip    = `${tStr} | imp:${impStr}p exp:${expStr}p | ${s.action.toUpperCase()} | SOC→${socStr}kWh`;
+      const tip    = `${tStr} | imp:${impStr}p exp:${expStr}p | ${s.action.toUpperCase()} | SOC→${socStr}kWh${isPast?' (done)':''}`;
       return `<div title="${tip}" style="flex:1;min-width:8px;max-width:18px;height:40px;background:${col};border-radius:3px;${border}display:flex;align-items:flex-end;justify-content:center;cursor:default">
-        <span style="font-size:6px;color:#fff;opacity:.7;padding-bottom:1px;writing-mode:vertical-lr;transform:rotate(180deg)">${label}</span>
+        <span style="font-size:6px;color:#fff;opacity:${isPast?'.35':'.7'};padding-bottom:1px;writing-mode:vertical-lr;transform:rotate(180deg)">${label}</span>
       </div>`;
     } catch(e) { return ''; }
   }).join('');
 
   // Update summary span in title
   const summaryEl = document.getElementById('sched-summary');
-  // Show buy/sell thresholds and context reason in the title bar
-  const fwdBuyDisplay  = future.length ? future[0].fwdBuyThr.toFixed(1)  : '?';
-  const fwdSellDisplay = future.length ? future[0].fwdSellThr.toFixed(1) : '?';
-  const ctxReason      = future.length ? getContextFactors(future[0].time).reason : '';
+  const fwdBuyDisplay  = allSlots[0]?.fwdBuyThr?.toFixed(1)  ?? '?';
+  const fwdSellDisplay = allSlots[0]?.fwdSellThr?.toFixed(1) ?? '?';
+  const ctxReason      = allSlots[0] ? getContextFactors(allSlots[0].time).reason : '';
   if (summaryEl) summaryEl.textContent =
     `${chSlots.length} charge / ${exSlots.length} export · buy ≤${fwdBuyDisplay}p · sell ≥${fwdSellDisplay}p`
     + (ctxReason ? ` · ${ctxReason}` : '')
@@ -2300,7 +2303,7 @@ function renderSchedule(schedule) {
 
   container.innerHTML = `
     <div style="display:flex;gap:4px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-      <span style="font-size:10px;color:var(--muted)">NEXT ${future.length} SLOTS (${(future.length/2).toFixed(0)}h):</span>
+      <span style="font-size:10px;color:var(--muted)">48-SLOT DAY PLAN · ${remaining} slots remaining:</span>
       <span style="font-size:11px;color:#388bfd;font-weight:600">⚡ ${chSlots.length} charge (${chKwh.toFixed(0)}kWh @ avg ${avgBuyP}p)</span>
       <span style="color:var(--muted)">·</span>
       <span style="font-size:11px;color:#3fb950;font-weight:600">↑ ${exSlots.length} export (${exKwh.toFixed(1)}kWh @ avg ${avgSellP}p)</span>
@@ -2309,11 +2312,11 @@ function renderSchedule(schedule) {
     </div>
     <div style="display:flex;gap:2px;align-items:stretch;height:44px">${bars}</div>
     <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px">
-      <span>${future[0]?.time.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span>
+      <span>00:00</span>
       <span style="color:#388bfd">■ charge</span>
       <span style="color:#3fb950">■ export</span>
       <span style="color:#555">■ idle</span>
-      <span>${future[future.length-1]?.time.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span>
+      <span>23:30</span>
     </div>`;
 }
 
