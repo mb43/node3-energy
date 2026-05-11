@@ -28,8 +28,13 @@ from datetime import datetime, timedelta, timezone
 # CONFIGURATION
 # ---------------------------------------------
 BATTERY_KWH        = 72.0    # 3x Nissan e-NV200 packs = 72kWh nominal
-MIN_SOC_KWH        = 7.2     # 10% reserve (never discharge below this)
-INITIAL_SOC_KWH    = 36.0    # starting SOC (50%)
+MIN_SOC_KWH        = 7.2     # 10% absolute floor (protection — hardware limit)
+RESERVE_SOC_KWH    = 36.0    # 50% operational reserve — maintain this between sessions
+                              # Regular trades only use capacity ABOVE this floor.
+                              # VLP events (>=40p) may draw into the reserve down to MIN_SOC.
+                              # Purpose: 72kWh battery must always be ready to capitalise on
+                              # price spikes; starting depleted destroys arbitrage capacity.
+INITIAL_SOC_KWH    = 36.0    # starting SOC assumption when real state unavailable (50%)
 INVERTER_KW        = 10.5    # FoxESS KH10.5 hard inverter limit — never exceeded
 DAILY_LOAD_KWH     = 12.0    # household consumption per day
 SOLAR_KWP          = 0.0     # no solar modelled (pure arbitrage)
@@ -615,6 +620,37 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
             continue
         tentative[i] = 'charge'
         charge_budget -= charge_per_slot
+
+    # ── Step 4d: reserve restoration ─────────────────────────────────────────────
+    # The 72kWh battery must stay ≥50% (RESERVE_SOC_KWH) between sessions.
+    # Starting each day depleted kills arbitrage capacity — you can't capitalise on
+    # price spikes if the tank is empty.  After all trading is planned, project the
+    # end-of-window SOC.  If below RESERVE_SOC_KWH, add cheapest available idle slots
+    # as top-up charge until the deficit is covered.
+    # VLP discharges (≥40p) may dip into the reserve — that's intentional.  The top-up
+    # here only fires when routine trading leaves the battery short.
+    planned_charge_count   = sum(1 for x in tentative if x == 'charge')
+    planned_discharge_count = sum(1 for x in tentative if x == 'discharge')
+    load_total             = load_per_slot * n
+    projected_end_soc      = (initial_soc_kwh
+                               + planned_charge_count    * charge_per_slot
+                               - planned_discharge_count * discharge_per_slot
+                               - load_total)
+    projected_end_soc      = max(min_soc_kwh, min(battery_kwh, projected_end_soc))
+
+    reserve_deficit = RESERVE_SOC_KWH - projected_end_soc
+    if reserve_deficit > charge_per_slot * 0.5:
+        topup_budget = reserve_deficit
+        print("[PLAN] Reserve deficit=" + str(round(reserve_deficit, 1)) + "kWh"
+              + "  projected_end=" + str(round(projected_end_soc, 1)) + "kWh"
+              + "  adding top-up charge slots…")
+        for i in sorted_asc:
+            if topup_budget <= 0:
+                break
+            if tentative[i] in ('discharge', 'charge'):
+                continue
+            tentative[i] = 'charge'
+            topup_budget -= charge_per_slot
 
     # ── Step 5: walk in time order enforcing SOC ─────────────────────────────
     soc  = initial_soc_kwh
