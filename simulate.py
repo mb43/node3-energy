@@ -529,8 +529,8 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
     if not price_slots:
         return {}
 
-    charge_per_slot    = discharge_per_slot              # ALWAYS symmetric — charge == export cap
     discharge_per_slot = export_kwh_cap if export_kwh_cap is not None else EXPORT_KWH
+    charge_per_slot    = discharge_per_slot              # ALWAYS symmetric — charge == export cap
     load_per_slot      = DAILY_LOAD_KWH / 48.0          # 0.25 kWh
 
     n              = len(price_slots)
