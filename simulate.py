@@ -581,8 +581,14 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
         tentative[i] = 'discharge'
         discharge_budget -= discharge_per_slot
 
-    # Mark charge slots: cheapest first, skip slots already marked discharge
-    charge_budget = battery_kwh - initial_soc_kwh
+    # Mark charge slots: only charge what's needed to fuel planned discharges.
+    # Charging more than this guarantees a loss — you're paying to store energy
+    # you can't profitably export under the current DNO cap.
+    discharge_count   = tentative.count('discharge')
+    energy_for_exports = discharge_count * discharge_per_slot / ROUND_TRIP_EFF
+    usable_now        = max(0.0, initial_soc_kwh - min_soc_kwh)
+    net_charge_needed = max(0.0, energy_for_exports - usable_now)
+    charge_budget     = min(net_charge_needed, battery_kwh - initial_soc_kwh)
     for i in sorted_asc:
         if charge_budget <= 0:
             break

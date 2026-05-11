@@ -14,7 +14,6 @@ services:
       - ./index.html:/app/index.html
       - ./simulate.py:/app/simulate.py
       - ./server.py:/app/server.py
-      - ./NODE3_Schematic.html:/app/NODE3_Schematic.html
     environment:
       - NODE3_API_KEY=${NODE3_API_KEY:-}
       - PYTHONDONTWRITEBYTECODE=1

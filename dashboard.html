@@ -802,58 +802,62 @@
     </div>
   </div>
 
-  <!-- VLP / VIRTUAL POWER PLANT REVENUE PANEL -->
+  <!-- BM / VLP REVENUE PANEL -->
   <div class="revenue-section balancing" style="margin-bottom:16px">
     <div class="revenue-title" style="color:var(--purple);display:flex;align-items:center;justify-content:space-between">
-      <span>⚡ Virtual Power Plant (VPP) — Future Revenue Pathway</span>
-      <span id="vlp-status-badge" style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(188,140,255,0.15);color:var(--purple);font-weight:bold;letter-spacing:1px">PRE-REGISTRATION · PROJECTED ONLY</span>
+      <span>⚡ Balancing Mechanism (VLP) — Projected Revenue</span>
+      <span id="vlp-status-badge" style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(139,148,158,0.15);color:var(--muted);font-weight:bold;letter-spacing:1px">PRE-REGISTRATION</span>
     </div>
-    <div style="background:rgba(188,140,255,0.06);border:1px solid rgba(188,140,255,0.2);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--muted)">
-      ⚠ These are <strong style="color:var(--amber)">market projections — not live income</strong>. Node-3 is not yet enrolled in a VPP/aggregator. Once enrolled (Octopus Kraken Flex or similar), real dispatch income will replace these estimates. The Agile arbitrage figures above are real.
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
       <div style="text-align:center">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Year (G98 projection)</div>
-        <div style="font-size:17px;font-weight:bold;color:var(--purple)">~£700</div>
-        <div style="font-size:10px;color:var(--muted)">10.5kW × £70k/MW/yr (Modo Energy 2025)</div>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Day</div>
+        <div style="font-size:17px;font-weight:bold;color:var(--purple)" id="bm-day">£1.92</div>
       </div>
       <div style="text-align:center">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Year (G99 projection)</div>
-        <div style="font-size:17px;font-weight:bold;color:var(--purple)">~£1,000</div>
-        <div style="font-size:10px;color:var(--muted)">50A upgrade → full inverter capacity dispatch</div>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Week</div>
+        <div style="font-size:17px;font-weight:bold;color:var(--purple)" id="bm-week">£13.46</div>
       </div>
       <div style="text-align:center">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">G99 + Agile combined</div>
-        <div style="font-size:17px;font-weight:bold;color:var(--green)">~£1,350+</div>
-        <div style="font-size:10px;color:var(--muted)">VPP £1k + Agile arbitrage £350 est.</div>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Month</div>
+        <div style="font-size:17px;font-weight:bold;color:var(--purple)" id="bm-month">£58.33</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Year</div>
+        <div style="font-size:17px;font-weight:bold;color:var(--purple)" id="bm-year">£700</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">+ Agile</div>
+        <div style="font-size:17px;font-weight:bold;color:var(--green)" id="bm-combined">£1,050+</div>
       </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:8px;align-items:center">
-      <span>Source: Modo Energy 2025 — GB BESS average £70k/MW/yr · Node-3 inverter 10.5kW</span>
+      <span>Based on Modo Energy 2025: GB BESS avg £70k/MW/yr · 10.5kW = <strong style="color:var(--purple)">£700/yr</strong></span>
       <span style="color:var(--border)">|</span>
-      <span id="vlp-phase-text" style="color:var(--amber)">▶ G99 approved → Octopus Kraken Flex enrolment → dispatched by aggregator → VPP income live</span>
+      <span>G99 50A upgrade → <strong style="color:var(--purple)">£1,000/yr BM</strong> + <strong style="color:var(--green)">£350 Agile</strong></span>
+      <span style="color:var(--border)">|</span>
+      <span id="vlp-phase-text" style="color:var(--amber)">▶ G99 application → Octopus VPP (interim) → Elexon BSC accession → VLP go-live ~10 weeks</span>
     </div>
     <!-- VLP Phase Progress -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px">
       <div id="vlp-p1" style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:4px;padding:4px 6px;font-size:11px;text-align:center">
         <div style="color:var(--muted);letter-spacing:.5px">PHASE 1</div>
         <div style="color:var(--green);font-weight:bold">G99 APPLICATION</div>
-        <div style="color:var(--muted)">Submitted to SSEN ✓</div>
+        <div style="color:var(--muted)">Submit to SSEN</div>
       </div>
       <div id="vlp-p2" style="background:rgba(139,148,158,0.08);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:11px;text-align:center">
         <div style="color:var(--muted);letter-spacing:.5px">PHASE 2</div>
-        <div style="color:var(--muted);font-weight:bold">VPP ENROLMENT</div>
+        <div style="color:var(--muted);font-weight:bold">INTERIM VPP</div>
         <div style="color:var(--muted)">Octopus Kraken Flex</div>
       </div>
       <div id="vlp-p3" style="background:rgba(139,148,158,0.08);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:11px;text-align:center">
         <div style="color:var(--muted);letter-spacing:.5px">PHASE 3</div>
-        <div style="color:var(--muted);font-weight:bold">DISPATCH LIVE</div>
-        <div style="color:var(--muted)">Aggregator dispatches</div>
+        <div style="color:var(--muted);font-weight:bold">BSC ACCESSION</div>
+        <div style="color:var(--muted)">Elexon + KPMG audit</div>
       </div>
       <div id="vlp-p4" style="background:rgba(139,148,158,0.08);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:11px;text-align:center">
         <div style="color:var(--muted);letter-spacing:.5px">PHASE 4</div>
-        <div style="color:var(--muted);font-weight:bold">REAL INCOME</div>
-        <div style="color:var(--muted)">Live settlement data</div>
+        <div style="color:var(--muted);font-weight:bold">VLP GO-LIVE</div>
+        <div style="color:var(--muted)">Direct BM dispatch</div>
       </div>
     </div>
   </div>
@@ -1052,7 +1056,7 @@
       <span>
         <strong>HOW THE NUMBERS WORK:</strong>
         <span class="acct-sep">GRID P&amp;L</span> = Real cash. Export income − charge cost. What Octopus pays Dovecote for grid exports minus what Octopus charges to charge the battery. This is the actual bank account movement — no modelling, no assumptions. The battery also covers the home's 12kWh/day consumption from its charge cycles, meaning the homeowner pays £0 for electricity up to that cap. The Grid P&L proves the system is commercially viable even after providing that free electricity.
-        <span class="acct-sep">AGILE TARIFF SAVING (indicative)</span> = Per-slot saving from buying on Agile vs the Ofgem Standard Variable Tariff (25p/kWh reference), weighted by the Elexon PC1 domestic load profile across 12kWh/day. This is NOT cash paid by Octopus — it is the financial benefit of being on Agile instead of SVT. Shown for context only.
+        <span class="acct-sep">HOME ENERGY (indicative)</span> = The 12kWh/day the battery provides to the home free of charge, valued at 25p/kWh SVT reference. Shown for context only — the real homeowner benefit is simply £0/day electricity cost up to the 12kWh fair-use cap, not a tariff comparison.
         <span class="acct-sep">NET VALUE</span> = Grid P&amp;L + Home Energy value. Combined annual benefit to the household. The chart above plots this.
       </span>
     </div>
@@ -1152,8 +1156,8 @@
     <div class="hist-table">
       <div class="chart-title" style="margin-bottom:4px">MONTHLY BREAKDOWN</div>
       <div style="font-size:10px;color:var(--muted);margin-bottom:12px;letter-spacing:0.5px">
-        GRID P&amp;L = real bank cash (export income − charge cost) · Octopus pays/charges Dovecote &nbsp;·&nbsp;
-        AGILE SAVING = per-slot Agile vs SVT 25p tariff saving on 12kWh/day home consumption (indicative) &nbsp;·&nbsp;
+        GRID P&amp;L = real bank cash (export income − charge cost) · homeowner gets 12kWh/day at £0 cost &nbsp;·&nbsp;
+        HOME ENERGY = 12kWh/day free electricity valued at SVT 25p (indicative context only) &nbsp;·&nbsp;
         NET VALUE = Grid P&amp;L + Home Energy = total annual household benefit
       </div>
       <table class="hist-tbl" id="hist-table">
@@ -1365,7 +1369,7 @@
   <div class="data-banner">
     Live data: <a href="https://octopus.energy/agile" target="_blank">Octopus Agile API</a> &nbsp;·&nbsp;
     Solar forecast: <a href="https://open-meteo.com" target="_blank">Open-Meteo</a> &nbsp;·&nbsp;
-    Strategy: LP greedy optimiser · context-adjusted thresholds · 7.2kWh reserve (10% DoD) &nbsp;·&nbsp;
+    Strategy: LP greedy optimiser · context-adjusted thresholds · 10kWh reserve &nbsp;·&nbsp;
     Refreshes every 30s
   </div>
 
@@ -1380,7 +1384,7 @@ const CFG = {
   BATTERY_KWH:    72.0,    // node3: 3× Nissan e-NV200 24kWh = 72kWh nominal; 10–90% DoD = 57.6kWh usable
   MIN_SOC_KWH:    7.2,     // 10% DoD floor — Nissan pack longevity
   INITIAL_SOC:    36.0,    // 50% of 72kWh
-  CHARGE_KWH:     5.25,    // FoxESS KH10.5: 10.5kW × 0.5h per slot (matches Python CHARGE_RATE_KW=10.5)
+  CHARGE_KWH:     5.0,     // 10kW × 0.5h per slot
   EXPORT_KWH:     3.68,    // 32A × 230V × 0.5h — current DNO G98 limit (pre-G99 upgrade)
                             // G99 50A upgrade → 5.75kWh/slot. Apply now via SSEN fast-track.
   LOAD_PER_SLOT:  12/48,   // fallback flat: 12kWh/day ÷ 48 slots (overridden by HOME_LOAD_PROFILE below)
@@ -1725,7 +1729,7 @@ function getExportPriceForSlot(slotDt, expPrices) {
 // Agile Outgoing has std dev > 2p; a fixed SEG tariff has std dev ~0.
 // Returns true only if the data is usable as a variable export tariff.
 function isVariableExportData(expPrices) {
-  if (!expPrices || expPrices.length < 10) return false; // 48h = max 96 slots; 10 is a sane minimum
+  if (!expPrices || expPrices.length < 200) return false;
   const vals = expPrices.map(p => p.value_inc_vat);
   const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
   const variance = vals.reduce((s,v) => s + (v-mean)**2, 0) / vals.length;
@@ -2133,6 +2137,120 @@ async function loadFromServer() {
   }));
 }
 
+// ══════════════════════════════════════════════════════════════
+// LP GREEDY OPTIMISER — TRUE MATHEMATICAL OPTIMUM
+// Given the full 48h price window (which Octopus publishes daily
+// at 4pm), computes the mathematically optimal CHARGE / DISCHARGE
+// / HOLD action for every 30-minute slot.
+//
+// Algorithm:
+//   1. Compute buy ceiling = min(MAX_BUY_P, P20 of window)
+//      Compute sell floor  = max(MIN_SELL_P, P80 of window)
+//      These are ABSOLUTE guards — no selling cheap on a flat day.
+//   2. Tag every slot as a charge candidate (importP ≤ buyThr)
+//      or discharge candidate (exportP ≥ sellThr).
+//   3. Sort charge candidates cheapest→priciest (greedy: buy at
+//      the very cheapest slots first).
+//   4. Sort discharge candidates most expensive→cheapest (greedy:
+//      sell at the very best peaks first).
+//   5. Forward-simulate SOC, assigning actions and enforcing
+//      battery capacity constraints at every step.
+//
+// This is the Dovecote Node3 product — runs every day at 4pm
+// when Octopus publishes tomorrow's Agile prices.
+// ══════════════════════════════════════════════════════════════
+function planForwardSchedule(importSlots, expPrices) {
+  if (!importSlots || importSlots.length < 2) return [];
+
+  // ── 1. Anchor to today's Agile midnight window — always 48 slots ──
+  const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+  const midnightMs = midnight.getTime();
+  let startIdx = importSlots.findIndex(s =>
+    new Date(s.valid_from || s.time).getTime() >= midnightMs
+  );
+  if (startIdx < 0) startIdx = 0;
+  const slots = importSlots.slice(startIdx, startIdx + 48); // exactly 48 slots = 24hr
+  const n = slots.length;
+  if (n < 2) return [];
+
+  // ── 2. Build slot objects with import + export prices ─────────
+  const builtSlots = slots.map((s, i) => {
+    const time  = new Date(s.valid_from || s.time);
+    const imp   = typeof s.value_inc_vat === 'number' ? s.value_inc_vat : (s.priceP || 0);
+    const ep    = expPrices && expPrices.length ? getExportPriceForSlot(time, expPrices) : null;
+    const exp   = (ep !== null && ep !== undefined) ? ep : exportRateFromImport(imp);
+    return { i, time, importP: imp, exportP: exp, action: 'idle', planSoc: 0 };
+  });
+
+  // ── 3. Compute thresholds — relative + absolute + weather/day context ────────
+  const impPrices  = builtSlots.map(s => s.importP);
+  const expPricesW = builtSlots.map(s => s.exportP);
+  // Context: weather, day-of-week, season
+  const ctx = getContextFactors(builtSlots[0]?.time || new Date());
+  // Dynamic buy ceiling: same logic as historical sim —
+  //   max buy price = best future export × RTE − minProfit
+  // Ensures we only charge when a real spread exists to capture.
+  const bestFwdExport  = Math.max(...expPricesW);
+  const dynamicBuyCeil = bestFwdExport * CFG.ROUND_TRIP_EFF - ctx.minProfitAdj;
+  const relBuyThr      = percentile(impPrices, CFG.BUY_PCT);
+  const buyThr         = dynamicBuyCeil > 0 ? Math.min(relBuyThr, dynamicBuyCeil) : -Infinity;
+  // Sell threshold: percentile of EXPORT prices, floored to guarantee profitability.
+  // Breakeven export price: importCost / (EXPORT_KWH × RTE)
+  // i.e. we need exportP × 3.68 × 0.88 ≥ importP × 5.0 → exportP ≥ importP × 1.545
+  const adjSellPct      = (ctx.sellPctAdj !== undefined) ? ctx.sellPctAdj : CFG.SELL_PCT;
+  const pctSellThr      = percentile(expPricesW, adjSellPct);
+  const breakEvenExport = buyThr > 0
+    ? (buyThr * CFG.CHARGE_KWH) / (CFG.EXPORT_KWH * CFG.ROUND_TRIP_EFF) + CFG.MIN_PROFIT_P / CFG.ROUND_TRIP_EFF
+    : pctSellThr;
+  const sellThr = Math.max(pctSellThr, breakEvenExport);
+
+  // ── 4. Tag candidates ─────────────────────────────────────────
+  // Charge: import price at or below buy ceiling
+  const chargeCandidates    = builtSlots.filter(s => s.importP <= buyThr);
+  // Discharge: export price at or above sell floor
+  const dischargeCandidates = builtSlots.filter(s => s.exportP >= sellThr);
+
+  // ── 5. Sort: buy cheapest first, sell most-expensive first ─────
+  chargeCandidates.sort((a, b) => a.importP - b.importP);
+  dischargeCandidates.sort((a, b) => b.exportP - a.exportP);
+
+  // Build action map (greedy: charge wins over discharge if both qualify;
+  // in practice they won't overlap because buyThr < sellThr always)
+  const actionMap = new Map(); // slot index → 'charge' | 'discharge'
+  for (const s of chargeCandidates)    actionMap.set(s.i, 'charge');
+  for (const s of dischargeCandidates) {
+    if (!actionMap.has(s.i)) actionMap.set(s.i, 'discharge');
+  }
+
+  // ── 6. Forward SOC simulation ─────────────────────────────────
+  const BAT_MAX    = CFG.BATTERY_KWH;
+  const BAT_MIN    = CFG.MIN_SOC_KWH;
+  const CH_RATE    = CFG.CHARGE_KWH;
+  const EXP_RATE   = CFG.EXPORT_KWH;  // 7.68kWh per slot — site discharge cap
+
+  let soc = fleet.length
+    ? fleet.reduce((sum, h) => sum + (h.soc || BAT_MAX * 0.5), 0) / fleet.length
+    : BAT_MAX * 0.5;
+
+  for (const s of builtSlots) {
+    const wanted = actionMap.get(s.i) || 'idle';
+    if (wanted === 'charge' && soc < BAT_MAX - 0.1) {
+      const ch = Math.min(CH_RATE, BAT_MAX - soc);
+      soc += ch;
+      s.action = 'charge';
+    } else if (wanted === 'discharge' && soc > BAT_MIN + 0.1) {
+      const dc = Math.min(EXP_RATE, soc - BAT_MIN);  // 32A cap applied here
+      soc -= dc;
+      s.action = 'discharge';
+    }
+    soc = Math.max(BAT_MIN, Math.min(BAT_MAX, soc));
+    s.planSoc     = soc;
+    s.fwdBuyThr   = buyThr;
+    s.fwdSellThr  = sellThr;
+  }
+
+  return builtSlots;
+}
 
 /** Render the forward schedule from Python /api/plan — single source of truth */
 function renderSchedule(planData) {
@@ -3012,7 +3130,7 @@ function renderHistoricalResults(res) {
     const days          = totalSlots / 48;
     const chargePerDay  = totalChargeKwh   > 0 ? (Object.values(monthly).reduce((s,m)=>s+m.chargeSlots,0) / days).toFixed(1) : '—';
     const sellPerDay    = totalDischargeKwh> 0 ? (Object.values(monthly).reduce((s,m)=>s+m.sellSlots,0) / days).toFixed(1) : '—';
-    const cyclesPerDay  = ((parseFloat(chargePerDay)||0) + (parseFloat(sellPerDay)||0)) / 2;
+    const cyclesPerDay  = (parseFloat(chargePerDay)||0 + parseFloat(sellPerDay)||0) / 2;
     const scKwh         = totalChargeKwh;
     const sdKwh         = totalDischargeKwh;
     const _totalCS      = Object.values(monthly).reduce((s,m)=>s+m.chargeSlots,0);
