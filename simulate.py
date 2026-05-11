@@ -581,18 +581,29 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
         tentative[i] = 'discharge'
         discharge_budget -= discharge_per_slot
 
-    # Mark charge slots: only charge what's needed to fuel planned discharges.
+    # ── Negative price slots: ALWAYS charge (Octopus pays YOU to consume) ───────
+    # These are unconditional — free or paid energy, fill regardless of export plan.
+    # The SOC walk (Step 5) will skip if battery is already full.
+    for i in range(n):
+        if prices_vals[i] <= 0 and tentative[i] != 'discharge':
+            tentative[i] = 'charge'
+
+    # ── Export-linked charge budget ──────────────────────────────────────────────
+    # Only charge what's needed to fuel planned discharges.
     # Charging more than this guarantees a loss — you're paying to store energy
     # you can't profitably export under the current DNO cap.
+    # Negative-price slots already handled above; subtract their energy contribution.
+    neg_charge_slots  = sum(1 for i in range(n) if tentative[i] == 'charge')
+    neg_charge_energy = neg_charge_slots * charge_per_slot
     discharge_count   = tentative.count('discharge')
     energy_for_exports = discharge_count * discharge_per_slot / ROUND_TRIP_EFF
     usable_now        = max(0.0, initial_soc_kwh - min_soc_kwh)
-    net_charge_needed = max(0.0, energy_for_exports - usable_now)
-    charge_budget     = min(net_charge_needed, battery_kwh - initial_soc_kwh)
+    net_charge_needed = max(0.0, energy_for_exports - usable_now - neg_charge_energy)
+    charge_budget     = min(net_charge_needed, battery_kwh - initial_soc_kwh - neg_charge_energy)
     for i in sorted_asc:
         if charge_budget <= 0:
             break
-        if tentative[i] == 'discharge':
+        if tentative[i] == 'discharge' or tentative[i] == 'charge':
             continue
         tentative[i] = 'charge'
         charge_budget -= charge_per_slot
