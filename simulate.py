@@ -520,8 +520,8 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
          charge in reserve for higher-value slots later in the day.
 
     Break-even: export_p > (charge_kwh_per_slot × avg_charge_p) / (discharge_kwh_per_slot × RTE)
-      G98 example: 5.25 × 17p / (3.68 × 0.88) = 27.4p  →  only discharge above 27p
-      G99 example: 5.25 × 17p / (5.75 × 0.88) = 17.5p  →  discharge above 17.5p
+      G98 example (symmetric 3.68/3.68): 3.68 × 17p / (3.68 × 0.88) = 19.3p  →  discharge above ~19p
+      G99 example (symmetric 5.75/5.75): 5.75 × 17p / (5.75 × 0.88) = 19.3p  →  same break-even
 
     historical_stats param retained for API compatibility but no longer used.
     Returns: dict mapping valid_from string -> 'charge' | 'discharge' | 'idle'

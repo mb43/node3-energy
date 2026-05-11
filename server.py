@@ -298,10 +298,12 @@ def _run_backtest(months=12):
         home_load     = _bt_home_load(dt)
 
         if is_vlp and soc > _BT_MIN_SOC_KWH + 0.1:
-            # VLP: serve house first, then export remainder
+            # VLP: serve house first, then export remainder up to DNO export cap.
+            # DNO cap (_BT_EXPORT_KWH) is a GRID export limit only — house serving
+            # is local (behind the meter) and does NOT reduce the export headroom.
             avail     = soc - _BT_MIN_SOC_KWH
             house     = min(home_load, avail)
-            grid_disc = min(_BT_EXPORT_KWH - house, max(0.0, avail - house))
+            grid_disc = min(_BT_EXPORT_KWH, max(0.0, avail - house))
             moved     = house + grid_disc
             if moved > 0.01:
                 soc -= moved
@@ -517,17 +519,22 @@ def api_plan():
         })
 
     # Annotate with forward SoC simulation (Python constants)
-    CHARGE_KWH = 5.25
-    EXPORT_KWH = 3.68   # G98; update to 5.75 post-G99
-    RTE        = 0.88
-    BAT_KWH    = 72.0
-    MIN_SOC    = 7.2
+    # SYMMETRIC RATES ONLY — charge rate always equals export cap per mode
+    # G98: 32A DNO cap → 3.68 kWh/slot export, 7.36 kW charge → 3.68 kWh/slot charge
+    # G99: 50A DNO cap → 5.75 kWh/slot export, 11.5 kW (inv cap) → 5.75 kWh/slot charge
+    CHARGE_KWH_G98 = 3.68   # symmetric G98 — charge == export cap
+    EXPORT_KWH_G98 = 3.68
+    CHARGE_KWH_G99 = 5.75   # symmetric G99 — charge == export cap
+    EXPORT_KWH_G99 = 5.75
+    RTE            = 0.88
+    BAT_KWH        = 72.0
+    MIN_SOC        = 7.2
 
     raw = load_json("fleet_state.json") or {}
     state = normalize_state(raw) or {}
     soc = float(state.get("soc_kwh", BAT_KWH * 0.5))
 
-    # Annualised figures (G98 and G99)
+    # G98 P&L — plan was generated with G98 symmetric rates
     total_revenue_g98 = 0.0
     total_cost        = 0.0
     ch_slots = [s for s in slots if s["action"] == "charge"]
@@ -535,12 +542,12 @@ def api_plan():
 
     for s in slots:
         if s["action"] == "charge":
-            ch = min(CHARGE_KWH, BAT_KWH - soc)
+            ch = min(CHARGE_KWH_G98, BAT_KWH - soc)
             soc = min(BAT_KWH, soc + ch)
             s["planSoc"] = round(soc, 2)
             total_cost += ch * s["importP"] / 100
         elif s["action"] == "discharge":
-            dc = min(EXPORT_KWH, soc - MIN_SOC)
+            dc = min(EXPORT_KWH_G98, soc - MIN_SOC)
             dc = max(0, dc)
             soc = max(MIN_SOC, soc - dc)
             s["planSoc"] = round(soc, 2)
@@ -550,13 +557,21 @@ def api_plan():
 
     net_g98 = total_revenue_g98 - total_cost
 
-    # G99 net (same cost, larger export cap)
-    EXPORT_KWH_G99 = 5.75
-    rev_g99 = sum(
-        min(EXPORT_KWH_G99, BAT_KWH) * RTE * s["exportP"] / 100
-        for s in ex_slots
-    )
-    net_g99 = rev_g99 - total_cost
+    # G99 net — independent SOC simulation with symmetric G99 rates (5.75 kWh both ways)
+    soc_g99 = float(state.get("soc_kwh", BAT_KWH * 0.5))
+    total_revenue_g99 = 0.0
+    total_cost_g99    = 0.0
+    for s in slots:
+        if s["action"] == "charge":
+            ch = min(CHARGE_KWH_G99, BAT_KWH - soc_g99)
+            soc_g99 = min(BAT_KWH, soc_g99 + ch)
+            total_cost_g99 += ch * s["importP"] / 100
+        elif s["action"] == "discharge":
+            dc = min(EXPORT_KWH_G99, soc_g99 - MIN_SOC)
+            dc = max(0, dc)
+            soc_g99 = max(MIN_SOC, soc_g99 - dc)
+            total_revenue_g99 += dc * RTE * s["exportP"] / 100
+    net_g99 = total_revenue_g99 - total_cost_g99
 
     return jsonify({
         "slots":    slots,
@@ -567,6 +582,7 @@ def api_plan():
             "net_g99":        round(net_g99, 4),
             "total_cost":     round(total_cost, 4),
             "total_rev_g98":  round(total_revenue_g98, 4),
+            "total_rev_g99":  round(total_revenue_g99, 4),
         }
     })
 
