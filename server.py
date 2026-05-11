@@ -522,67 +522,107 @@ def api_plan():
     # SYMMETRIC RATES ONLY — charge rate always equals export cap per mode
     # G98: 32A DNO cap → 3.68 kWh/slot export, 7.36 kW charge → 3.68 kWh/slot charge
     # G99: 50A DNO cap → 5.75 kWh/slot export, 11.5 kW (inv cap) → 5.75 kWh/slot charge
-    CHARGE_KWH_G98 = 3.68   # symmetric G98 — charge == export cap
-    EXPORT_KWH_G98 = 3.68
-    CHARGE_KWH_G99 = 5.75   # symmetric G99 — charge == export cap
-    EXPORT_KWH_G99 = 5.75
-    RTE            = 0.88
-    BAT_KWH        = 72.0
-    MIN_SOC        = 7.2
+    CHARGE_KWH_G98  = 3.68   # symmetric G98 — charge == export cap
+    EXPORT_KWH_G98  = 3.68
+    CHARGE_KWH_G99  = 5.75   # symmetric G99 — charge == export cap
+    EXPORT_KWH_G99  = 5.75
+    RTE             = 0.88
+    BAT_KWH         = 72.0
+    MIN_SOC         = 7.2
+    DAILY_LOAD_KWH  = 12.0   # homeowner allowance: 12 kWh/day free, excess billed at cost
+    LOAD_PER_SLOT   = DAILY_LOAD_KWH / 48.0
 
-    raw = load_json("fleet_state.json") or {}
+    raw   = load_json("fleet_state.json") or {}
     state = normalize_state(raw) or {}
-    soc = float(state.get("soc_kwh", BAT_KWH * 0.5))
+    soc   = float(state.get("soc_kwh", BAT_KWH * 0.5))
 
-    # G98 P&L — plan was generated with G98 symmetric rates
-    total_revenue_g98 = 0.0
-    total_cost        = 0.0
     ch_slots = [s for s in slots if s["action"] == "charge"]
     ex_slots = [s for s in slots if s["action"] == "discharge"]
+    n_slots  = len(slots)
+
+    # ── G98 SOC trace + P&L ───────────────────────────────────────────────────
+    # SOC simulation mirrors simulate.py exactly: house load drawn every slot.
+    # P&L is split into:
+    #   arbitrage_cost  = electricity bought to fuel exports (what Dovecote spends to earn)
+    #   hosting_cost    = electricity consumed by house, given free up to 12 kWh/day
+    #                     (homeowner pays back excess above allowance at 0% uplift)
+    total_revenue_g98 = 0.0
+    total_charge_cost = 0.0   # all charge electricity paid by Dovecote
+    house_load_cost   = 0.0   # portion of charge cost attributed to house supply
 
     for s in slots:
+        # House load drawn every slot regardless of action (always-on load)
+        soc = max(MIN_SOC, soc - LOAD_PER_SLOT)
+        # Track house supply cost at the slot import price (what Dovecote pays for it)
+        house_load_cost += LOAD_PER_SLOT * s["importP"] / 100
+
         if s["action"] == "charge":
-            ch = min(CHARGE_KWH_G98, BAT_KWH - soc)
+            ch  = min(CHARGE_KWH_G98, BAT_KWH - soc)
             soc = min(BAT_KWH, soc + ch)
-            s["planSoc"] = round(soc, 2)
-            total_cost += ch * s["importP"] / 100
+            total_charge_cost += ch * s["importP"] / 100
         elif s["action"] == "discharge":
-            dc = min(EXPORT_KWH_G98, soc - MIN_SOC)
-            dc = max(0, dc)
+            dc  = min(EXPORT_KWH_G98, soc - MIN_SOC)
+            dc  = max(0.0, dc)
             soc = max(MIN_SOC, soc - dc)
-            s["planSoc"] = round(soc, 2)
             total_revenue_g98 += dc * RTE * s["exportP"] / 100
-        else:
-            s["planSoc"] = round(soc, 2)
 
-    net_g98 = total_revenue_g98 - total_cost
+        s["planSoc"] = round(soc, 2)
 
-    # G99 net — independent SOC simulation with symmetric G99 rates (5.75 kWh both ways)
-    soc_g99 = float(state.get("soc_kwh", BAT_KWH * 0.5))
-    total_revenue_g99 = 0.0
-    total_cost_g99    = 0.0
+    # House load within the free 12 kWh/day allowance → Dovecote absorbs it
+    # Excess above allowance → homeowner pays back at cost (recovery offsets Dovecote's spend)
+    house_load_kwh_total  = LOAD_PER_SLOT * n_slots
+    house_days            = n_slots / 48.0
+    free_allowance_kwh    = DAILY_LOAD_KWH * house_days          # e.g. 1.3125 days = 15.75 kWh
+    excess_kwh            = max(0.0, house_load_kwh_total - free_allowance_kwh)
+    # For the planning window all load is within the allowance (free_allowance = total load)
+    # excess_kwh will be >0 only if the homeowner's actual usage exceeds the allowance
+    avg_import_p          = (total_charge_cost / (len(ch_slots) * CHARGE_KWH_G98)
+                             if ch_slots else sum(s["importP"] for s in slots) / n_slots)
+    house_recovery        = excess_kwh * avg_import_p / 100      # homeowner pays this back
+    hosting_cost_absorbed = house_load_cost - house_recovery     # Dovecote's real hosting cost
+
+    # Arbitrage net: export revenue minus the charge cost spent purely on exports
+    # (hosting cost is a separate line — it's the price of securing the asset location)
+    arbitrage_cost = total_charge_cost - hosting_cost_absorbed   # charge cost for export energy
+    net_g98        = total_revenue_g98 - total_charge_cost       # total Dovecote cash position
+    arbitrage_net  = total_revenue_g98 - arbitrage_cost          # pure trading profit
+
+    # ── G99 net — independent SOC simulation with symmetric G99 rates ─────────
+    soc_g99        = float(state.get("soc_kwh", BAT_KWH * 0.5))
+    total_rev_g99  = 0.0
+    total_cost_g99 = 0.0
     for s in slots:
+        soc_g99 = max(MIN_SOC, soc_g99 - LOAD_PER_SLOT)
         if s["action"] == "charge":
-            ch = min(CHARGE_KWH_G99, BAT_KWH - soc_g99)
-            soc_g99 = min(BAT_KWH, soc_g99 + ch)
+            ch       = min(CHARGE_KWH_G99, BAT_KWH - soc_g99)
+            soc_g99  = min(BAT_KWH, soc_g99 + ch)
             total_cost_g99 += ch * s["importP"] / 100
         elif s["action"] == "discharge":
-            dc = min(EXPORT_KWH_G99, soc_g99 - MIN_SOC)
-            dc = max(0, dc)
-            soc_g99 = max(MIN_SOC, soc_g99 - dc)
-            total_revenue_g99 += dc * RTE * s["exportP"] / 100
-    net_g99 = total_revenue_g99 - total_cost_g99
+            dc       = min(EXPORT_KWH_G99, soc_g99 - MIN_SOC)
+            dc       = max(0.0, dc)
+            soc_g99  = max(MIN_SOC, soc_g99 - dc)
+            total_rev_g99 += dc * RTE * s["exportP"] / 100
+    net_g99 = total_rev_g99 - total_cost_g99
 
     return jsonify({
         "slots":    slots,
         "summary": {
-            "charge_slots":   len(ch_slots),
-            "export_slots":   len(ex_slots),
-            "net_g98":        round(net_g98, 4),
-            "net_g99":        round(net_g99, 4),
-            "total_cost":     round(total_cost, 4),
-            "total_rev_g98":  round(total_revenue_g98, 4),
-            "total_rev_g99":  round(total_revenue_g99, 4),
+            "charge_slots":          len(ch_slots),
+            "export_slots":          len(ex_slots),
+            # Total Dovecote cash position (export revenue minus all charge costs)
+            "net_g98":               round(net_g98, 4),
+            "net_g99":               round(net_g99, 4),
+            # P&L breakdown
+            "total_rev_g98":         round(total_revenue_g98, 4),
+            "total_rev_g99":         round(total_rev_g99, 4),
+            "total_charge_cost":     round(total_charge_cost, 4),
+            # House load split
+            "house_load_kwh":        round(house_load_kwh_total, 3),
+            "house_load_cost":       round(house_load_cost, 4),    # what Dovecote pays for house supply
+            "house_recovery":        round(house_recovery, 4),     # recovered from homeowner (excess)
+            "hosting_cost":          round(hosting_cost_absorbed, 4), # Dovecote's free-allowance cost
+            # Pure arbitrage profit (hosting cost separated out)
+            "arbitrage_net_g98":     round(arbitrage_net, 4),
         }
     })
 

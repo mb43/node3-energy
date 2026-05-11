@@ -2159,12 +2159,15 @@ function renderSchedule(planData) {
   const remaining = slots.filter(s => new Date(s.time).getTime() >= now).length;
 
   // Use server-computed P&L if available, otherwise compute from slots
-  const netG98 = summary ? summary.net_g98 : 0;
-  const netG99 = summary ? summary.net_g99 : null;
+  const netG98         = summary ? summary.net_g98          : 0;
+  const netG99         = summary ? summary.net_g99          : null;
+  const arbitrageNet   = summary ? summary.arbitrage_net_g98 : netG98;  // pure trading profit
+  const hostingCost    = summary ? summary.hosting_cost      : null;    // free 12kWh/day cost
+  const houseLoadKwh   = summary ? summary.house_load_kwh    : null;
   const avgBuyP  = chSlots.length ? (chSlots.reduce((s,x) => s + (x.importP||0), 0) / chSlots.length).toFixed(1) : '—';
   const avgSellP = exSlots.length ? (exSlots.reduce((s,x) => s + (x.exportP||0), 0) / exSlots.length).toFixed(1) : '—';
-  const chKwh    = chSlots.length * 5.25;
-  const exKwh    = exSlots.length * 3.68 * 0.88;
+  const chKwh    = chSlots.length * CFG.CHARGE_KWH;   // G98 symmetric: 3.68 kWh/slot
+  const exKwh    = exSlots.length * CFG.EXPORT_KWH * 0.88;
 
   const bars = slots.map(s => {
     try {
@@ -2190,6 +2193,19 @@ function renderSchedule(planData) {
     + ` · G98 net ${netG98>=0?'+':''}£${netG98.toFixed(3)}`
     + (netG99 != null ? ` · G99 net ${netG99>=0?'+':''}£${netG99.toFixed(3)}` : '');
 
+  // P&L breakdown: show hosting cost split if server provided it
+  const hostingLine = (hostingCost != null && houseLoadKwh != null)
+    ? `<span style="color:var(--muted)">·</span>
+       <span style="font-size:11px;color:var(--muted)" title="House supply: ${houseLoadKwh.toFixed(1)}kWh free allowance (12kWh/day). Excess billed to homeowner at cost.">
+         🏠 hosting £${hostingCost.toFixed(3)}
+       </span>
+       <span style="color:var(--muted)">·</span>
+       <span style="font-size:11px;color:${arbitrageNet>=0?'#3fb950':'#f85149'};font-weight:700"
+             title="Pure arbitrage profit: export revenue minus charge cost for exports only. Hosting cost (free 12kWh/day) is separated out.">
+         arb: ${arbitrageNet>=0?'+':''}£${arbitrageNet.toFixed(3)}
+       </span>`
+    : '';
+
   container.innerHTML = `
     <div style="display:flex;gap:4px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
       <span style="font-size:10px;color:var(--muted)">PYTHON DISPATCH PLAN · ${remaining} slots remaining today:</span>
@@ -2197,8 +2213,9 @@ function renderSchedule(planData) {
       <span style="color:var(--muted)">·</span>
       <span style="font-size:11px;color:#3fb950;font-weight:600">↑ ${exSlots.length} export (${exKwh.toFixed(1)}kWh @ avg ${avgSellP}p export)</span>
       <span style="color:var(--muted)">·</span>
-      <span style="font-size:11px;color:${netG98>=0?'#3fb950':'#f85149'};font-weight:700">G98: ${netG98>=0?'+':''}£${netG98.toFixed(3)}</span>
+      <span style="font-size:11px;color:${netG98>=0?'#3fb950':'#f85149'};font-weight:700">G98 net: ${netG98>=0?'+':''}£${netG98.toFixed(3)}</span>
       ${netG99 != null ? `<span style="color:var(--muted)">·</span><span style="font-size:11px;color:var(--purple);font-weight:700">G99: ${netG99>=0?'+':''}£${netG99.toFixed(3)}</span>` : ''}
+      ${hostingLine}
     </div>
     <div style="display:flex;gap:2px;align-items:stretch;height:44px">${bars}</div>
     <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px">

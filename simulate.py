@@ -601,56 +601,63 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
         if prices_vals[i] <= 0 and tentative[i] != 'discharge':
             tentative[i] = 'charge'
 
-    # ── Export-linked charge budget ──────────────────────────────────────────────
-    # Only charge what's needed to fuel planned discharges.
-    # Charging more than this guarantees a loss — you're paying to store energy
-    # you can't profitably export under the current DNO cap.
-    # Negative-price slots already handled above; subtract their energy contribution.
-    neg_charge_slots  = sum(1 for i in range(n) if tentative[i] == 'charge')
-    neg_charge_energy = neg_charge_slots * charge_per_slot
-    discharge_count   = tentative.count('discharge')
-    energy_for_exports = discharge_count * discharge_per_slot / ROUND_TRIP_EFF
-    usable_now        = max(0.0, initial_soc_kwh - min_soc_kwh)
-    net_charge_needed = max(0.0, energy_for_exports - usable_now - neg_charge_energy)
-    charge_budget     = min(net_charge_needed, battery_kwh - initial_soc_kwh - neg_charge_energy)
+    # ── Unified charge allocation (export fuel + reserve restoration) ─────────────
+    # Two separate passes previously caused under-counting due to mid-path SOC
+    # capping (the linear projection assumed all charge energy was absorbed, but
+    # the time walk caps at battery_kwh, so fewer kWh actually enter the battery).
+    #
+    # Replaced with a single iterative approach: simulate the forward SOC after each
+    # slot addition and stop when the reserve floor is met.  This is O(n²) but n≤63
+    # so trivially fast.  Negative-price slots (already assigned above) are kept.
+    #
+    # Phase 1: sub-break-even slots only — these are profitable for export.
+    # Phase 2: above-break-even slots if reserve still not met — operational priority.
+    #          (Reserve maintenance matters more than marginal charge cost above BE.)
+
+    def _soc_walk(labels):
+        """Forward SOC simulation matching Step 5 exactly (no VLP — handled in Step 5)."""
+        s = initial_soc_kwh
+        for i in range(n):
+            s = max(min_soc_kwh, s - load_per_slot)
+            if labels[i] == 'charge':
+                headroom = battery_kwh - s
+                if headroom > 0.01:
+                    s = min(battery_kwh, s + min(charge_per_slot, headroom))
+            elif labels[i] == 'discharge':
+                avail = s - min_soc_kwh
+                if avail >= discharge_per_slot * 0.5:
+                    s = max(min_soc_kwh, s - min(discharge_per_slot, avail))
+            s = max(min_soc_kwh, min(battery_kwh, s))
+        return s
+
+    # Phase 1: add profitable charge slots (≤ break-even price) until reserve met
     for i in sorted_asc:
-        if charge_budget <= 0:
+        if prices_vals[i] > breakeven_p:
+            break   # sorted ascending — all remaining are above break-even too
+        if tentative[i] in ('discharge', 'charge'):
+            continue
+        if _soc_walk(tentative) >= RESERVE_SOC_KWH:
+            break   # reserve already met — stop adding
+        tentative[i] = 'charge'
+
+    # Phase 2: if reserve still short, add cheapest remaining idle slots
+    # (above break-even is acceptable here — this is reserve maintenance, not trading)
+    reserve_added = 0
+    for i in sorted_asc:
+        if _soc_walk(tentative) >= RESERVE_SOC_KWH:
             break
-        if tentative[i] == 'discharge' or tentative[i] == 'charge':
+        if tentative[i] in ('discharge', 'charge'):
             continue
         tentative[i] = 'charge'
-        charge_budget -= charge_per_slot
+        reserve_added += 1
 
-    # ── Step 4d: reserve restoration ─────────────────────────────────────────────
-    # The 72kWh battery must stay ≥50% (RESERVE_SOC_KWH) between sessions.
-    # Starting each day depleted kills arbitrage capacity — you can't capitalise on
-    # price spikes if the tank is empty.  After all trading is planned, project the
-    # end-of-window SOC.  If below RESERVE_SOC_KWH, add cheapest available idle slots
-    # as top-up charge until the deficit is covered.
-    # VLP discharges (≥40p) may dip into the reserve — that's intentional.  The top-up
-    # here only fires when routine trading leaves the battery short.
-    planned_charge_count   = sum(1 for x in tentative if x == 'charge')
-    planned_discharge_count = sum(1 for x in tentative if x == 'discharge')
-    load_total             = load_per_slot * n
-    projected_end_soc      = (initial_soc_kwh
-                               + planned_charge_count    * charge_per_slot
-                               - planned_discharge_count * discharge_per_slot
-                               - load_total)
-    projected_end_soc      = max(min_soc_kwh, min(battery_kwh, projected_end_soc))
-
-    reserve_deficit = RESERVE_SOC_KWH - projected_end_soc
-    if reserve_deficit > charge_per_slot * 0.5:
-        topup_budget = reserve_deficit
-        print("[PLAN] Reserve deficit=" + str(round(reserve_deficit, 1)) + "kWh"
-              + "  projected_end=" + str(round(projected_end_soc, 1)) + "kWh"
-              + "  adding top-up charge slots…")
-        for i in sorted_asc:
-            if topup_budget <= 0:
-                break
-            if tentative[i] in ('discharge', 'charge'):
-                continue
-            tentative[i] = 'charge'
-            topup_budget -= charge_per_slot
+    final_proj = _soc_walk(tentative)
+    if reserve_added:
+        print("[PLAN] Reserve top-up (phase 2): +" + str(reserve_added) + " above-BE slots"
+              + "  projected_end=" + str(round(final_proj, 1)) + "kWh")
+    else:
+        print("[PLAN] Reserve met by phase-1 charges"
+              + "  projected_end=" + str(round(final_proj, 1)) + "kWh")
 
     # ── Step 5: walk in time order enforcing SOC ─────────────────────────────
     soc  = initial_soc_kwh
@@ -1130,7 +1137,38 @@ def run_single():
     if state_g99 is None:
         state_g99 = _fresh_state()
 
-    # Fetch 12-month historical stats for intelligent thresholds
+    # ── STARTUP SEQUENCE ─────────────────────────────────────────────────────────
+    # If battery SOC is below the reserve floor (default first-boot or after a deep
+    # drain), skip arbitrage and just charge continuously at any price until the
+    # reserve is reached.  This prevents the algorithm from planning large export
+    # windows it can't complete and ending each day progressively more depleted.
+    #
+    # Target: RESERVE_SOC_KWH (36 kWh, 50%).  Once reached, normal arbitrage begins.
+    # Override flag in fleet_state.json: "startup_complete": true to skip this check.
+    startup_done = state.get('startup_complete', False)
+    soc_now = state['soc_kwh']
+    if not startup_done and soc_now < RESERVE_SOC_KWH:
+        print("[STARTUP] SOC=" + str(round(soc_now, 1)) + "kWh < reserve floor "
+              + str(RESERVE_SOC_KWH) + "kWh — CHARGE-ONLY mode until reserve met.")
+        print("[STARTUP] Arbitrage suspended. Battery will charge at current price regardless.")
+        # Force all new slots to charge regardless of plan
+        for price_slot in (load_cached_prices() or prices)[-48:]:
+            slot_dt = datetime.fromisoformat(price_slot['valid_from'].replace('Z', '+00:00'))
+            price_p = price_slot['value_inc_vat']
+            slot_profit = simulate_slot(state, price_p, slot_dt, weather,
+                                        buy_thr=999.0, sell_thr=999.0,
+                                        export_prices=export_prices,
+                                        planned_action='charge',
+                                        export_kwh_cap=EXPORT_KWH_G98)
+            if state['soc_kwh'] >= RESERVE_SOC_KWH:
+                state['startup_complete'] = True
+                print("[STARTUP] Reserve reached: " + str(round(state['soc_kwh'], 1))
+                      + "kWh — resuming normal arbitrage next slot.")
+                break
+        save_state(state)
+        return
+
+    # ── Fetch 12-month historical stats for intelligent thresholds ────────────
     hist_stats = get_or_refresh_historical_stats(product_code if not offline_mode else None)
 
     # Dual dispatch plans: G98 and G99
