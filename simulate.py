@@ -30,19 +30,27 @@ from datetime import datetime, timedelta, timezone
 BATTERY_KWH        = 72.0    # 3x Nissan e-NV200 packs = 72kWh nominal
 MIN_SOC_KWH        = 7.2     # 10% reserve (never discharge below this)
 INITIAL_SOC_KWH    = 36.0    # starting SOC (50%)
-CHARGE_RATE_KW     = 10.5    # FoxESS 10.5kW HV inverter
+INVERTER_KW        = 10.5    # FoxESS KH10.5 hard inverter limit — never exceeded
 DAILY_LOAD_KWH     = 12.0    # household consumption per day
 SOLAR_KWP          = 0.0     # no solar modelled (pure arbitrage)
 SOLAR_EFFICIENCY   = 0.18    # panel efficiency
-BUY_PERCENTILE     = 35      # charge when price < 35th percentile of window
-SELL_PERCENTILE    = 60      # discharge when price > 60th percentile of window
 ROUND_TRIP_EFF     = 0.88    # FoxESS + Nissan cell round-trip efficiency
-EXPORT_KWH_G98     = 3.68    # 32A x 230V x 0.5h = G98 current cap (pending G99)
-EXPORT_KWH_G99     = 5.75    # 50A x 230V x 0.5h = G99 target (ref 260420-000198)
-EXPORT_KWH         = EXPORT_KWH_G98  # active cap — update to G99 once SSEN approves
+
+# ── DNO export caps ──────────────────────────────────────────────────────────
+# CHARGE RATE ALWAYS EQUALS EXPORT CAP (symmetric operation).
+# Running asymmetric (charge faster than you can export) is guaranteed loss —
+# you pay for energy you cannot profitably discharge. Never do this.
+EXPORT_KWH_G98     = 3.68    # 32A × 230V × 0.5h  — G98 DNO cap (active)
+EXPORT_KWH_G99     = 5.75    # 50A × 230V × 0.5h  — G99 target (ref 260420-000198)
+
+# ── Active mode — change BOTH lines together when SSEN approves G99 ──────────
+EXPORT_KWH         = EXPORT_KWH_G98
+CHARGE_RATE_KW     = min(EXPORT_KWH * 2, INVERTER_KW)  # symmetric: kWh/slot × 2 = kW
+#                                                         G98 → 7.36 kW / G99 → 10.5 kW
+
 EXPORT_RATE_P_DEF  = 15.0    # Conservative Octopus Outgoing default (p/kWh) when live
                               # export prices unavailable; live prices preferred
-VLP_PRICE_P        = 40.0    # VLP activation threshold: serve house first when >= 40p
+VLP_PRICE_P        = 40.0    # VLP threshold: always discharge when price >= 40p
 
 # NO peak window restriction. Algorithm optimises across all 48 slots regardless
 # of time of day. Midday solar dumps, overnight lows, morning spikes — all captured.
@@ -521,7 +529,7 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
     if not price_slots:
         return {}
 
-    charge_per_slot    = CHARGE_RATE_KW * 0.5          # 5.25 kWh
+    charge_per_slot    = discharge_per_slot              # ALWAYS symmetric — charge == export cap
     discharge_per_slot = export_kwh_cap if export_kwh_cap is not None else EXPORT_KWH
     load_per_slot      = DAILY_LOAD_KWH / 48.0          # 0.25 kWh
 
