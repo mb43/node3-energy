@@ -56,6 +56,8 @@ CHARGE_RATE_KW     = min(EXPORT_KWH * 2, INVERTER_KW)  # symmetric: kWh/slot × 
 EXPORT_RATE_P_DEF  = 15.0    # Conservative Octopus Outgoing default (p/kWh) when live
                               # export prices unavailable; live prices preferred
 VLP_PRICE_P        = 40.0    # VLP threshold: always discharge when price >= 40p
+BUY_PERCENTILE     = 35      # charge when price < 35th percentile of window
+SELL_PERCENTILE    = 60      # discharge when price > 60th percentile of window
 
 # NO peak window restriction. Algorithm optimises across all 48 slots regardless
 # of time of day. Midday solar dumps, overnight lows, morning spikes — all captured.
