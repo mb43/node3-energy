@@ -579,7 +579,9 @@ def api_plan():
     avg_import_p          = (total_charge_cost / (len(ch_slots) * CHARGE_KWH_G98)
                              if ch_slots else sum(s["importP"] for s in slots) / n_slots)
     house_recovery        = excess_kwh * avg_import_p / 100      # homeowner pays this back
-    hosting_cost_absorbed = house_load_cost - house_recovery     # Dovecote's real hosting cost
+    # Cap at total_charge_cost: hosting can only be absorbed from actual charge spend.
+    # When total_charge_cost=0 (idle window), hosting_cost_absorbed=0 → arbitrage_net=0.
+    hosting_cost_absorbed = min(house_load_cost - house_recovery, total_charge_cost)
 
     # Arbitrage net: export revenue minus the charge cost spent purely on exports
     # (hosting cost is a separate line — it's the price of securing the asset location)
