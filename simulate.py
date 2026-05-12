@@ -1185,9 +1185,13 @@ def run_single():
     sell_thr = percentile(vals, SELL_PERCENTILE)
 
     last_updated = None if offline_mode else state.get('last_updated')
+    now_utc = datetime.now(timezone.utc).isoformat()
     new_prices = []
     for ps in prices:
         slot_from = ps['valid_from'].replace('Z', '+00:00')
+        # Only process slots that have already started (no future slots)
+        if slot_from > now_utc:
+            continue
         if last_updated is None or slot_from > last_updated:
             new_prices.append(ps)
 
