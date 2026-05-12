@@ -579,15 +579,15 @@ def api_plan():
     avg_import_p          = (total_charge_cost / (len(ch_slots) * CHARGE_KWH_G98)
                              if ch_slots else sum(s["importP"] for s in slots) / n_slots)
     house_recovery        = excess_kwh * avg_import_p / 100      # homeowner pays this back
-    # Cap at total_charge_cost: hosting can only be absorbed from actual charge spend.
-    # When total_charge_cost=0 (idle window), hosting_cost_absorbed=0 → arbitrage_net=0.
-    hosting_cost_absorbed = min(house_load_cost - house_recovery, total_charge_cost)
+    # hosting_cost = net electricity value given free to homeowner (their grid import savings)
+    # Capped at 0 (can't be negative) and at total_charge_cost when no trades.
+    hosting_cost_absorbed = max(0.0, min(house_load_cost - house_recovery, total_charge_cost))
 
-    # Arbitrage net: export revenue minus the charge cost spent purely on exports
-    # (hosting cost is a separate line — it's the price of securing the asset location)
-    arbitrage_cost = total_charge_cost - hosting_cost_absorbed   # charge cost for export energy
-    net_g98        = total_revenue_g98 - total_charge_cost       # total Dovecote cash position
-    arbitrage_net  = total_revenue_g98 - arbitrage_cost          # pure trading profit
+    # net_g98        = what Dovecote actually earned in cash from battery trading
+    # arbitrage_net  = what Dovecote keeps after giving homeowner their free-electricity benefit
+    # hosting_cost   = the portion of battery value passed to the homeowner (non-cash)
+    net_g98        = total_revenue_g98 - total_charge_cost       # total Dovecote cash P&L
+    arbitrage_net  = net_g98 - hosting_cost_absorbed             # Dovecote's share after hosting
 
     # ── G99 net — independent SOC simulation with symmetric G99 rates ─────────
     soc_g99        = float(state.get("soc_kwh", BAT_KWH * 0.5))
