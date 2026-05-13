@@ -2237,6 +2237,16 @@ function renderSchedule(planData) {
 const SLOT_WINDOW = 48;
 function get48Window()  { return historyData.slice(-SLOT_WINDOW); }
 function getPrev48()    { return historyData.slice(-SLOT_WINDOW * 2, -SLOT_WINDOW); }
+
+// 7-day rolling average daily profit — smooths out volatile single-day swings.
+// Returns average profit per day over whichever period we have (up to 7 days).
+function rolling7DayAvg() {
+  const slots7 = historyData.slice(-SLOT_WINDOW * 7);
+  if (!slots7.length) return 0;
+  const total = slots7.reduce((s, d) => s + (d.slotProfit || 0), 0);
+  const days  = slots7.length / SLOT_WINDOW;   // fractional days handled correctly
+  return total / days;
+}
 function window24hrProfit(data48) {
   return data48.reduce((s, d) => s + (d.slotProfit || 0), 0);
 }
@@ -2311,18 +2321,22 @@ function renderStats() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// PROJECTIONS — extrapolated from 48-slot (24hr) Agile window
+// PROJECTIONS — extrapolated from 7-day rolling average
 // ══════════════════════════════════════════════════════════════
 function calculateProjections() {
   const today48 = get48Window();
   if (today48.length < 4) return;
 
-  // ── Daily base = sum of the 48-slot window (what the system actually earned today) ──
-  // This is the only honest figure — not a rate extrapolation.
-  // It represents one full Agile day (midnight→midnight or 4pm→4pm publication window).
-  const dailyBase = window24hrProfit(today48);
+  // ── Projection base = 7-day rolling average daily profit ──
+  // Single-day figures are too volatile (tight-spread days look terrible,
+  // high-spread days look over-optimistic). A 7-day rolling average gives
+  // a stable, honest basis for weekly/monthly/annual projections.
+  const dailyAvg7  = rolling7DayAvg();
+  const today24hr  = window24hrProfit(today48);   // still used for "today" stat card
+  const daysOfData = Math.min(7, historyData.length / SLOT_WINDOW);
+  const dailyBase  = dailyAvg7;
 
-  // Linear extrapolation from confirmed daily figure
+  // Linear extrapolation from 7-day rolling average
   const weeklyBase = dailyBase * 7;
   const monthBase  = dailyBase * 30;
 
@@ -2364,27 +2378,17 @@ function calculateProjections() {
     }
   }
 
-  // Daily caveat: compare to historical avg for same month if available
-  let dailyCaveat = '';
-  if (histAvgDaily !== null) {
-    const now = new Date();
-    const mo  = (now.getMonth() + 1).toString().padStart(2,'0');
-    const yr  = now.getFullYear();
-    const key = `${yr - 1}-${mo}`;  // same month last year
-    const histMonth = histResultsCache?.monthly?.[key];
-    if (histMonth) {
-      const daysInMonth = new Date(yr - 1, now.getMonth() + 1, 0).getDate();
-      const histSameMonth = histMonth.profit / daysInMonth;
-      const sign = dailyBase >= histSameMonth ? '▲' : '▼';
-      dailyCaveat = `${sign} hist avg £${histAvgDaily.toFixed(2)}/day`;
-    } else {
-      dailyCaveat = `hist avg £${histAvgDaily.toFixed(2)}/day`;
-    }
-  }
+  // Caveats: show today's actual vs the 7-day avg, and historical context
+  const daysLabel = daysOfData >= 6.9 ? '7-day avg' : `${daysOfData.toFixed(1)}-day avg`;
+  const todaySign = today24hr >= dailyBase ? '▲' : '▼';
+  const todayCaveat = `${daysLabel} · today ${todaySign}£${Math.abs(today24hr - dailyBase).toFixed(2)}`;
 
-  setProjCell('daily',   dailyBase,   dailyBase * worstMult,   dailyBase * bestMult,   dailyCaveat);
-  setProjCell('weekly',  weeklyBase,  weeklyBase * worstMult,  weeklyBase * bestMult,  histAvgDaily ? `hist avg £${(histAvgDaily*7).toFixed(2)}/wk` : '');
-  setProjCell('monthly', monthBase,   monthBase * worstMult,   monthBase * bestMult,   histResultsCache ? `hist avg £${(annualBase/12).toFixed(2)}/mo` : '');
+  const wkCaveat  = histAvgDaily ? `hist avg £${(histAvgDaily*7).toFixed(2)}/wk · ${daysLabel}` : daysLabel;
+  const moCaveat  = histResultsCache ? `hist avg £${(annualBase/12).toFixed(2)}/mo · ${daysLabel}` : daysLabel;
+
+  setProjCell('daily',   dailyBase,   dailyBase * worstMult,   dailyBase * bestMult,   todayCaveat);
+  setProjCell('weekly',  weeklyBase,  weeklyBase * worstMult,  weeklyBase * bestMult,  wkCaveat);
+  setProjCell('monthly', monthBase,   monthBase * worstMult,   monthBase * bestMult,   moCaveat);
   setProjCell('annual',  annualBase,  annualLo,                annualHi,               histResultsCache ? '12-month backtest' : '365 × today');
 
   // 5th cell: payback
