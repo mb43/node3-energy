@@ -664,6 +664,205 @@ def api_backtest():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route("/api/backtest-lp")
+def api_backtest_lp():
+    """
+    12-month LP-optimal backtest vs greedy, day-by-day.
+
+    Fetches 12 months of real Octopus Agile import prices, groups by UTC calendar
+    day, and for each day runs:
+      - LP:    scipy HiGHS linear programme — globally optimal for the known 48-slot window
+      - Greedy: percentile-threshold heuristic — matches the old algorithm
+
+    Uses symmetric G98 rates (3.68 kWh/slot charge & discharge).
+    Results cached 24h in backtest_lp_cache.json.  Add ?force=1 to rerun.
+    """
+    cache_path = os.path.join(BASE_DIR, "backtest_lp_cache.json")
+    force      = request.args.get('force', '').lower() in ('1', 'true', 'yes')
+
+    if not force and os.path.exists(cache_path):
+        try:
+            with open(cache_path) as f:
+                cached = json.load(f)
+            age_h = (time.time() - cached.get('_cached_at', 0)) / 3600
+            if age_h < 24:
+                print(f'[BT-LP] Cache hit ({age_h:.1f}h old)')
+                return jsonify(cached['data'])
+        except Exception as e:
+            print(f'[BT-LP] Cache read error: {e}')
+
+    try:
+        import numpy as np
+        from scipy.optimize import linprog
+    except ImportError:
+        return jsonify({'error': 'scipy not installed — run docker compose build --no-cache'}), 500
+
+    # ── Constants ────────────────────────────────────────────────────────────
+    BATTERY     = 72.0
+    MIN_SOC     = 7.2
+    KWH_SLOT    = 3.68       # symmetric G98: charge == discharge cap
+    RTE         = 0.88
+    VLP_P       = 40.0
+    LOAD_DAY    = 12.0
+    LOAD_SLOT   = LOAD_DAY / 48.0
+
+    # ── Fetch 12 months of import prices ─────────────────────────────────────
+    print('[BT-LP] Fetching 12-month Agile import prices…')
+    imp_code = _bt_discover(is_export=False)
+    from_dt  = (datetime.now(timezone.utc) - timedelta(days=366)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    imp_url  = (f'https://api.octopus.energy/v1/products/{imp_code}'
+                f'/electricity-tariffs/E-1R-{imp_code}-{_BT_REGION}/standard-unit-rates/'
+                f'?period_from={from_dt}&page_size=1500')
+    import_prices = _bt_fetch_all(imp_url)
+    print(f'[BT-LP] {len(import_prices)} import slots fetched')
+
+    # ── Group by UTC calendar day ─────────────────────────────────────────────
+    from collections import defaultdict
+    by_day = defaultdict(list)
+    for slot in import_prices:
+        day = slot['valid_from'][:10]   # 'YYYY-MM-DD'
+        by_day[day].append(slot)
+    # Sort slots within each day
+    for day in by_day:
+        by_day[day].sort(key=lambda s: s['valid_from'])
+
+    # ── Per-day LP and greedy functions ───────────────────────────────────────
+    def lp_day(prices_p, init_soc):
+        n = len(prices_p)
+        if n < 10:
+            return 0.0, init_soc
+        p       = np.array(prices_p, dtype=float)
+        c_obj   = np.concatenate([p, -p * RTE])
+        A_ub    = np.zeros((2 * n, 2 * n))
+        b_ub    = np.zeros(2 * n)
+        for t in range(1, n + 1):
+            rl = t - 1; ru = n + (t - 1)
+            A_ub[rl, :t] = -1;  A_ub[rl, n:n+t] =  1
+            b_ub[rl]     = init_soc - t * LOAD_SLOT - MIN_SOC
+            A_ub[ru, :t] =  1;  A_ub[ru, n:n+t] = -1
+            b_ub[ru]     = BATTERY - init_soc + t * LOAD_SLOT
+        bounds = [(0, KWH_SLOT)] * n + [(0, KWH_SLOT)] * n
+        res    = linprog(c_obj, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method='highs')
+        if res.status != 0:
+            return 0.0, init_soc
+        c_v = res.x[:n]; d_v = res.x[n:]
+        rev_p = sum(d_v[i]*prices_p[i]*RTE - c_v[i]*prices_p[i] for i in range(n))
+        # Walk SOC to get end state
+        soc = init_soc
+        for i in range(n):
+            soc = max(0.0, soc - LOAD_SLOT)
+            if d_v[i] > KWH_SLOT * 0.1:
+                soc = max(MIN_SOC, soc - min(KWH_SLOT, soc - MIN_SOC))
+            elif c_v[i] > KWH_SLOT * 0.1:
+                soc = min(BATTERY, soc + min(KWH_SLOT, BATTERY - soc))
+            soc = max(MIN_SOC, min(BATTERY, soc))
+        return rev_p / 100.0, soc   # return £ and end SOC
+
+    def greedy_day(prices_p, init_soc):
+        n = len(prices_p)
+        if n < 10:
+            return 0.0, init_soc
+        sorted_asc  = sorted(range(n), key=lambda i: prices_p[i])
+        sorted_desc = sorted(range(n), key=lambda i: prices_p[i], reverse=True)
+        usable      = BATTERY - MIN_SOC
+        max_cs      = max(1, int(usable / KWH_SLOT) + 1)
+        cands       = [i for i in sorted_asc if prices_p[i] < VLP_P][:max_cs]
+        avg_cp      = sum(prices_p[i] for i in cands) / len(cands) if cands else min(prices_p)
+        be_p        = (KWH_SLOT * avg_cp) / (KWH_SLOT * RTE)
+        tentative   = ['idle'] * n
+        dbud        = usable
+        for i in sorted_desc:
+            if prices_p[i] >= VLP_P:
+                tentative[i] = 'discharge'; dbud -= KWH_SLOT; continue
+            if dbud <= 0 or prices_p[i] <= be_p: break
+            tentative[i] = 'discharge'; dbud -= KWH_SLOT
+        for i in sorted_asc:
+            if prices_p[i] > be_p: break
+            if tentative[i] != 'idle': continue
+            tentative[i] = 'charge'
+        soc = init_soc; rev_p = 0.0
+        for i in range(n):
+            soc = max(0.0, soc - LOAD_SLOT)
+            p   = prices_p[i]
+            if prices_p[i] >= VLP_P and soc > MIN_SOC + 0.1:
+                di = min(KWH_SLOT, soc - MIN_SOC); soc -= di; rev_p += di * p * RTE
+            elif tentative[i] == 'charge':
+                ch = min(KWH_SLOT, BATTERY - soc)
+                if ch > 0.01: soc += ch; rev_p -= ch * p
+            elif tentative[i] == 'discharge':
+                av = soc - MIN_SOC
+                if av >= KWH_SLOT * 0.5:
+                    di = min(KWH_SLOT, av); soc -= di; rev_p += di * p * RTE
+            soc = max(MIN_SOC, min(BATTERY, soc))
+        return rev_p / 100.0, soc
+
+    # ── Run both algorithms across all days ───────────────────────────────────
+    days_sorted = sorted(by_day.keys())
+    lp_monthly  = defaultdict(float)
+    gr_monthly  = defaultdict(float)
+    lp_daily    = {}
+    gr_daily    = {}
+    lp_soc = BATTERY * 0.5    # start at 50%
+    gr_soc = BATTERY * 0.5
+
+    print(f'[BT-LP] Running LP + greedy across {len(days_sorted)} days…')
+    for day in days_sorted:
+        slots    = by_day[day]
+        prices_p = [float(s['value_inc_vat']) for s in slots]
+        month    = day[:7]
+
+        lp_rev, lp_soc  = lp_day(prices_p, lp_soc)
+        gr_rev, gr_soc  = greedy_day(prices_p, gr_soc)
+
+        lp_monthly[month] += lp_rev
+        gr_monthly[month] += gr_rev
+        lp_daily[day]      = round(lp_rev, 4)
+        gr_daily[day]      = round(gr_rev, 4)
+
+    lp_total = sum(lp_monthly.values())
+    gr_total = sum(gr_monthly.values())
+    uplift   = lp_total - gr_total
+    uplift_pct = (uplift / abs(gr_total) * 100) if gr_total else 0
+
+    print(f'[BT-LP] LP total=£{lp_total:.2f}  Greedy total=£{gr_total:.2f}  Uplift=+£{uplift:.2f} ({uplift_pct:.1f}%)')
+
+    # Build monthly comparison list
+    all_months = sorted(set(list(lp_monthly.keys()) + list(gr_monthly.keys())))
+    monthly_compare = [
+        {
+            'month':   m,
+            'lp':      round(lp_monthly.get(m, 0), 2),
+            'greedy':  round(gr_monthly.get(m, 0), 2),
+            'uplift':  round(lp_monthly.get(m, 0) - gr_monthly.get(m, 0), 2),
+        }
+        for m in all_months
+    ]
+
+    result = {
+        'lp_total_gbp':      round(lp_total, 2),
+        'greedy_total_gbp':  round(gr_total, 2),
+        'uplift_gbp':        round(uplift, 2),
+        'uplift_pct':        round(uplift_pct, 1),
+        'days_analysed':     len(days_sorted),
+        'monthly':           monthly_compare,
+        'lp_daily':          lp_daily,
+        'greedy_daily':      gr_daily,
+        'algorithm':         'scipy HiGHS LP  vs  percentile-greedy',
+        'rates':             f'G98 symmetric {KWH_SLOT}kWh/slot charge & discharge',
+        'rte':               RTE,
+        'battery_kwh':       BATTERY,
+        'run_at':            datetime.now(timezone.utc).isoformat(),
+    }
+
+    try:
+        with open(cache_path, 'w') as f:
+            json.dump({'_cached_at': time.time(), 'data': result}, f)
+    except Exception as e:
+        print(f'[BT-LP] Cache write error: {e}')
+
+    return jsonify(result)
+
+
 @app.route("/api/trigger", methods=["GET", "POST"])
 def api_trigger():
     """
