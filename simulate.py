@@ -642,10 +642,23 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
             break   # reserve already met — stop adding
         tentative[i] = 'charge'
 
-    # Phase 2: if reserve still short, add cheapest remaining idle slots
-    # (above break-even is acceptable here — this is reserve maintenance, not trading)
+    # Phase 2: above-break-even reserve top-up — capped to prevent losing trades.
+    # Only charge above break-even if price is within PHASE2_MAX_PREMIUM_P pence of
+    # break-even AND a profitable discharge exists (best_sell_p * RTE > charge price).
+    # On tight-spread days the cap is hit, reserve stays low, and the next overnight
+    # cheap window handles the refill instead of forcing expensive daytime charges.
+    PHASE2_MAX_PREMIUM_P = 3.0   # max pence above break-even for reserve top-up
+
+    discharge_prices = [prices_vals[i] for i in range(n)
+                        if tentative[i] == 'discharge' or prices_vals[i] >= VLP_PRICE_P]
+    best_sell_p = max(discharge_prices) if discharge_prices else 0.0
+    phase2_price_cap = min(breakeven_p + PHASE2_MAX_PREMIUM_P,
+                           best_sell_p * ROUND_TRIP_EFF)
+
     reserve_added = 0
     for i in sorted_asc:
+        if prices_vals[i] > phase2_price_cap:
+            break  # sorted ascending — all remaining slots too expensive
         if _soc_walk(tentative) >= RESERVE_SOC_KWH:
             break
         if tentative[i] in ('discharge', 'charge'):
@@ -654,9 +667,14 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
         reserve_added += 1
 
     final_proj = _soc_walk(tentative)
+    reserve_shortfall = final_proj < RESERVE_SOC_KWH
     if reserve_added:
-        print("[PLAN] Reserve top-up (phase 2): +" + str(reserve_added) + " above-BE slots"
+        print("[PLAN] Reserve top-up (phase 2): +" + str(reserve_added) + " slots"
+              + "  cap=" + str(round(phase2_price_cap, 2)) + "p"
               + "  projected_end=" + str(round(final_proj, 1)) + "kWh")
+    elif reserve_shortfall:
+        print("[PLAN] Phase 2 skipped — price cap " + str(round(phase2_price_cap, 2))
+              + "p prevents expensive refill; reserve deferred to next cheap window")
     else:
         print("[PLAN] Reserve met by phase-1 charges"
               + "  projected_end=" + str(round(final_proj, 1)) + "kWh")
