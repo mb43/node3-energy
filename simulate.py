@@ -490,7 +490,7 @@ def get_solar_kwh_for_slot(weather, slot_dt, kwp=SOLAR_KWP, efficiency=SOLAR_EFF
 
 
 # ---------------------------------------------
-# LOOKAHEAD OPTIMIZER
+# LP-OPTIMAL DISPATCH
 # ---------------------------------------------
 def percentile(values, pct):
     if not values:
@@ -504,180 +504,118 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
                           min_soc_kwh=MIN_SOC_KWH, historical_stats=None,
                           export_kwh_cap=None):
     """
-    True greedy optimiser over the known 48-slot Agile price window.
+    Linear-programming optimal dispatch over the known Agile price window.
 
-    Octopus Agile publishes the next day's 48 half-hourly prices at ~16:00 each day.
-    run_single() fetches from now-2h to now+26h, so:
-      - Before 16:00: window = remaining slots of today (known since yesterday's 16:00 publish)
-      - After  16:00: window = remaining today + full tomorrow (both now published)
-    In either case, all prices in the returned window are REAL published values.
-    Historical scoring is not needed and actively harms results (e.g. labelling a 34p
-    slot 'idle' because it is historically normal, while labelling 22p 'discharge'
-    because it is unusually high for that hour of day). With known prices the correct
-    strategy is simple:
+    Octopus Agile publishes all 48 slot prices for the next day at ~16:00.
+    Since ALL prices are known in advance, the optimal dispatch is a classic
+    LP:
 
-    Algorithm:
-      1. Sort all slots by import price ascending → cheapest M slots = charge candidates
-      2. Calculate actual average charge cost from those M slots (accurate break-even)
-      3. Sort all slots by price descending → label as 'discharge' from highest down,
-         stopping when price falls below break-even. Higher prices ALWAYS selected
-         before lower ones — never discharge at 22p when 34p is in the same window.
-      4. VLP override (≥ VLP_PRICE_P): flagged as discharge regardless of ranking.
-      5. Walk in time order enforcing SOC constraints. Slots labelled 'idle' hold
-         charge in reserve for higher-value slots later in the day.
+        maximise  Σ d[i] * p[i] * RTE  −  Σ c[i] * p[i]
+        subject to
+            SOC[t] = initial_soc − t*load + Σ_{k<t}(c[k] − d[k])
+            min_soc  ≤  SOC[t]  ≤  battery_kwh   ∀ t = 1..n
+            0  ≤  c[i]  ≤  charge_per_slot
+            0  ≤  d[i]  ≤  discharge_per_slot
 
-    Break-even: export_p > (charge_kwh_per_slot × avg_charge_p) / (discharge_kwh_per_slot × RTE)
-      G98 example (symmetric 3.68/3.68): 3.68 × 17p / (3.68 × 0.88) = 19.3p  →  discharge above ~19p
-      G99 example (symmetric 5.75/5.75): 5.75 × 17p / (5.75 × 0.88) = 19.3p  →  same break-even
+    The LP solver (HiGHS via scipy) finds the globally optimal charge/discharge
+    schedule in milliseconds — no percentile thresholds, no break-even heuristics,
+    no Phase 2 forced reserve refills. On tight-spread days it correctly idles
+    rather than forcing above-break-even charges that guarantee a loss.
 
-    historical_stats param retained for API compatibility but no longer used.
+    Falls back to a simple greedy schedule if scipy is unavailable.
+
     Returns: dict mapping valid_from string -> 'charge' | 'discharge' | 'idle'
     """
     if not price_slots:
         return {}
 
     discharge_per_slot = export_kwh_cap if export_kwh_cap is not None else EXPORT_KWH
-    charge_per_slot    = discharge_per_slot              # ALWAYS symmetric — charge == export cap
-    load_per_slot      = DAILY_LOAD_KWH / 48.0          # 0.25 kWh
+    charge_per_slot    = discharge_per_slot   # always symmetric
+    load_per_slot      = DAILY_LOAD_KWH / 48.0
 
-    n              = len(price_slots)
-    prices_vals    = [s['value_inc_vat'] for s in price_slots]
+    n           = len(price_slots)
+    prices_vals = [s['value_inc_vat'] for s in price_slots]
 
-    print("[PLAN] True greedy optimiser | window=" + str(n) + " slots"
+    print("[PLAN] LP optimiser | window=" + str(n) + " slots"
           + "  min=" + str(round(min(prices_vals), 2)) + "p"
           + "  max=" + str(round(max(prices_vals), 2)) + "p"
-          + "  avg=" + str(round(sum(prices_vals)/n, 2)) + "p")
+          + "  avg=" + str(round(sum(prices_vals) / n, 2)) + "p")
 
-    # ── Step 1: estimate how much energy we can usefully cycle ──────────────
-    usable_kwh = battery_kwh - min_soc_kwh          # 72 - 7.2 = 64.8 kWh
+    # ── LP SOLVER ────────────────────────────────────────────────────────────
+    lp_ok = False
+    try:
+        import numpy as np
+        from scipy.optimize import linprog
 
-    # ── Step 2: identify the cheapest charge slots ───────────────────────────
-    # Sort indices by price ascending; exclude slots that will be VLP-discharged
-    sorted_asc  = sorted(range(n), key=lambda i: prices_vals[i])
-    sorted_desc = sorted(range(n), key=lambda i: prices_vals[i], reverse=True)
+        prices = np.array(prices_vals, dtype=float)
 
-    vlp_indices = {i for i in range(n) if prices_vals[i] >= VLP_PRICE_P}
+        # Objective vector: minimise [p, −p*RTE] @ [c, d]
+        c_obj = np.concatenate([prices, -prices * ROUND_TRIP_EFF])
 
-    # Take cheapest slots (excluding VLP) up to battery capacity
-    max_charge_slots = max(1, int(usable_kwh / charge_per_slot) + 1)
-    charge_candidates = [i for i in sorted_asc if i not in vlp_indices][:max_charge_slots]
+        # SOC constraints for t = 1..n (before each slot and after the last):
+        #   Lower: −Σ_{k<t}c[k] + Σ_{k<t}d[k]  ≤  initial_soc − t*load − min_soc
+        #   Upper:  Σ_{k<t}c[k] − Σ_{k<t}d[k]  ≤  battery − initial_soc + t*load
+        A_ub = np.zeros((2 * n, 2 * n))
+        b_ub = np.zeros(2 * n)
+        for t in range(1, n + 1):
+            rl = t - 1;       ru = n + (t - 1)
+            A_ub[rl, :t]      = -1;  A_ub[rl, n:n + t] =  1
+            b_ub[rl]          = initial_soc_kwh - t * load_per_slot - min_soc_kwh
+            A_ub[ru, :t]      =  1;  A_ub[ru, n:n + t] = -1
+            b_ub[ru]          = battery_kwh - initial_soc_kwh + t * load_per_slot
 
-    # ── Step 3: break-even based on ACTUAL planned charge prices ────────────
-    if charge_candidates:
-        avg_charge_p = sum(prices_vals[i] for i in charge_candidates) / len(charge_candidates)
-    else:
-        avg_charge_p = min(prices_vals) if prices_vals else 0.0
+        bounds  = [(0, charge_per_slot)] * n + [(0, discharge_per_slot)] * n
+        result  = linprog(c_obj, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method='highs')
 
-    # Export price needed to cover the round-trip cost of one charge-discharge pair
-    # charge_cost = charge_per_slot × avg_charge_p
-    # revenue     = discharge_per_slot × RTE × export_p
-    # break-even: charge_cost = revenue  →  export_p = charge_cost / (discharge_per_slot × RTE)
-    breakeven_p = (charge_per_slot * avg_charge_p) / (discharge_per_slot * ROUND_TRIP_EFF)
+        if result.status == 0:
+            c_vals = result.x[:n]
+            d_vals = result.x[n:]
+            rev_p  = float(sum(
+                d_vals[i] * prices_vals[i] * ROUND_TRIP_EFF - c_vals[i] * prices_vals[i]
+                for i in range(n)
+            ))
+            print("[PLAN] LP optimal: projected revenue = £" + str(round(rev_p / 100, 4)))
 
-    print("[PLAN] avg_charge_p=" + str(round(avg_charge_p, 2)) + "p"
-          + "  breakeven_export_p=" + str(round(breakeven_p, 2)) + "p"
-          + "  discharge_per_slot=" + str(discharge_per_slot) + "kWh")
+            # Convert continuous LP solution → binary slot labels
+            # LP naturally pushes to bounds (full charge or full discharge); threshold
+            # at 10% to handle floating-point artefacts.
+            tentative = ['idle'] * n
+            for i in range(n):
+                if d_vals[i] > discharge_per_slot * 0.1:
+                    tentative[i] = 'discharge'
+                elif c_vals[i] > charge_per_slot * 0.1:
+                    tentative[i] = 'charge'
+            lp_ok = True
+        else:
+            print("[PLAN] LP infeasible (status=" + str(result.status)
+                  + ") — using greedy fallback")
 
-    # ── Step 4: label slots ──────────────────────────────────────────────────
-    tentative = ['idle'] * n
+    except Exception as lp_err:
+        print("[PLAN] LP error: " + str(lp_err) + " — using greedy fallback")
 
-    # Mark discharge slots: highest price first, stop below break-even
-    discharge_budget = usable_kwh
-    for i in sorted_desc:
-        if prices_vals[i] >= VLP_PRICE_P:
-            # VLP handled separately in time-walk; mark here so charge slots avoid it
-            tentative[i] = 'discharge'
-            discharge_budget -= discharge_per_slot
-            continue
-        if discharge_budget <= 0:
-            break
-        if prices_vals[i] <= breakeven_p:
-            break   # sorted descending — all remaining prices are also below break-even
-        tentative[i] = 'discharge'
-        discharge_budget -= discharge_per_slot
-
-    # ── Negative price slots: ALWAYS charge (Octopus pays YOU to consume) ───────
-    # These are unconditional — free or paid energy, fill regardless of export plan.
-    # The SOC walk (Step 5) will skip if battery is already full.
-    for i in range(n):
-        if prices_vals[i] <= 0 and tentative[i] != 'discharge':
+    # ── GREEDY FALLBACK (only if LP fails) ───────────────────────────────────
+    if not lp_ok:
+        sorted_asc  = sorted(range(n), key=lambda i: prices_vals[i])
+        sorted_desc = sorted(range(n), key=lambda i: prices_vals[i], reverse=True)
+        vlp_indices = {i for i in range(n) if prices_vals[i] >= VLP_PRICE_P}
+        usable_kwh  = battery_kwh - min_soc_kwh
+        max_cs = max(1, int(usable_kwh / charge_per_slot) + 1)
+        charge_candidates = [i for i in sorted_asc if i not in vlp_indices][:max_cs]
+        avg_charge_p = (sum(prices_vals[i] for i in charge_candidates) / len(charge_candidates)
+                        if charge_candidates else min(prices_vals))
+        breakeven_p  = (charge_per_slot * avg_charge_p) / (discharge_per_slot * ROUND_TRIP_EFF)
+        tentative    = ['idle'] * n
+        discharge_budget = usable_kwh
+        for i in sorted_desc:
+            if prices_vals[i] >= VLP_PRICE_P:
+                tentative[i] = 'discharge'; discharge_budget -= discharge_per_slot; continue
+            if discharge_budget <= 0 or prices_vals[i] <= breakeven_p: break
+            tentative[i] = 'discharge'; discharge_budget -= discharge_per_slot
+        for i in sorted_asc:
+            if prices_vals[i] > breakeven_p: break
+            if tentative[i] != 'idle': continue
             tentative[i] = 'charge'
-
-    # ── Unified charge allocation (export fuel + reserve restoration) ─────────────
-    # Two separate passes previously caused under-counting due to mid-path SOC
-    # capping (the linear projection assumed all charge energy was absorbed, but
-    # the time walk caps at battery_kwh, so fewer kWh actually enter the battery).
-    #
-    # Replaced with a single iterative approach: simulate the forward SOC after each
-    # slot addition and stop when the reserve floor is met.  This is O(n²) but n≤63
-    # so trivially fast.  Negative-price slots (already assigned above) are kept.
-    #
-    # Phase 1: sub-break-even slots only — these are profitable for export.
-    # Phase 2: above-break-even slots if reserve still not met — operational priority.
-    #          (Reserve maintenance matters more than marginal charge cost above BE.)
-
-    def _soc_walk(labels):
-        """Forward SOC simulation matching Step 5 exactly (no VLP — handled in Step 5)."""
-        s = initial_soc_kwh
-        for i in range(n):
-            s = max(min_soc_kwh, s - load_per_slot)
-            if labels[i] == 'charge':
-                headroom = battery_kwh - s
-                if headroom > 0.01:
-                    s = min(battery_kwh, s + min(charge_per_slot, headroom))
-            elif labels[i] == 'discharge':
-                avail = s - min_soc_kwh
-                if avail >= discharge_per_slot * 0.5:
-                    s = max(min_soc_kwh, s - min(discharge_per_slot, avail))
-            s = max(min_soc_kwh, min(battery_kwh, s))
-        return s
-
-    # Phase 1: add profitable charge slots (≤ break-even price) until reserve met
-    for i in sorted_asc:
-        if prices_vals[i] > breakeven_p:
-            break   # sorted ascending — all remaining are above break-even too
-        if tentative[i] in ('discharge', 'charge'):
-            continue
-        if _soc_walk(tentative) >= RESERVE_SOC_KWH:
-            break   # reserve already met — stop adding
-        tentative[i] = 'charge'
-
-    # Phase 2: above-break-even reserve top-up — capped to prevent losing trades.
-    # Only charge above break-even if price is within PHASE2_MAX_PREMIUM_P pence of
-    # break-even AND a profitable discharge exists (best_sell_p * RTE > charge price).
-    # On tight-spread days the cap is hit, reserve stays low, and the next overnight
-    # cheap window handles the refill instead of forcing expensive daytime charges.
-    PHASE2_MAX_PREMIUM_P = 3.0   # max pence above break-even for reserve top-up
-
-    discharge_prices = [prices_vals[i] for i in range(n)
-                        if tentative[i] == 'discharge' or prices_vals[i] >= VLP_PRICE_P]
-    best_sell_p = max(discharge_prices) if discharge_prices else 0.0
-    phase2_price_cap = min(breakeven_p + PHASE2_MAX_PREMIUM_P,
-                           best_sell_p * ROUND_TRIP_EFF)
-
-    reserve_added = 0
-    for i in sorted_asc:
-        if prices_vals[i] > phase2_price_cap:
-            break  # sorted ascending — all remaining slots too expensive
-        if _soc_walk(tentative) >= RESERVE_SOC_KWH:
-            break
-        if tentative[i] in ('discharge', 'charge'):
-            continue
-        tentative[i] = 'charge'
-        reserve_added += 1
-
-    final_proj = _soc_walk(tentative)
-    reserve_shortfall = final_proj < RESERVE_SOC_KWH
-    if reserve_added:
-        print("[PLAN] Reserve top-up (phase 2): +" + str(reserve_added) + " slots"
-              + "  cap=" + str(round(phase2_price_cap, 2)) + "p"
-              + "  projected_end=" + str(round(final_proj, 1)) + "kWh")
-    elif reserve_shortfall:
-        print("[PLAN] Phase 2 skipped — price cap " + str(round(phase2_price_cap, 2))
-              + "p prevents expensive refill; reserve deferred to next cheap window")
-    else:
-        print("[PLAN] Reserve met by phase-1 charges"
-              + "  projected_end=" + str(round(final_proj, 1)) + "kWh")
+        print("[PLAN] Greedy fallback: breakeven=" + str(round(breakeven_p, 2)) + "p")
 
     # ── Step 5: walk in time order enforcing SOC ─────────────────────────────
     soc  = initial_soc_kwh
