@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>179 King Georges Avenue — G99 Site Plan</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  body { margin: 0; padding: 0; }
+  #map { width: 960px; height: 720px; }
+  .legend {
+    background: rgba(255,255,255,0.92);
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.7;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .legend h4 { margin: 0 0 6px; font-size: 14px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .line { display: inline-block; width: 20px; height: 3px; margin-right: 6px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+// Property centroid: 179 King George's Avenue, Southampton SO15 4LD
+// Coordinates confirmed via OSM Nominatim (building centroid, way 704644810)
+// OSM building bbox: N=50.9203941 S=50.9202855 W=-1.4460114 E=-1.4457968
+const LAT = 50.9203478;
+const LNG = -1.4458938;
+
+var map = L.map('map', {
+  center: [LAT, LNG],
+  zoom: 20,
+  zoomControl: true,
+  attributionControl: true
+});
+
+// ESRI World Imagery satellite tiles (no API key required)
+L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  {
+    attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics',
+    maxZoom: 21
+  }
+).addTo(map);
+
+// ESRI labels overlay
+L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+  { maxZoom: 21, opacity: 0.7 }
+).addTo(map);
+
+// Property boundary polygon
+// OSM building footprint: N=50.9203941 S=50.9202855 W=-1.4460114 E=-1.4457968
+// Plot = building + 3m front garden, 20m rear garden, 2m W side, 3m E driveway
+var boundary = [
+  [50.9204210, -1.4460399],  // NW: 3m N of bldg face, 2m W of W wall
+  [50.9204210, -1.4457541],  // NE: 3m N of bldg face, 3m E (driveway east)
+  [50.9201058, -1.4457541],  // SE: 20m S of bldg rear, east side
+  [50.9201058, -1.4460399],  // SW: 20m S of bldg rear, west side
+];
+
+L.polygon(boundary, {
+  color: '#e63b12',
+  weight: 3,
+  fillColor: '#ff6b47',
+  fillOpacity: 0.15,
+  dashArray: null
+}).addTo(map).bindTooltip('179 King Georges Avenue<br>Plot boundary', {permanent: false, direction: 'top'});
+
+// Meter: east wall of building (driveway side), mid-height of building
+var meterLat = (50.9203941 + 50.9202855) / 2;  // midpoint of building N/S faces
+var meterLng = -1.4457968;  // east wall of building
+
+var meterIcon = L.divIcon({
+  html: '<div style="background:#1a73e8;color:white;border:2px solid white;border-radius:50%;width:20px;height:20px;text-align:center;line-height:18px;font-size:11px;font-weight:bold;box-shadow:0 2px 6px rgba(0,0,0,0.5)">⚡</div>',
+  iconSize: [20, 20],
+  iconAnchor: [10, 10]
+});
+
+L.marker([meterLat, meterLng], {icon: meterIcon})
+  .addTo(map)
+  .bindTooltip('SMETS2 Electricity Meter<br>MPAN: 2000022678841<br>East wall (driveway side), internal face', {permanent: false, direction: 'right'});
+
+// BESS install point: external, driveway, hard against east wall
+// Slightly south of meter (mid-building level, external face of east wall)
+var bessIcon = L.divIcon({
+  html: '<div style="background:#1e7e34;color:white;border:2px solid white;border-radius:4px;width:22px;height:22px;text-align:center;line-height:20px;font-size:11px;font-weight:bold;box-shadow:0 2px 6px rgba(0,0,0,0.5)">🔋</div>',
+  iconSize: [22, 22],
+  iconAnchor: [11, 11]
+});
+
+L.marker([meterLat - 0.00003, meterLng + 0.00003], {icon: bessIcon})
+  .addTo(map)
+  .bindTooltip('FoxESS KH10.5HV BESS<br>Node-3 (external, driveway)', {permanent: false, direction: 'right'});
+
+// Address marker at front of property
+var addrIcon = L.divIcon({
+  html: '<div style="background:#d93025;color:white;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:bold;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.5)">179 King Georges Ave</div>',
+  iconSize: [null, null],
+  iconAnchor: [60, 10]
+});
+
+L.marker([50.9204210, LNG], {icon: addrIcon}).addTo(map);
+
+// Scale bar
+L.control.scale({metric: true, imperial: false, position: 'bottomright'}).addTo(map);
+
+// Legend
+var legend = L.control({position: 'bottomleft'});
+legend.onAdd = function() {
+  var div = L.DomUtil.create('div', 'legend');
+  div.innerHTML = '<h4>G99 Site Plan — 179 King Georges Ave, SO15 4LD</h4>' +
+    '<div><span class="line" style="background:#e63b12"></span> Property boundary</div>' +
+    '<div><span class="dot" style="background:#1a73e8"></span> SMETS2 Electricity Meter (MPAN: 2000022678841)</div>' +
+    '<div><span class="dot" style="background:#1e7e34"></span> Node-3 BESS (FoxESS KH10.5HV, 10.5kW)</div>' +
+    '<div style="margin-top:6px;font-size:11px;color:#666">Imagery © Esri/Maxar &nbsp;|&nbsp; G99 Fast-Track ref: 260420-000198</div>';
+  return div;
+};
+legend.addTo(map);
+</script>
+</body>
+</html>

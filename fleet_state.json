@@ -1,15 +1,16 @@
 {
-  "soc_kwh": 23.470000000000006,
-  "profit_gbp": 11.128849493999997,
-  "charged_kwh": 150.3,
-  "discharged_kwh": 138.76000000000013,
-  "last_action": "charging",
-  "last_price_p": 14.3535,
-  "buy_threshold_p": 16.695,
+  "soc_kwh": 7.2,
+  "profit_gbp": 44.17122393599996,
+  "charged_kwh": 1166.989999999998,
+  "discharged_kwh": 1038.869999999994,
+  "last_action": "idle",
+  "last_price_p": 20.307,
+  "buy_threshold_p": 17.22,
   "sell_threshold_p": 20.0865,
-  "last_updated": "2026-04-20T21:30:00+00:00",
-  "slots_simulated": 113,
+  "last_updated": "2026-05-22T22:30:00+00:00",
+  "slots_simulated": 689,
   "battery_kwh": 72.0,
   "solar_kwp": 0.0,
-  "daily_load_kwh": 12.0
+  "daily_load_kwh": 12.0,
+  "startup_complete": true
 }

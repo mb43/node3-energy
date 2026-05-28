@@ -121,7 +121,7 @@ def normalize_state(state):
 # Constants must match simulate.py
 _BT_BATTERY_KWH      = 72.0
 _BT_MIN_SOC_KWH      = 7.2
-_BT_CHARGE_KWH_SLOT  = 10.5 * 0.5   # 5.25 kWh/slot
+_BT_CHARGE_KWH_SLOT  = 5.25          # inverter max: FoxESS KH10.5 @ 10.5kW × 0.5h (NOT export-capped)
 _BT_EXPORT_KWH       = 3.68          # G98 single-phase export cap per slot
 _BT_RTE              = 0.88          # round-trip efficiency
 _BT_BUY_PCT          = 35
@@ -519,13 +519,12 @@ def api_plan():
         })
 
     # Annotate with forward SoC simulation (Python constants)
-    # SYMMETRIC RATES ONLY — charge rate always equals export cap per mode
-    # G98: 32A DNO cap → 3.68 kWh/slot export, 7.36 kW charge → 3.68 kWh/slot charge
-    # G99: 50A DNO cap → 5.75 kWh/slot export, 11.5 kW (inv cap) → 5.75 kWh/slot charge
-    CHARGE_KWH_G98  = 3.68   # symmetric G98 — charge == export cap
-    EXPORT_KWH_G98  = 3.68
-    CHARGE_KWH_G99  = 5.75   # symmetric G99 — charge == export cap
-    EXPORT_KWH_G99  = 5.75
+    # Asymmetric rates: FoxESS KH10.5 charges at inverter max (5.25 kWh/slot).
+    # Export is DNO-capped: G98 = 3.68 kWh/slot (32A), G99 = 5.75 kWh/slot (50A).
+    # Charging rate is the same in both scenarios — only export cap changes.
+    CHARGE_KWH      = 5.25   # inverter max: FoxESS KH10.5 @ 10.5kW × 0.5h
+    EXPORT_KWH_G98  = 3.68   # G98 DNO export cap (active)
+    EXPORT_KWH_G99  = 5.75   # G99 DNO export cap (pending ref 260420-000198)
     RTE             = 0.88
     BAT_KWH         = 72.0
     MIN_SOC         = 7.2
@@ -557,7 +556,7 @@ def api_plan():
         house_load_cost += LOAD_PER_SLOT * s["importP"] / 100
 
         if s["action"] == "charge":
-            ch  = min(CHARGE_KWH_G98, BAT_KWH - soc)
+            ch  = min(CHARGE_KWH, BAT_KWH - soc)
             soc = min(BAT_KWH, soc + ch)
             total_charge_cost += ch * s["importP"] / 100
         elif s["action"] == "discharge":
@@ -576,7 +575,7 @@ def api_plan():
     excess_kwh            = max(0.0, house_load_kwh_total - free_allowance_kwh)
     # For the planning window all load is within the allowance (free_allowance = total load)
     # excess_kwh will be >0 only if the homeowner's actual usage exceeds the allowance
-    avg_import_p          = (total_charge_cost / (len(ch_slots) * CHARGE_KWH_G98)
+    avg_import_p          = (total_charge_cost / (len(ch_slots) * CHARGE_KWH)
                              if ch_slots else sum(s["importP"] for s in slots) / n_slots)
     house_recovery        = excess_kwh * avg_import_p / 100      # homeowner pays this back
     # hosting_cost = net electricity value given free to homeowner (their grid import savings)
@@ -589,22 +588,30 @@ def api_plan():
     net_g98        = total_revenue_g98 - total_charge_cost       # total Dovecote cash P&L
     arbitrage_net  = net_g98 - hosting_cost_absorbed             # Dovecote's share after hosting
 
-    # ── G99 net — independent SOC simulation with symmetric G99 rates ─────────
+    # ── G99 net — independent SOC simulation with G99 export cap, same charge rate ──
+    # Charge rate is unchanged (inverter-limited at 5.25 kWh/slot).
+    # Only export cap increases: 3.68 → 5.75 kWh/slot.
     soc_g99        = float(state.get("soc_kwh", BAT_KWH * 0.5))
     total_rev_g99  = 0.0
     total_cost_g99 = 0.0
     for s in slots:
         soc_g99 = max(MIN_SOC, soc_g99 - LOAD_PER_SLOT)
         if s["action"] == "charge":
-            ch       = min(CHARGE_KWH_G99, BAT_KWH - soc_g99)
+            ch       = min(CHARGE_KWH, BAT_KWH - soc_g99)   # same charge rate as G98
             soc_g99  = min(BAT_KWH, soc_g99 + ch)
             total_cost_g99 += ch * s["importP"] / 100
         elif s["action"] == "discharge":
-            dc       = min(EXPORT_KWH_G99, soc_g99 - MIN_SOC)
+            dc       = min(EXPORT_KWH_G99, soc_g99 - MIN_SOC)   # larger export cap
             dc       = max(0.0, dc)
             soc_g99  = max(MIN_SOC, soc_g99 - dc)
             total_rev_g99 += dc * RTE * s["exportP"] / 100
     net_g99 = total_rev_g99 - total_cost_g99
+
+    # ── Annualised projections based on this planning window ─────────────────
+    plan_days      = n_slots / 48.0 if n_slots > 0 else 1.0
+    annual_g98     = round(net_g98 / plan_days * 365, 2) if plan_days > 0 else 0
+    annual_g99     = round(net_g99 / plan_days * 365, 2) if plan_days > 0 else 0
+    annual_delta   = round(annual_g99 - annual_g98, 2)
 
     return jsonify({
         "slots":    slots,
@@ -614,6 +621,10 @@ def api_plan():
             # Total Dovecote cash position (export revenue minus all charge costs)
             "net_g98":               round(net_g98, 4),
             "net_g99":               round(net_g99, 4),
+            # Annualised projections (scale this planning window × 365/plan_days)
+            "annual_g98":            annual_g98,
+            "annual_g99":            annual_g99,
+            "annual_delta":          annual_delta,
             # P&L breakdown
             "total_rev_g98":         round(total_revenue_g98, 4),
             "total_rev_g99":         round(total_rev_g99, 4),
@@ -698,13 +709,15 @@ def api_backtest_lp():
         return jsonify({'error': 'scipy not installed — run docker compose build --no-cache'}), 500
 
     # ── Constants ────────────────────────────────────────────────────────────
-    BATTERY     = 72.0
-    MIN_SOC     = 7.2
-    KWH_SLOT    = 3.68       # symmetric G98: charge == discharge cap
-    RTE         = 0.88
-    VLP_P       = 40.0
-    LOAD_DAY    = 12.0
-    LOAD_SLOT   = LOAD_DAY / 48.0
+    BATTERY        = 72.0
+    MIN_SOC        = 7.2
+    CHARGE_KWH     = 5.25    # inverter max: FoxESS KH10.5 @ 10.5kW × 0.5h (both G98 & G99)
+    EXPORT_G98     = 3.68    # G98 DNO export cap: 32A × 230V × 0.5h
+    EXPORT_G99     = 5.75    # G99 DNO export cap: 50A × 230V × 0.5h (pending)
+    RTE            = 0.88
+    VLP_P          = 40.0
+    LOAD_DAY       = 12.0
+    LOAD_SLOT      = LOAD_DAY / 48.0
 
     # ── Fetch 12 months of import prices ─────────────────────────────────────
     print('[BT-LP] Fetching 12-month Agile import prices…')
@@ -727,7 +740,7 @@ def api_backtest_lp():
         by_day[day].sort(key=lambda s: s['valid_from'])
 
     # ── Per-day LP and greedy functions ───────────────────────────────────────
-    def lp_day(prices_p, init_soc):
+    def lp_day(prices_p, init_soc, charge_kwh=CHARGE_KWH, export_kwh=EXPORT_G98):
         n = len(prices_p)
         if n < 10:
             return 0.0, init_soc
@@ -741,7 +754,7 @@ def api_backtest_lp():
             b_ub[rl]     = init_soc - t * LOAD_SLOT - MIN_SOC
             A_ub[ru, :t] =  1;  A_ub[ru, n:n+t] = -1
             b_ub[ru]     = BATTERY - init_soc + t * LOAD_SLOT
-        bounds = [(0, KWH_SLOT)] * n + [(0, KWH_SLOT)] * n
+        bounds = [(0, charge_kwh)] * n + [(0, export_kwh)] * n
         res    = linprog(c_obj, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method='highs')
         if res.status != 0:
             return 0.0, init_soc
@@ -751,10 +764,10 @@ def api_backtest_lp():
         soc = init_soc
         for i in range(n):
             soc = max(0.0, soc - LOAD_SLOT)
-            if d_v[i] > KWH_SLOT * 0.1:
-                soc = max(MIN_SOC, soc - min(KWH_SLOT, soc - MIN_SOC))
-            elif c_v[i] > KWH_SLOT * 0.1:
-                soc = min(BATTERY, soc + min(KWH_SLOT, BATTERY - soc))
+            if d_v[i] > export_kwh * 0.1:
+                soc = max(MIN_SOC, soc - min(export_kwh, soc - MIN_SOC))
+            elif c_v[i] > charge_kwh * 0.1:
+                soc = min(BATTERY, soc + min(charge_kwh, BATTERY - soc))
             soc = max(MIN_SOC, min(BATTERY, soc))
         return rev_p / 100.0, soc   # return £ and end SOC
 
@@ -765,17 +778,17 @@ def api_backtest_lp():
         sorted_asc  = sorted(range(n), key=lambda i: prices_p[i])
         sorted_desc = sorted(range(n), key=lambda i: prices_p[i], reverse=True)
         usable      = BATTERY - MIN_SOC
-        max_cs      = max(1, int(usable / KWH_SLOT) + 1)
+        max_cs      = max(1, int(usable / EXPORT_G98) + 1)
         cands       = [i for i in sorted_asc if prices_p[i] < VLP_P][:max_cs]
         avg_cp      = sum(prices_p[i] for i in cands) / len(cands) if cands else min(prices_p)
-        be_p        = (KWH_SLOT * avg_cp) / (KWH_SLOT * RTE)
+        be_p        = (CHARGE_KWH * avg_cp) / (EXPORT_G98 * RTE)
         tentative   = ['idle'] * n
         dbud        = usable
         for i in sorted_desc:
             if prices_p[i] >= VLP_P:
-                tentative[i] = 'discharge'; dbud -= KWH_SLOT; continue
+                tentative[i] = 'discharge'; dbud -= EXPORT_G98; continue
             if dbud <= 0 or prices_p[i] <= be_p: break
-            tentative[i] = 'discharge'; dbud -= KWH_SLOT
+            tentative[i] = 'discharge'; dbud -= EXPORT_G98
         for i in sorted_asc:
             if prices_p[i] > be_p: break
             if tentative[i] != 'idle': continue
@@ -785,73 +798,90 @@ def api_backtest_lp():
             soc = max(0.0, soc - LOAD_SLOT)
             p   = prices_p[i]
             if prices_p[i] >= VLP_P and soc > MIN_SOC + 0.1:
-                di = min(KWH_SLOT, soc - MIN_SOC); soc -= di; rev_p += di * p * RTE
+                di = min(EXPORT_G98, soc - MIN_SOC); soc -= di; rev_p += di * p * RTE
             elif tentative[i] == 'charge':
-                ch = min(KWH_SLOT, BATTERY - soc)
+                ch = min(CHARGE_KWH, BATTERY - soc)
                 if ch > 0.01: soc += ch; rev_p -= ch * p
             elif tentative[i] == 'discharge':
                 av = soc - MIN_SOC
-                if av >= KWH_SLOT * 0.5:
-                    di = min(KWH_SLOT, av); soc -= di; rev_p += di * p * RTE
+                if av >= EXPORT_G98 * 0.5:
+                    di = min(EXPORT_G98, av); soc -= di; rev_p += di * p * RTE
             soc = max(MIN_SOC, min(BATTERY, soc))
         return rev_p / 100.0, soc
 
-    # ── Run both algorithms across all days ───────────────────────────────────
-    days_sorted = sorted(by_day.keys())
-    lp_monthly  = defaultdict(float)
-    gr_monthly  = defaultdict(float)
-    lp_daily    = {}
-    gr_daily    = {}
-    lp_soc = BATTERY * 0.5    # start at 50%
-    gr_soc = BATTERY * 0.5
+    # ── Run all algorithms across all days ────────────────────────────────────
+    days_sorted  = sorted(by_day.keys())
+    lp_monthly   = defaultdict(float)
+    g99_monthly  = defaultdict(float)
+    gr_monthly   = defaultdict(float)
+    lp_daily     = {}
+    g99_daily    = {}
+    gr_daily     = {}
+    lp_soc  = BATTERY * 0.5    # start at 50%
+    g99_soc = BATTERY * 0.5
+    gr_soc  = BATTERY * 0.5
 
-    print(f'[BT-LP] Running LP + greedy across {len(days_sorted)} days…')
+    print(f'[BT-LP] Running LP(G98) + LP(G99) + greedy across {len(days_sorted)} days…')
     for day in days_sorted:
         slots    = by_day[day]
         prices_p = [float(s['value_inc_vat']) for s in slots]
         month    = day[:7]
 
-        lp_rev, lp_soc  = lp_day(prices_p, lp_soc)
-        gr_rev, gr_soc  = greedy_day(prices_p, gr_soc)
+        lp_rev,  lp_soc  = lp_day(prices_p, lp_soc,  charge_kwh=CHARGE_KWH, export_kwh=EXPORT_G98)
+        g99_rev, g99_soc = lp_day(prices_p, g99_soc, charge_kwh=CHARGE_KWH, export_kwh=EXPORT_G99)
+        gr_rev,  gr_soc  = greedy_day(prices_p, gr_soc)
 
-        lp_monthly[month] += lp_rev
-        gr_monthly[month] += gr_rev
-        lp_daily[day]      = round(lp_rev, 4)
-        gr_daily[day]      = round(gr_rev, 4)
+        lp_monthly[month]  += lp_rev
+        g99_monthly[month] += g99_rev
+        gr_monthly[month]  += gr_rev
+        lp_daily[day]       = round(lp_rev, 4)
+        g99_daily[day]      = round(g99_rev, 4)
+        gr_daily[day]       = round(gr_rev, 4)
 
-    lp_total = sum(lp_monthly.values())
-    gr_total = sum(gr_monthly.values())
-    uplift   = lp_total - gr_total
+    lp_total  = sum(lp_monthly.values())
+    g99_total = sum(g99_monthly.values())
+    gr_total  = sum(gr_monthly.values())
+    uplift    = lp_total - gr_total
     uplift_pct = (uplift / abs(gr_total) * 100) if gr_total else 0
+    g99_uplift = g99_total - lp_total
+    g99_uplift_pct = (g99_uplift / abs(lp_total) * 100) if lp_total else 0
 
-    print(f'[BT-LP] LP total=£{lp_total:.2f}  Greedy total=£{gr_total:.2f}  Uplift=+£{uplift:.2f} ({uplift_pct:.1f}%)')
+    print(f'[BT-LP] G98 LP=£{lp_total:.2f}  G99 LP=£{g99_total:.2f}  '
+          f'Greedy=£{gr_total:.2f}  LP/Greedy uplift=+£{uplift:.2f} ({uplift_pct:.1f}%)')
+    print(f'[BT-LP] G99 vs G98 uplift: +£{g99_uplift:.2f} ({g99_uplift_pct:.1f}%)')
 
     # Build monthly comparison list
     all_months = sorted(set(list(lp_monthly.keys()) + list(gr_monthly.keys())))
     monthly_compare = [
         {
-            'month':   m,
-            'lp':      round(lp_monthly.get(m, 0), 2),
-            'greedy':  round(gr_monthly.get(m, 0), 2),
-            'uplift':  round(lp_monthly.get(m, 0) - gr_monthly.get(m, 0), 2),
+            'month':      m,
+            'lp':         round(lp_monthly.get(m, 0), 2),
+            'lp_g99':     round(g99_monthly.get(m, 0), 2),
+            'greedy':     round(gr_monthly.get(m, 0), 2),
+            'uplift':     round(lp_monthly.get(m, 0) - gr_monthly.get(m, 0), 2),
+            'g99_uplift': round(g99_monthly.get(m, 0) - lp_monthly.get(m, 0), 2),
         }
         for m in all_months
     ]
 
     result = {
-        'lp_total_gbp':      round(lp_total, 2),
-        'greedy_total_gbp':  round(gr_total, 2),
-        'uplift_gbp':        round(uplift, 2),
-        'uplift_pct':        round(uplift_pct, 1),
-        'days_analysed':     len(days_sorted),
-        'monthly':           monthly_compare,
-        'lp_daily':          lp_daily,
-        'greedy_daily':      gr_daily,
-        'algorithm':         'scipy HiGHS LP  vs  percentile-greedy',
-        'rates':             f'G98 symmetric {KWH_SLOT}kWh/slot charge & discharge',
-        'rte':               RTE,
-        'battery_kwh':       BATTERY,
-        'run_at':            datetime.now(timezone.utc).isoformat(),
+        'lp_total_gbp':        round(lp_total, 2),
+        'lp_g99_total_gbp':    round(g99_total, 2),
+        'greedy_total_gbp':    round(gr_total, 2),
+        'uplift_gbp':          round(uplift, 2),
+        'uplift_pct':          round(uplift_pct, 1),
+        'g99_uplift_gbp':      round(g99_uplift, 2),
+        'g99_uplift_pct':      round(g99_uplift_pct, 1),
+        'days_analysed':       len(days_sorted),
+        'monthly':             monthly_compare,
+        'lp_daily':            lp_daily,
+        'lp_g99_daily':        g99_daily,
+        'greedy_daily':        gr_daily,
+        'algorithm':           'scipy HiGHS LP  vs  percentile-greedy',
+        'rates':               f'G98: charge={CHARGE_KWH}kWh/slot export={EXPORT_G98}kWh/slot | G99: export={EXPORT_G99}kWh/slot',
+        'rte':                 RTE,
+        'battery_kwh':         BATTERY,
+        'run_at':              datetime.now(timezone.utc).isoformat(),
     }
 
     try:

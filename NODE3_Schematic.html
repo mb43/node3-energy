@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>NODE-3 / G99 SLD — Dovecote Systems Ltd — DSL-SLD-001 Rev A</title>
+<title>NODE-3 / G99 SLD — Dovecote Systems Ltd — DSL-SLD-001 Rev B</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0b0f1a; font-family: 'Courier New', monospace; padding: 16px; }
@@ -12,10 +12,12 @@
   .li { display: flex; align-items: center; gap: 7px; font-size: 10px; color: #64748b; }
   .ll { width: 28px; height: 3px; border-radius: 2px; }
   .ld { width: 28px; height: 0; border-top: 2px dashed; }
+  @page { size: 1650px 1380px; margin: 0; }
+  @media print { body { padding: 8px; background: #0b0f1a; } }
 </style>
 </head>
 <body>
-<div class="title">NODE-3 "SLAB" — SINGLE LINE DIAGRAM / G99 APPLICATION &nbsp;|&nbsp; DSL-SLD-001 Rev A &nbsp;|&nbsp; Dovecote Systems Ltd &nbsp;|&nbsp; 29 April 2026 &nbsp;|&nbsp; For G99 submission to SSEN / commissioning electrician</div>
+<div class="title">NODE-3 "SLAB" — SINGLE LINE DIAGRAM / G99 APPLICATION &nbsp;|&nbsp; DSL-SLD-001 Rev B &nbsp;|&nbsp; Dovecote Systems Ltd &nbsp;|&nbsp; 29 April 2026 &nbsp;|&nbsp; For G99 submission to SSEN / commissioning electrician</div>
 <div class="wrap">
 <svg width="1560" height="1220" viewBox="0 0 1560 1220" xmlns="http://www.w3.org/2000/svg">
 
@@ -54,12 +56,13 @@
 <!-- Grid → Meter -->
 <line x1="110" y1="100" x2="110" y2="162" stroke="#3b82f6" stroke-width="3"/>
 
-<!-- Smart Meter -->
+<!-- Export/Import Meter -->
 <rect x="28" y="162" width="164" height="66" rx="4" fill="#0c1a30" stroke="#3b82f6" stroke-width="1.5"/>
-<text x="110" y="180" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="bold">SMART METER</text>
-<text x="110" y="194" text-anchor="middle" fill="#475569" font-size="9">Octopus Agile (smart)</text>
-<text x="110" y="208" text-anchor="middle" fill="#334155" font-size="8">MPAN 2000022678841</text>
-<text x="110" y="220" text-anchor="middle" fill="#334155" font-size="8">SO15 4LD</text>
+<text x="110" y="177" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">EXPORT / IMPORT METER</text>
+<text x="110" y="190" text-anchor="middle" fill="#93c5fd" font-size="8">SMETS2 — Bidirectional</text>
+<text x="110" y="203" text-anchor="middle" fill="#334155" font-size="8">MPAN 2000022678841</text>
+<text x="110" y="215" text-anchor="middle" fill="#334155" font-size="8">Octopus Agile In+Out</text>
+<text x="110" y="225" text-anchor="middle" fill="#334155" font-size="7">G99 Export Metering Point</text>
 
 <!-- CT clamp marker -->
 <ellipse cx="110" cy="248" rx="10" ry="7" fill="none" stroke="#4ade80" stroke-width="1.5"/>
@@ -87,9 +90,9 @@
 <text x="110" y="460" text-anchor="middle" fill="#334155" font-size="8">Adjacent to enclosure</text>
 <text x="110" y="472" text-anchor="middle" fill="#334155" font-size="8">G99 compliant isolation point</text>
 
-<!-- AC Isolator → FoxESS AC input (right then up) -->
+<!-- AC Isolator → FoxESS AC input — bidirectional import/export bus -->
 <polyline points="192,447 248,447 248,222 530,222" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linejoin="round"/>
-<text x="258" y="217" fill="#3b82f6" font-size="9">230V AC L+N+PE</text>
+<text x="258" y="217" fill="#3b82f6" font-size="9">230V AC L+N+PE  ↕ bidirectional</text>
 
 <!-- ══════════════════════════════════════════════════════════════════════
      FOXESS KH10.5 INVERTER
@@ -125,11 +128,8 @@
 <circle cx="530" cy="222" r="6" fill="#3b82f6"/>
 <text x="518" y="226" text-anchor="end" fill="#3b82f6" font-size="9">AC IN</text>
 
-<!-- Grid export port (top) -->
-<circle cx="620" cy="60" r="5" fill="#3b82f6"/>
-<line x1="620" y1="55" x2="620" y2="30" stroke="#3b82f6" stroke-width="2" stroke-dasharray="4,3"/>
-<text x="620" y="22" text-anchor="middle" fill="#3b82f6" font-size="9">↑ GRID EXPORT</text>
-<text x="620" y="12" text-anchor="middle" fill="#334155" font-size="8">Octopus Agile Outgoing</text>
+<!-- Export route annotation: FoxESS AC port → bidirectional bus → Export/Import Meter → SSEN Grid -->
+<text x="400" y="28" text-anchor="middle" fill="#3b82f6" font-size="9" font-weight="bold">↕ BIDIRECTIONAL AC BUS  —  Import drawn from / Export fed to SSEN Grid via Export/Import Meter</text>
 
 <!-- Battery port exit (bottom) -->
 <circle cx="660" cy="380" r="7" fill="#f97316"/>
@@ -489,7 +489,7 @@
 <line x1="980" y1="991" x2="1010" y2="991" stroke="#64748b" stroke-width="2"/>
 <text x="1016" y="995" fill="#64748b" font-size="9">USB / Data</text>
 
-<text x="1100" y="995" fill="#334155" font-size="9">Dovecote Systems Ltd &nbsp;|&nbsp; NODE-3 G99 SLD &nbsp;|&nbsp; DSL-SLD-001 Rev A &nbsp;|&nbsp; 29 Apr 2026</text>
+<text x="1100" y="995" fill="#334155" font-size="9">Dovecote Systems Ltd &nbsp;|&nbsp; NODE-3 G99 SLD &nbsp;|&nbsp; DSL-SLD-001 Rev B &nbsp;|&nbsp; 29 Apr 2026</text>
 
 
 <!-- ══════════════════════════════════════════════════════════════════════
@@ -521,7 +521,7 @@
 <text x="230" y="392" text-anchor="middle" fill="#22c55e" font-size="7">TN-C-S</text>
 
 <!-- ══════════════════════════════════════════════════════════════════════
-     FORMAL G99 SLD TITLE BLOCK — Drawing DSL-SLD-001 Rev A
+     FORMAL G99 SLD TITLE BLOCK — Drawing DSL-SLD-001 Rev B
      ENA EREC G99 Issue 1 — Required for formal application submission
 ══════════════════════════════════════════════════════════════════════ -->
 <!-- Outer border -->

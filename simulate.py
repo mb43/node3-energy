@@ -41,17 +41,17 @@ SOLAR_KWP          = 0.0     # no solar modelled (pure arbitrage)
 SOLAR_EFFICIENCY   = 0.18    # panel efficiency
 ROUND_TRIP_EFF     = 0.88    # FoxESS + Nissan cell round-trip efficiency
 
-# ── DNO export caps ──────────────────────────────────────────────────────────
-# CHARGE RATE ALWAYS EQUALS EXPORT CAP (symmetric operation).
-# Running asymmetric (charge faster than you can export) is guaranteed loss —
-# you pay for energy you cannot profitably discharge. Never do this.
-EXPORT_KWH_G98     = 3.68    # 32A × 230V × 0.5h  — G98 DNO cap (active)
+# ── DNO export caps (asymmetric: charging is inverter-limited, export is DNO-limited) ──
+# G98 caps EXPORT at 3.68 kWh/slot (32A × 230V × 0.5h) — does NOT cap charging.
+# Charging rate is set by the FoxESS KH10.5 inverter: 10.5 kW = 5.25 kWh/slot.
+# G99 raises EXPORT cap to 5.75 kWh/slot (50A × 230V × 0.5h). Charging unchanged.
+EXPORT_KWH_G98     = 3.68    # 32A × 230V × 0.5h  — G98 DNO export cap (active)
 EXPORT_KWH_G99     = 5.75    # 50A × 230V × 0.5h  — G99 target (ref 260420-000198)
+EXPORT_KWH         = EXPORT_KWH_G98   # current active export cap
 
-# ── Active mode — change BOTH lines together when SSEN approves G99 ──────────
-EXPORT_KWH         = EXPORT_KWH_G98
-CHARGE_RATE_KW     = min(EXPORT_KWH * 2, INVERTER_KW)  # symmetric: kWh/slot × 2 = kW
-#                                                         G98 → 7.36 kW / G99 → 10.5 kW
+# ── Charge rate — inverter max, independent of DNO export cap ────────────────
+CHARGE_RATE_KW     = INVERTER_KW     # 10.5 kW — FoxESS KH10.5 inverter max
+CHARGE_KWH         = CHARGE_RATE_KW * 0.5  # 5.25 kWh/slot — charge at full inverter rate
 
 EXPORT_RATE_P_DEF  = 15.0    # Conservative Octopus Outgoing default (p/kWh) when live
                               # export prices unavailable; live prices preferred
@@ -530,7 +530,7 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
         return {}
 
     discharge_per_slot = export_kwh_cap if export_kwh_cap is not None else EXPORT_KWH
-    charge_per_slot    = discharge_per_slot   # always symmetric
+    charge_per_slot    = CHARGE_KWH           # inverter max: 5.25 kWh/slot (G98 & G99)
     load_per_slot      = DAILY_LOAD_KWH / 48.0
 
     n           = len(price_slots)

@@ -1181,6 +1181,71 @@
     </div>
   </div>
 
+  <!-- ══ LP BACKTEST COMPARISON — G98 vs G99 vs Greedy ══════════════════ -->
+  <div style="margin-top:16px">
+    <div class="chart-card" style="margin-bottom:10px">
+      <div class="chart-title" style="flex-direction:column;align-items:flex-start;gap:4px">
+        LP BACKTEST — G98 vs G99 vs GREEDY (12 MONTHS)
+        <span style="color:var(--muted);font-size:10px;font-weight:normal">Asymmetric rates: charge 5.25 kWh/slot (inverter max) · G98 export 3.68 kWh/slot · G99 export 5.75 kWh/slot · LP = scipy HiGHS globally optimal</span>
+      </div>
+    </div>
+    <button class="hist-btn" id="lp-bt-btn" onclick="loadLpBacktest()">🔬 LOAD LP BACKTEST (G98 + G99 vs GREEDY)</button>
+    <div id="lp-bt-progress" class="hist-progress" style="display:none"><div id="lp-bt-bar" class="hist-bar" style="width:0%"></div></div>
+    <div id="lp-bt-error" class="hist-error"></div>
+    <div id="lp-bt-results" style="display:none">
+      <!-- Three-way comparison banner -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+        <div style="background:rgba(63,185,80,0.08);border:2px solid rgba(63,185,80,0.5);border-radius:8px;padding:14px;text-align:center">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">G98 LP (ACTUAL)</div>
+          <div style="font-size:26px;font-weight:800;color:var(--green)" id="lp-bt-g98">—</div>
+          <div style="font-size:11px;color:var(--muted)">12-month total · LP optimal</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px">charge 5.25 · export 3.68 kWh/slot</div>
+        </div>
+        <div style="background:rgba(163,113,247,0.08);border:2px solid rgba(163,113,247,0.5);border-radius:8px;padding:14px;text-align:center">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">G99 LP (PROJECTED)</div>
+          <div style="font-size:26px;font-weight:800;color:var(--purple)" id="lp-bt-g99">—</div>
+          <div style="font-size:11px;color:var(--muted)">12-month projected · pending SSEN OA</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px">charge 5.25 · export 5.75 kWh/slot</div>
+        </div>
+        <div style="background:rgba(255,193,7,0.08);border:2px solid rgba(255,193,7,0.3);border-radius:8px;padding:14px;text-align:center">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">G99 UPLIFT vs G98</div>
+          <div style="font-size:26px;font-weight:800;color:var(--amber)" id="lp-bt-g99-delta">—</div>
+          <div style="font-size:11px;color:var(--muted)">extra per year from G99 approval</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px" id="lp-bt-g99-pct">—</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div style="background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.3);border-radius:6px;padding:10px 14px;text-align:center">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">GREEDY (OLD ALGORITHM)</div>
+          <div style="font-size:20px;font-weight:700;color:var(--amber)" id="lp-bt-greedy">—</div>
+          <div style="font-size:11px;color:var(--muted)">percentile-threshold heuristic</div>
+        </div>
+        <div style="background:rgba(63,185,80,0.06);border:1px solid rgba(63,185,80,0.3);border-radius:6px;padding:10px 14px;text-align:center">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">LP vs GREEDY UPLIFT</div>
+          <div style="font-size:20px;font-weight:700;color:var(--green)" id="lp-bt-uplift">—</div>
+          <div style="font-size:11px;color:var(--muted)" id="lp-bt-uplift-pct">—</div>
+        </div>
+      </div>
+      <!-- Monthly comparison table -->
+      <div class="chart-card" style="overflow-x:auto">
+        <div class="chart-title">MONTHLY LP COMPARISON — G98 vs G99 vs GREEDY</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px">
+          <thead>
+            <tr style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)">
+              <th style="padding:6px 8px;text-align:left">Month</th>
+              <th style="padding:6px 8px;text-align:right;color:var(--green)">G98 LP</th>
+              <th style="padding:6px 8px;text-align:right;color:var(--purple)">G99 LP</th>
+              <th style="padding:6px 8px;text-align:right;color:var(--amber)">Greedy</th>
+              <th style="padding:6px 8px;text-align:right;color:var(--green)">LP/Greedy uplift</th>
+              <th style="padding:6px 8px;text-align:right;color:var(--purple)">G99/G98 uplift</th>
+            </tr>
+          </thead>
+          <tbody id="lp-bt-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   </div><!-- /tab-historical -->
 
   <!-- ══ TAB: G98 ══════════════════════════════════════════════ -->
@@ -1381,10 +1446,10 @@ const CFG = {
   MIN_SOC_KWH:    7.2,     // 10% absolute floor — Nissan pack protection (hardware limit)
   RESERVE_SOC_KWH: 36.0,  // 50% operational reserve — routine trades stay above this
   INITIAL_SOC:    36.0,    // 50% of 72kWh — starting assumption / target between sessions
-  CHARGE_KWH:     3.68,    // G98 symmetric: charge == export cap (32A × 230V × 0.5h = 7.36kW)
-                            // G99: 5.75kWh/slot both ways. Change both CHARGE_KWH+EXPORT_KWH together.
-  EXPORT_KWH:     3.68,    // 32A × 230V × 0.5h — current DNO G98 limit (pre-G99 upgrade)
-                            // G99 50A upgrade → 5.75kWh/slot. Apply now via SSEN fast-track.
+  CHARGE_KWH:     5.25,    // Inverter max: FoxESS KH10.5 @ 10.5kW × 0.5h — NOT export-capped
+                            // Charging rate is inverter-limited, same for G98 and G99.
+  EXPORT_KWH:     3.68,    // G98 DNO export cap: 32A × 230V × 0.5h (G99 target: 5.75 kWh/slot)
+  EXPORT_KWH_G99: 5.75,    // G99 DNO export cap: 50A × 230V × 0.5h (pending ref 260420-000198)
   LOAD_PER_SLOT:  12/48,   // fallback flat: 12kWh/day ÷ 48 slots (overridden by HOME_LOAD_PROFILE below)
   SOLAR_KWP:      0.0,     // no solar — battery arbitrage only
   SOLAR_EFF:      0.18,
@@ -2159,15 +2224,39 @@ function renderSchedule(planData) {
   const remaining = slots.filter(s => new Date(s.time).getTime() >= now).length;
 
   // Use server-computed P&L if available, otherwise compute from slots
-  const netG98         = summary ? summary.net_g98          : 0;
-  const netG99         = summary ? summary.net_g99          : null;
-  const arbitrageNet   = summary ? summary.arbitrage_net_g98 : netG98;  // pure trading profit
-  const hostingCost    = summary ? summary.hosting_cost      : null;    // free 12kWh/day cost
+  const netG98         = summary ? summary.net_g98           : 0;
+  const netG99         = summary ? summary.net_g99           : null;
+  const annualG98      = summary ? summary.annual_g98        : null;   // £/yr projected from this window
+  const annualG99      = summary ? summary.annual_g99        : null;   // G99 projected annual
+  const annualDelta    = summary ? summary.annual_delta      : null;   // G99 − G98 annual uplift
+  const arbitrageNet   = summary ? summary.arbitrage_net_g98 : netG98;
+  const hostingCost    = summary ? summary.hosting_cost      : null;
   const houseLoadKwh   = summary ? summary.house_load_kwh    : null;
   const avgBuyP  = chSlots.length ? (chSlots.reduce((s,x) => s + (x.importP||0), 0) / chSlots.length).toFixed(1) : '—';
   const avgSellP = exSlots.length ? (exSlots.reduce((s,x) => s + (x.exportP||0), 0) / exSlots.length).toFixed(1) : '—';
-  const chKwh    = chSlots.length * CFG.CHARGE_KWH;   // G98 symmetric: 3.68 kWh/slot
+  const chKwh    = chSlots.length * CFG.CHARGE_KWH;   // inverter max: 5.25 kWh/slot
   const exKwh    = exSlots.length * CFG.EXPORT_KWH * 0.88;
+
+  // Push projections into G98/G99 tab elements if present
+  if (annualG98 != null) {
+    const el98 = document.getElementById('g98-current-profit');
+    const el98a = document.getElementById('g98-annual');
+    if (el98)  el98.textContent  = (netG98 >= 0 ? '+' : '') + '£' + netG98.toFixed(3);
+    if (el98a) el98a.textContent = '~£' + Math.round(annualG98) + '/yr (LP)';
+  }
+  if (annualG99 != null) {
+    const el99  = document.getElementById('g99-current-profit');
+    const el99a = document.getElementById('g99-annual');
+    const el99d = document.getElementById('g99-delta-window');
+    const el99da = document.getElementById('g99-delta-annual');
+    const el99p = document.getElementById('g99-pct-uplift');
+    if (el99)  el99.textContent  = (netG99 >= 0 ? '+' : '') + '£' + netG99.toFixed(3);
+    if (el99a) el99a.textContent = '~£' + Math.round(annualG99) + '/yr (LP)';
+    if (el99d) el99d.textContent = (annualDelta >= 0 ? '+' : '') + '£' + (netG99 - netG98).toFixed(3);
+    if (el99da) el99da.textContent = '~£' + Math.round(annualDelta) + '/yr';
+    const pct = netG98 > 0 ? ((netG99/netG98 - 1)*100).toFixed(1) + '%' : 'N/A';
+    if (el99p) el99p.textContent = pct;
+  }
 
   const bars = slots.map(s => {
     try {
@@ -2206,7 +2295,36 @@ function renderSchedule(planData) {
        </span>`
     : '';
 
+  // Build annual projection block
+  const annualBlock = (annualG98 != null) ? `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding:8px 10px;
+                background:rgba(0,0,0,0.2);border-radius:6px;border:1px solid var(--border)">
+      <div style="display:flex;flex-direction:column;align-items:center;min-width:80px">
+        <span style="font-size:9px;color:var(--muted);letter-spacing:.8px">G98 ANNUAL (LP)</span>
+        <span style="font-size:15px;font-weight:700;color:#3fb950">~£${Math.round(annualG98)}/yr</span>
+        <span style="font-size:9px;color:var(--muted)">charge 5.25 · export 3.68 kWh</span>
+      </div>
+      ${annualG99 != null ? `
+      <div style="width:1px;background:var(--border);margin:0 4px"></div>
+      <div style="display:flex;flex-direction:column;align-items:center;min-width:80px">
+        <span style="font-size:9px;color:var(--muted);letter-spacing:.8px">G99 ANNUAL (LP)</span>
+        <span style="font-size:15px;font-weight:700;color:var(--purple)">~£${Math.round(annualG99)}/yr</span>
+        <span style="font-size:9px;color:var(--muted)">charge 5.25 · export 5.75 kWh</span>
+      </div>
+      <div style="width:1px;background:var(--border);margin:0 4px"></div>
+      <div style="display:flex;flex-direction:column;align-items:center;min-width:70px">
+        <span style="font-size:9px;color:var(--muted);letter-spacing:.8px">G99 UPLIFT</span>
+        <span style="font-size:15px;font-weight:700;color:var(--amber)">+£${Math.round(annualDelta)}/yr</span>
+        <span style="font-size:9px;color:var(--muted)">vs G98 — pending SSEN OA</span>
+      </div>` : ''}
+      <div style="flex:1"></div>
+      <div style="font-size:10px;color:var(--muted);align-self:flex-end;text-align:right">
+        Extrapolated from ${slots.length}-slot window · LP-optimised
+      </div>
+    </div>` : '';
+
   container.innerHTML = `
+    ${annualBlock}
     <div style="display:flex;gap:4px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
       <span style="font-size:10px;color:var(--muted)">PYTHON DISPATCH PLAN · ${remaining} slots remaining today:</span>
       <span style="font-size:11px;color:#388bfd;font-weight:600">⚡ ${chSlots.length} charge (${chKwh.toFixed(0)}kWh @ avg ${avgBuyP}p import)</span>
@@ -2214,7 +2332,7 @@ function renderSchedule(planData) {
       <span style="font-size:11px;color:#3fb950;font-weight:600">↑ ${exSlots.length} export (${exKwh.toFixed(1)}kWh @ avg ${avgSellP}p export)</span>
       <span style="color:var(--muted)">·</span>
       <span style="font-size:11px;color:${netG98>=0?'#3fb950':'#f85149'};font-weight:700">G98 net: ${netG98>=0?'+':''}£${netG98.toFixed(3)}</span>
-      ${netG99 != null ? `<span style="color:var(--muted)">·</span><span style="font-size:11px;color:var(--purple);font-weight:700">G99: ${netG99>=0?'+':''}£${netG99.toFixed(3)}</span>` : ''}
+      ${netG99 != null ? `<span style="color:var(--muted)">·</span><span style="font-size:11px;color:var(--purple);font-weight:700">G99 net: ${netG99>=0?'+':''}£${netG99.toFixed(3)}</span>` : ''}
       ${hostingLine}
     </div>
     <div style="display:flex;gap:2px;align-items:stretch;height:44px">${bars}</div>
@@ -2812,6 +2930,91 @@ function setDemoMode(on) {
   if (on) {
     document.getElementById('data-mode').textContent = 'DEMO';
     document.getElementById('data-mode').style.color = 'var(--amber)';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// LP BACKTEST — G98 vs G99 vs GREEDY
+// ══════════════════════════════════════════════════════════════
+async function loadLpBacktest(force) {
+  const btn  = document.getElementById('lp-bt-btn');
+  const prog = document.getElementById('lp-bt-progress');
+  const bar  = document.getElementById('lp-bt-bar');
+  const err  = document.getElementById('lp-bt-error');
+  const res  = document.getElementById('lp-bt-results');
+
+  btn.disabled    = true;
+  btn.textContent = 'RUNNING LP BACKTEST (G98 + G99)…';
+  prog.style.display = 'block';
+  err.style.display  = 'none';
+  res.style.display  = 'none';
+  bar.style.width = '15%';
+
+  try {
+    const url  = '/api/backtest-lp' + (force ? '?force=1' : '');
+    const resp = await fetch(url, { signal: AbortSignal.timeout(300000) }); // 5 min
+    bar.style.width = '90%';
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      throw new Error(body.error || `Server error HTTP ${resp.status}`);
+    }
+    const d = await resp.json();
+    if (d.error) throw new Error(d.error);
+    bar.style.width = '100%';
+
+    // Populate summary cards
+    const g98  = d.lp_total_gbp      || 0;
+    const g99  = d.lp_g99_total_gbp  || 0;
+    const gr   = d.greedy_total_gbp   || 0;
+    const g99d = g99 - g98;
+    const g99p = g98 > 0 ? ((g99/g98 - 1)*100).toFixed(1) : '?';
+    const lpUp = d.uplift_gbp         || 0;
+    const lpPc = d.uplift_pct         || 0;
+
+    document.getElementById('lp-bt-g98').textContent      = '£' + g98.toFixed(2) + '/yr';
+    document.getElementById('lp-bt-g99').textContent      = '£' + g99.toFixed(2) + '/yr';
+    document.getElementById('lp-bt-g99-delta').textContent = '+£' + g99d.toFixed(2) + '/yr';
+    document.getElementById('lp-bt-g99-pct').textContent  = '+' + g99p + '% vs G98 LP';
+    document.getElementById('lp-bt-greedy').textContent   = '£' + gr.toFixed(2) + '/yr';
+    document.getElementById('lp-bt-uplift').textContent   = '+£' + lpUp.toFixed(2) + '/yr';
+    document.getElementById('lp-bt-uplift-pct').textContent = '+' + lpPc.toFixed(1) + '% vs greedy';
+
+    // Monthly table
+    const tbody = document.getElementById('lp-bt-tbody');
+    if (tbody && d.monthly) {
+      tbody.innerHTML = d.monthly.map(m => {
+        const upliftCol  = m.uplift  >= 0 ? 'var(--green)' : 'var(--red)';
+        const g99Col     = m.g99_uplift >= 0 ? 'var(--purple)' : 'var(--red)';
+        return `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:5px 8px;color:var(--muted)">${m.month}</td>
+          <td style="padding:5px 8px;text-align:right;color:var(--green)">£${(m.lp||0).toFixed(2)}</td>
+          <td style="padding:5px 8px;text-align:right;color:var(--purple)">£${(m.lp_g99||0).toFixed(2)}</td>
+          <td style="padding:5px 8px;text-align:right;color:var(--amber)">£${(m.greedy||0).toFixed(2)}</td>
+          <td style="padding:5px 8px;text-align:right;color:${upliftCol}">${m.uplift>=0?'+':''}£${(m.uplift||0).toFixed(2)}</td>
+          <td style="padding:5px 8px;text-align:right;color:${g99Col}">${(m.g99_uplift||0)>=0?'+':''}£${(m.g99_uplift||0).toFixed(2)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    prog.style.display = 'none';
+    res.style.display  = 'block';
+    btn.disabled = false;
+    btn.textContent = '↻ REFRESH LP BACKTEST';
+
+    // Also update G99 tab annual value from backtest
+    const el99a = document.getElementById('g99-annual');
+    if (el99a && g99 > 0) el99a.textContent = '~£' + Math.round(g99) + '/yr (12-mo LP)';
+    const el98a = document.getElementById('g98-annual');
+    if (el98a && g98 > 0) el98a.textContent = '~£' + Math.round(g98) + '/yr (12-mo LP)';
+    const el99d = document.getElementById('g99-delta-annual');
+    if (el99d && g99d > 0) el99d.textContent = '+£' + Math.round(g99d) + '/yr (12-mo LP)';
+
+  } catch(e) {
+    prog.style.display = 'none';
+    err.style.display  = 'block';
+    err.textContent    = 'LP backtest error: ' + e.message;
+    btn.disabled  = false;
+    btn.textContent = '↻ RETRY LP BACKTEST';
   }
 }
 
