@@ -41,6 +41,10 @@ The battery also serves the home's 12 kWh/day consumption from those same charge
 | Solar | None modelled (pure arbitrage) |
 | Location | Southern England, Region H |
 
+## Wiring Schematic
+
+The full wiring schematic and build checklist can be found in **[NODE3_Wiring_Schematic.md](NODE3_Wiring_Schematic.md)**.
+
 ## Quick start
 
 ```bash

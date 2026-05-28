@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile.replica
     container_name: node3-replica
     ports:
-      - "8586:8585"   # host 8586 -> container 8585 (change if you prefer 8585)
+      - "8585:8585"   # host 8585 -> container 8585 (original port)
     volumes:
       - ./data:/app/data:ro   # read‑only mount to protect live data
     environment:
