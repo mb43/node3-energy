@@ -5,10 +5,10 @@ services:
       dockerfile: Dockerfile.replica
     container_name: node3-replica
     ports:
-      - "8585:8585"   # host 8585 -> container 8585 (original port)
+      - "8585:8585"   # host 8585 -> container 8585 (replica)
     volumes:
       - ./data:/app/data:ro   # read‑only mount to protect live data
     environment:
       - AGILE_REGION=H
       # Add any additional env vars here
-    restart: unless‑stopped
+    restart: unless-stopped
