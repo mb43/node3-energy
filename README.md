@@ -27,17 +27,8 @@ The battery also serves the home's 12 kWh/day consumption from those same charge
 
 ## Algorithm
 
-**Single source of truth — Python only.** The same algorithm runs live simulation, the dispatch planner, and the 12-month backtest. No duplicate JS implementation.
-
-- **BUY_PCT = 35**: charge when import price < 35th percentile of the 48-slot window
-- **SELL_PCT = 60**: export when import price > 60th percentile of the 48-slot window
-- **dynamicBuyCeil** = `bestExportInWindow × 0.88 − 3p` — prevents charging when no profitable export opportunity exists in the lookahead window
-- **RTE = 0.88**: FoxESS + Nissan cell round-trip efficiency
-- **No time-of-day restrictions** — full window optimisation, all hours
-- **VLP override**: when import price ≥ 40p, serve house load from battery first, then export remainder
-
-Export revenue uses **actual Agile Outgoing rates** per slot, not a flat default. During 40p+ import spikes, Agile Outgoing typically pays 30–38p — far above the flat fallback.
-
+**LP‑optimal dispatch** – the live system (and the 12‑month back‑test) uses a linear‑programming model (SciPy’s `linprog` with HiGHS) to globally optimise charge/discharge over the full 48‑slot look‑ahead, maximising export revenue minus charge cost while respecting SOC limits, inverter charge rate, and DNO export caps (G98/G99).
+**Fallback** – if SciPy/HiGHS is unavailable, the system falls back to the original percentile‑threshold heuristic (BUY_PCT = 35 %, SELL_PCT = 60 %).
 ## Hardware
 
 | Component | Spec |
@@ -106,6 +97,19 @@ GET /api/status        Server health check
 GET/POST /api/trigger  Run simulate.py (?mode=backfill for 48h replay)
 POST /api/reset        Clear state + history (requires NODE3_API_KEY if set)
 ```
+## Local Docker Replica
+
+To spin up a safe, isolated copy of the portal for development or testing:
+
+```bash
+# Build the replica image
+docker compose -f docker-compose.replica.yml build
+
+# Run the replica (exposes on host port 8586)
+docker compose -f docker-compose.replica.yml up -d
+```
+
+The replica mounts the host `data/` directory read‑only, so any live CSV/JSON files remain untouched. Adjust the port mapping in `docker-compose.replica.yml` if you need a different host port.
 
 ---
 

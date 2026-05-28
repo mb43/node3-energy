@@ -1,0 +1,23 @@
+# Dockerfile for a safe replica of Dovecote Node3
+# Uses the same base as the original project but excludes runtime data.
+
+FROM python:3.11-slim
+
+# Install system dependencies required by SciPy and other packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ python3-dev libatlas-base-dev libgomp1 && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the entire repository (the .dockerignore will exclude data files)
+COPY . /app
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Expose the API port (default 8585, can be overridden at runtime)
+EXPOSE 8585
+
+# Default command
+CMD ["python", "server.py", "--port", "8585"]
