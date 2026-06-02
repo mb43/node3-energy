@@ -23,6 +23,96 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+# ─────────────────────────────────────────────
+# BATTERY-EMULATOR MQTT — real SOC feed
+# Subscribes to Battery-Emulator ESP32 telemetry and writes real SOC
+# into fleet_state.json so LP dispatch uses actual hardware state.
+# ─────────────────────────────────────────────
+_MQTT_HOST  = os.environ.get("MQTT_HOST", "")
+_MQTT_PORT  = int(os.environ.get("MQTT_PORT", "1883"))
+_BATT_TOPIC = os.environ.get("BATTERY_EMULATOR_MQTT_TOPIC", "battery-emulator")
+_real_soc_lock = threading.Lock()
+
+
+def _on_battery_message(client, userdata, msg):
+    """
+    Called when Battery-Emulator publishes telemetry.
+    Payload keys (Battery-Emulator project):
+      SOC (%), StateOfHealth (%), voltage (V), current (A), temperature (°C)
+    Writes real SOC into fleet_state.json immediately.
+    """
+    try:
+        payload = json.loads(msg.payload.decode())
+        soc_pct = payload.get("SOC") or payload.get("soc")
+        if soc_pct is None:
+            return
+        # Convert % to kWh (battery = 72 kWh nominal)
+        battery_kwh = 72.0
+        soc_kwh = round(float(soc_pct) / 100.0 * battery_kwh, 2)
+
+        state_path = os.path.join(BASE_DIR, "fleet_state.json")
+        with _real_soc_lock:
+            try:
+                with open(state_path) as f:
+                    state = json.load(f)
+            except Exception:
+                state = {}
+            state["soc_kwh"]          = soc_kwh
+            state["soc_pct"]          = round(float(soc_pct), 1)
+            state["soc_source"]       = "hardware"
+            state["soc_updated"]      = datetime.now(timezone.utc).isoformat()
+            state["batt_voltage_v"]   = payload.get("voltage")
+            state["batt_current_a"]   = payload.get("current")
+            state["batt_temp_c"]      = payload.get("temperature")
+            state["batt_soh_pct"]     = payload.get("StateOfHealth")
+            with open(state_path, "w") as f:
+                json.dump(state, f, indent=2)
+
+        print(f"[MQTT-SOC] Real SOC: {soc_pct:.1f}% = {soc_kwh} kWh  "
+              f"V={payload.get('voltage','?')}  I={payload.get('current','?')}A",
+              flush=True)
+    except Exception as e:
+        print(f"[MQTT-SOC] Parse error: {e}", flush=True)
+
+
+def _start_mqtt_soc_listener():
+    """
+    Background thread: connect to MQTT broker and subscribe to
+    Battery-Emulator telemetry topic. Reconnects automatically.
+    Does nothing if MQTT_HOST is not set.
+    """
+    if not _MQTT_HOST:
+        print("[MQTT-SOC] MQTT_HOST not set — real SOC feed disabled (using simulated SOC)", flush=True)
+        return
+
+    try:
+        import paho.mqtt.client as mqtt
+    except ImportError:
+        print("[MQTT-SOC] paho-mqtt not installed — run: pip install paho-mqtt", flush=True)
+        return
+
+    def on_connect(client, userdata, flags, rc):
+        if rc == 0:
+            client.subscribe(_BATT_TOPIC)
+            print(f"[MQTT-SOC] Connected to {_MQTT_HOST}:{_MQTT_PORT} — subscribed to '{_BATT_TOPIC}'", flush=True)
+        else:
+            print(f"[MQTT-SOC] Connect failed rc={rc}", flush=True)
+
+    def on_disconnect(client, userdata, rc):
+        print(f"[MQTT-SOC] Disconnected (rc={rc}) — will reconnect", flush=True)
+
+    while True:
+        try:
+            client = mqtt.Client(client_id="node3-server", clean_session=True)
+            client.on_connect    = on_connect
+            client.on_disconnect = on_disconnect
+            client.on_message    = _on_battery_message
+            client.connect(_MQTT_HOST, _MQTT_PORT, keepalive=60)
+            client.loop_forever()
+        except Exception as e:
+            print(f"[MQTT-SOC] Exception: {e} — retrying in 30s", flush=True)
+            time.sleep(30)
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # API key authentication for mutating endpoints.
@@ -917,12 +1007,16 @@ def api_trigger():
             cwd=BASE_DIR,
             env={**os.environ, "PYTHONUNBUFFERED": "1"}
         )
+        hw_result = None
+        if result.returncode == 0 and mode == "single":
+            hw_result = _run_hardware_bridge()
         return jsonify({
             "status":    "ok" if result.returncode == 0 else "error",
             "mode":      mode,
             "stdout":    result.stdout[-3000:],
             "stderr":    result.stderr[-2000:],
-            "exit_code": result.returncode
+            "exit_code": result.returncode,
+            "hardware":  "bridge_called" if hw_result is not None else "skipped"
         })
     except subprocess.TimeoutExpired:
         return jsonify({"status": "timeout"}), 504
@@ -980,10 +1074,51 @@ def _run_simulate():
     return result.returncode, result.stderr
 
 
+def _run_hardware_bridge():
+    """
+    Run hardware_bridge.py as a subprocess — same pattern as simulate.py.
+    Avoids importlib/volume-mount locking issues on macOS Docker.
+    """
+    try:
+        bridge_path = os.path.join(BASE_DIR, "hardware_bridge.py")
+        if not os.path.exists(bridge_path):
+            print("[HW-BRIDGE] hardware_bridge.py not found — skipping", flush=True)
+            return None
+        result = subprocess.run(
+            [sys.executable, bridge_path],
+            timeout=30, capture_output=True, text=True
+        )
+        stdout = result.stdout.strip()
+        stderr = result.stderr.strip()
+        if result.returncode == 0:
+            try:
+                data   = json.loads(stdout)
+                mode   = data.get("mode", "?")
+                sent   = data.get("sent", False)
+                path   = data.get("path", "none")
+                action = data.get("lp_action", "?")
+                wm     = data.get("work_mode", "?")
+                if sent:
+                    print(f"[HW-BRIDGE] OK — mode={mode} action={action} → {wm} via {path}", flush=True)
+                else:
+                    reason = data.get("reason") or data.get("error", "no control path configured")
+                    print(f"[HW-BRIDGE] {reason}", flush=True)
+            except Exception:
+                print(f"[HW-BRIDGE] OK — {stdout[:120] or '(no output)'}", flush=True)
+        else:
+            print(f"[HW-BRIDGE] Error (rc={result.returncode}): {stderr[:200]}", flush=True)
+        return result
+    except Exception as exc:
+        print(f"[HW-BRIDGE] Exception: {exc}", flush=True)
+        return None
+
+
 def _simulation_loop():
     """
     Background thread: run simulate.py immediately on startup, then again
     at each 30-minute Agile slot boundary (HH:00 / HH:30).
+    After each successful simulate run, calls hardware_bridge to send
+    the current slot command to the FoxESS inverter.
     """
     # Run immediately on startup so prices.json is fresh from the first request.
     print("[NODE-3 scheduler] Startup run — fetching fresh prices…", flush=True)
@@ -991,6 +1126,7 @@ def _simulation_loop():
         rc, err = _run_simulate()
         if rc == 0:
             print("[NODE-3 scheduler] Startup simulate.py OK", flush=True)
+            _run_hardware_bridge()
         else:
             print(f"[NODE-3 scheduler] Startup simulate.py error: {err[:200]}", flush=True)
     except Exception as exc:
@@ -1006,10 +1142,51 @@ def _simulation_loop():
             rc, err = _run_simulate()
             if rc == 0:
                 print("[NODE-3 scheduler] simulate.py OK", flush=True)
+                _run_hardware_bridge()
             else:
                 print(f"[NODE-3 scheduler] simulate.py error: {err[:200]}", flush=True)
         except Exception as exc:
             print(f"[NODE-3 scheduler] Exception: {exc}", flush=True)
+
+
+# ─────────────────────────────────────────────
+# HARDWARE STATUS + MODE API
+# ─────────────────────────────────────────────
+@app.route("/api/hardware-status")
+def api_hardware_status():
+    """Current hardware bridge status: mode, last command, control paths."""
+    try:
+        result = subprocess.run(
+            [sys.executable, os.path.join(BASE_DIR, "hardware_bridge.py"), "--status"],
+            timeout=10, capture_output=True, text=True
+        )
+        return jsonify(json.loads(result.stdout))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/set-mode", methods=["POST"])
+def api_set_mode():
+    """
+    Change operational mode. Body: {"mode": "pre_commissioning|self_consumption|full_export",
+                                     "g99_active": true|false}
+    Requires NODE3_API_KEY header if key is set.
+    """
+    if not _check_api_key():
+        return jsonify({"error": "Unauthorised"}), 401
+    try:
+        body = request.get_json(force=True) or {}
+        mode = body.get("mode", "")
+        g99  = body.get("g99_active", None)
+        cmd  = [sys.executable, os.path.join(BASE_DIR, "hardware_bridge.py"), "--set-mode", mode]
+        if g99:
+            cmd.append("--g99")
+        result = subprocess.run(cmd, timeout=10, capture_output=True, text=True)
+        if result.returncode == 0:
+            return jsonify({"ok": True, "output": result.stdout.strip()})
+        return jsonify({"error": result.stderr.strip()}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ─────────────────────────────────────────────
@@ -1030,5 +1207,9 @@ if __name__ == "__main__":
     sim_thread = threading.Thread(target=_simulation_loop, daemon=True, name="sim-scheduler")
     sim_thread.start()
     print("[NODE-3 scheduler] Started — will run simulate.py at each 30-min slot boundary", flush=True)
+
+    # Start Battery-Emulator MQTT SOC listener (daemon — dies with server)
+    mqtt_thread = threading.Thread(target=_start_mqtt_soc_listener, daemon=True, name="mqtt-soc")
+    mqtt_thread.start()
 
     app.run(host=args.host, port=args.port, debug=False, threaded=True)

@@ -1,0 +1,325 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1100" font-family="Inter, Arial, sans-serif" font-size="11">
+  <style>
+    .enclosure { fill: #fafafa; stroke: #222; stroke-width: 3; }
+    .door-line { stroke: #888; stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+    .divider { fill: #cce4ff; stroke: #0044aa; stroke-width: 1.5; opacity: 0.7; }
+    .dinrail { fill: #c0c0c0; stroke: #555; stroke-width: 1; }
+    .breaker { fill: #ffe0e0; stroke: #aa0000; stroke-width: 1.5; }
+    .psu { fill: #e6ffe6; stroke: #008800; stroke-width: 1.5; }
+    .ssr { fill: #e6e6ff; stroke: #4444aa; stroke-width: 1.5; }
+    .module { fill: #fffbe0; stroke: #aa8800; stroke-width: 1.5; }
+    .busbar-pos { fill: #ff6666; stroke: #800000; stroke-width: 1; }
+    .busbar-neg { fill: #6666cc; stroke: #000080; stroke-width: 1; }
+    .pe-bar { fill: #66cc66; stroke: #004400; stroke-width: 1; }
+    .gland-hv { fill: #ffcccc; stroke: #aa0000; stroke-width: 1.5; }
+    .gland-lv { fill: #cce0ff; stroke: #0044aa; stroke-width: 1.5; }
+    .estop { fill: #ff0000; stroke: #800000; stroke-width: 2; }
+    .lbl { font-size: 10px; fill: #222; }
+    .ttl { font-size: 13px; font-weight: 700; fill: #000; }
+    .small { font-size: 8.5px; fill: #555; }
+    .dim { font-size: 9px; fill: #006; stroke: #006; stroke-width: 0.4; fill: #006; }
+    .hvwire { stroke: #aa0000; stroke-width: 1.6; fill: none; }
+    .lvwire { stroke: #0044aa; stroke-width: 1.3; fill: none; }
+  </style>
+
+  <!-- Title -->
+  <text x="450" y="25" text-anchor="middle" class="ttl">NODE-3 Physical Layout — TLC CMSB604025 portrait (400 W × 600 H × 250 D)</text>
+  <text x="450" y="42" text-anchor="middle" class="small">DALA single-BMS-read · pack-internal contactors · 4× TOMZN required (3 branch + 1 master)</text>
+
+  <!-- ===== Enclosure outline ===== -->
+  <!-- Outer box: 400W × 600H scaled to 600×900 (1.5× scale, 1.5px = 1mm) -->
+  <rect x="100" y="60" width="600" height="900" class="enclosure" rx="8"/>
+
+  <!-- Door (dashed inside, indicating hinged) -->
+  <rect x="115" y="75" width="570" height="870" class="door-line" rx="5"/>
+
+  <!-- Dimensions outside -->
+  <line x1="100" y1="50" x2="700" y2="50" stroke="#006" stroke-width="0.6"/>
+  <text x="400" y="48" text-anchor="middle" class="dim">400 mm (interior W ≈ 380)</text>
+
+  <line x1="80" y1="60" x2="80" y2="960" stroke="#006" stroke-width="0.6"/>
+  <text x="50" y="510" class="dim" transform="rotate(-90, 50, 510)">600 mm (interior H ≈ 580)</text>
+
+  <text x="720" y="510" class="dim">Depth: 250 mm (mounting plate ≈ 230 mm deep behind components)</text>
+
+  <!-- ===== HV ZONE (top half) ===== -->
+  <text x="400" y="92" text-anchor="middle" class="ttl" fill="#aa0000">⚡ HV DC ZONE (top)</text>
+
+  <!-- DIN rail 1: HV protection breakers + PE -->
+  <rect x="130" y="115" width="540" height="14" class="dinrail"/>
+  <text x="130" y="113" class="small">DIN rail #1 — HV protection</text>
+
+  <!-- 4 TOMZN breakers + PE busbar + Yazaki fuse on this rail -->
+  <!-- Each TOMZN ≈ 36mm wide × ~80mm tall (scaled ~54×120). 4 breakers + Yazaki fuse + PE -->
+  <g>
+    <rect x="140" y="135" width="80" height="95" class="breaker"/>
+    <text x="180" y="158" text-anchor="middle" class="lbl" font-weight="700">TOMZN</text>
+    <text x="180" y="172" text-anchor="middle" class="small">DC 2P 32A</text>
+    <text x="180" y="190" text-anchor="middle" class="small">BRANCH</text>
+    <text x="180" y="204" text-anchor="middle" class="ttl" fill="#aa0000">PACK 1</text>
+    <text x="180" y="222" text-anchor="middle" class="small">(in-hand)</text>
+
+    <rect x="230" y="135" width="80" height="95" class="breaker"/>
+    <text x="270" y="158" text-anchor="middle" class="lbl" font-weight="700">TOMZN</text>
+    <text x="270" y="172" text-anchor="middle" class="small">DC 2P 32A</text>
+    <text x="270" y="190" text-anchor="middle" class="small">BRANCH</text>
+    <text x="270" y="204" text-anchor="middle" class="ttl" fill="#aa0000">PACK 2</text>
+    <text x="270" y="222" text-anchor="middle" class="small">(in-hand)</text>
+
+    <rect x="320" y="135" width="80" height="95" class="breaker"/>
+    <text x="360" y="158" text-anchor="middle" class="lbl" font-weight="700">TOMZN</text>
+    <text x="360" y="172" text-anchor="middle" class="small">DC 2P 32A</text>
+    <text x="360" y="190" text-anchor="middle" class="small">BRANCH</text>
+    <text x="360" y="204" text-anchor="middle" class="ttl" fill="#aa0000">PACK 3</text>
+    <text x="360" y="222" text-anchor="middle" class="small">(in-hand)</text>
+
+    <rect x="410" y="135" width="80" height="95" class="breaker" stroke-dasharray="4 2"/>
+    <text x="450" y="158" text-anchor="middle" class="lbl" font-weight="700">TOMZN</text>
+    <text x="450" y="172" text-anchor="middle" class="small">DC 2P 32A</text>
+    <text x="450" y="190" text-anchor="middle" class="small">MASTER</text>
+    <text x="450" y="204" text-anchor="middle" class="ttl" fill="#aa0000">⚠ buy</text>
+    <text x="450" y="220" text-anchor="middle" class="small">4th unit</text>
+
+    <!-- PE busbar -->
+    <rect x="510" y="135" width="55" height="40" class="pe-bar"/>
+    <text x="537" y="152" text-anchor="middle" class="lbl" font-weight="700">PE BAR</text>
+    <text x="537" y="167" text-anchor="middle" class="small">Phoenix</text>
+    <text x="537" y="178" text-anchor="middle" class="small">USLKG 6</text>
+
+    <!-- Yazaki Pin 1 fuse -->
+    <rect x="580" y="135" width="80" height="40" class="module"/>
+    <text x="620" y="152" text-anchor="middle" class="small" font-weight="700">1A fuse</text>
+    <text x="620" y="166" text-anchor="middle" class="small">(Yazaki Pin 1)</text>
+    <text x="620" y="178" text-anchor="middle" class="small">+ holder</text>
+
+    <!-- Spare DIN space -->
+    <rect x="510" y="185" width="150" height="45" fill="none" stroke="#888" stroke-dasharray="2 2"/>
+    <text x="585" y="210" text-anchor="middle" class="small">Spare DIN (future)</text>
+  </g>
+
+  <!-- Busbars (positive + negative) -->
+  <text x="130" y="260" class="small">+ / − busbars on insulated M6 standoffs (1000 V), 6×30 mm tinned Cu, ~200 mm long:</text>
+
+  <g>
+    <!-- + busbar -->
+    <rect x="200" y="275" width="380" height="18" class="busbar-pos"/>
+    <text x="390" y="288" text-anchor="middle" class="lbl" font-weight="700" fill="white">+ BUSBAR (red H07RN-F)</text>
+    <!-- standoffs -->
+    <circle cx="210" cy="284" r="4" fill="white" stroke="#555"/>
+    <circle cx="390" cy="284" r="4" fill="white" stroke="#555"/>
+    <circle cx="570" cy="284" r="4" fill="white" stroke="#555"/>
+
+    <!-- − busbar -->
+    <rect x="200" y="310" width="380" height="18" class="busbar-neg"/>
+    <text x="390" y="323" text-anchor="middle" class="lbl" font-weight="700" fill="white">− BUSBAR (black H07RN-F)</text>
+    <circle cx="210" cy="319" r="4" fill="white" stroke="#555"/>
+    <circle cx="390" cy="319" r="4" fill="white" stroke="#555"/>
+    <circle cx="570" cy="319" r="4" fill="white" stroke="#555"/>
+  </g>
+
+  <!-- HV cable runs from breakers to busbar -->
+  <g>
+    <!-- Branch breaker bottoms → + busbar (top connection from breaker output) -->
+    <line x1="180" y1="230" x2="180" y2="275" class="hvwire"/>
+    <line x1="270" y1="230" x2="270" y2="275" class="hvwire"/>
+    <line x1="360" y1="230" x2="360" y2="275" class="hvwire"/>
+    <!-- Master breaker output → − busbar (path to inverter) -->
+    <line x1="450" y1="230" x2="450" y2="310" class="hvwire"/>
+  </g>
+
+  <!-- Notes for HV zone -->
+  <g transform="translate(130, 350)">
+    <rect x="0" y="0" width="540" height="60" fill="#fff4e6" stroke="#aa6600" stroke-width="1"/>
+    <text x="10" y="16" class="small" font-weight="700">HV cable routing:</text>
+    <text x="10" y="30" class="small">• 3× HV pack cables enter via M40 glands on RIGHT side wall (red OEM Sumitomo plugs into packs externally)</text>
+    <text x="10" y="42" class="small">• Each pack cable terminates with M8 hex-crimped ring lug on its branch TOMZN input</text>
+    <text x="10" y="54" class="small">• Inverter HV cable exits via TOP M40 gland (right side, top) — from master breaker output → +/− busbar pair</text>
+  </g>
+
+  <!-- ===== DIVIDER ===== -->
+  <rect x="115" y="430" width="570" height="12" class="divider"/>
+  <text x="400" y="439" text-anchor="middle" class="lbl" font-weight="700" fill="#0044aa">━━━ 3 mm perspex / 1 mm steel divider plate ━━━ (segregates HV from LV)</text>
+
+  <!-- ===== LV ZONE (bottom half) ===== -->
+  <text x="400" y="465" text-anchor="middle" class="ttl" fill="#0044aa">🔌 LV / Comms ZONE (bottom)</text>
+
+  <!-- DIN rail 2: LV power -->
+  <rect x="130" y="485" width="540" height="14" class="dinrail"/>
+  <text x="130" y="483" class="small">DIN rail #2 — LV power</text>
+
+  <g>
+    <rect x="140" y="505" width="120" height="90" class="psu"/>
+    <text x="200" y="528" text-anchor="middle" class="lbl" font-weight="700">Mean Well</text>
+    <text x="200" y="543" text-anchor="middle" class="lbl" font-weight="700">DR-60-12</text>
+    <text x="200" y="560" text-anchor="middle" class="small">230 V AC → 12 V DC</text>
+    <text x="200" y="574" text-anchor="middle" class="small">5 A · 60 W · DIN</text>
+    <text x="200" y="588" text-anchor="middle" class="small">(BUY — RS)</text>
+
+    <!-- Terminal blocks for 12V distribution -->
+    <rect x="280" y="505" width="180" height="40" class="module"/>
+    <text x="370" y="525" text-anchor="middle" class="lbl" font-weight="700">12 V distribution</text>
+    <text x="370" y="540" text-anchor="middle" class="small">Phoenix terminals: +12V bus, GND bus, +12V switched (via E-stop)</text>
+
+    <!-- DROK 12->5V -->
+    <rect x="280" y="555" width="80" height="40" class="module"/>
+    <text x="320" y="572" text-anchor="middle" class="small" font-weight="700">DROK</text>
+    <text x="320" y="586" text-anchor="middle" class="small">12 V → 5 V</text>
+
+    <!-- spare LV terminals -->
+    <rect x="380" y="555" width="80" height="40" class="module"/>
+    <text x="420" y="572" text-anchor="middle" class="small" font-weight="700">Spare LV</text>
+    <text x="420" y="586" text-anchor="middle" class="small">terminals</text>
+
+    <!-- E-stop wiring junction -->
+    <rect x="480" y="505" width="180" height="90" fill="#ffeded" stroke="#aa0000" stroke-width="1.2"/>
+    <text x="570" y="525" text-anchor="middle" class="lbl" font-weight="700" fill="#aa0000">E-STOP junction</text>
+    <text x="570" y="540" text-anchor="middle" class="small">12V from PSU → E-stop NC →</text>
+    <text x="570" y="552" text-anchor="middle" class="small">switched 12V to Yazaki Pin 1 bus</text>
+    <text x="570" y="568" text-anchor="middle" class="small">+ to SSR-04 OUT common</text>
+    <text x="570" y="582" text-anchor="middle" class="small">(E-stop button mounts on door)</text>
+  </g>
+
+  <!-- DIN rail 3: control modules -->
+  <rect x="130" y="620" width="540" height="14" class="dinrail"/>
+  <text x="130" y="618" class="small">DIN rail #3 — control modules (on DIN clips or panel-mounted adjacent)</text>
+
+  <g>
+    <!-- SSR-04 -->
+    <rect x="140" y="640" width="130" height="90" class="ssr"/>
+    <text x="205" y="660" text-anchor="middle" class="lbl" font-weight="700">SSR-04 5DD-CN</text>
+    <text x="205" y="676" text-anchor="middle" class="small">4-channel SSR module</text>
+    <text x="205" y="692" text-anchor="middle" class="small">Ch1: Precharge coil bus</text>
+    <text x="205" y="704" text-anchor="middle" class="small">Ch2: +Cont coil bus</text>
+    <text x="205" y="716" text-anchor="middle" class="small">Ch3: −Cont coil bus</text>
+    <text x="205" y="726" text-anchor="middle" class="small">(in-hand)</text>
+
+    <!-- LilyGo T-2CAN -->
+    <rect x="285" y="640" width="120" height="90" class="module"/>
+    <text x="345" y="660" text-anchor="middle" class="lbl" font-weight="700">LilyGo T-2CAN</text>
+    <text x="345" y="675" text-anchor="middle" class="small">ESP32-S3</text>
+    <text x="345" y="691" text-anchor="middle" class="small">DALA flashed</text>
+    <text x="345" y="704" text-anchor="middle" class="small">CAN-A → Pack 1</text>
+    <text x="345" y="716" text-anchor="middle" class="small">CAN-B → Waveshare</text>
+    <text x="345" y="726" text-anchor="middle" class="small">(in-hand)</text>
+
+    <!-- Waveshare CAN HAT -->
+    <rect x="420" y="640" width="120" height="90" class="module"/>
+    <text x="480" y="660" text-anchor="middle" class="lbl" font-weight="700">Waveshare</text>
+    <text x="480" y="675" text-anchor="middle" class="small">2-CH Isolated</text>
+    <text x="480" y="690" text-anchor="middle" class="small">CAN HAT</text>
+    <text x="480" y="705" text-anchor="middle" class="small">MCP2515 + SN65HVD230</text>
+    <text x="480" y="722" text-anchor="middle" class="small">(BUY — Amazon)</text>
+
+    <!-- MCP3008 / CT clamp ADC -->
+    <rect x="555" y="640" width="105" height="90" class="module"/>
+    <text x="608" y="660" text-anchor="middle" class="lbl" font-weight="700">MCP3008 ADC</text>
+    <text x="608" y="676" text-anchor="middle" class="small">+ CT clamp inputs</text>
+    <text x="608" y="690" text-anchor="middle" class="small">(2× YHDC SCT-013)</text>
+    <text x="608" y="705" text-anchor="middle" class="small">+ DS18B20 1-wire</text>
+    <text x="608" y="720" text-anchor="middle" class="small">temperature bus</text>
+  </g>
+
+  <!-- RPi 4 + Router area -->
+  <g>
+    <rect x="140" y="755" width="180" height="100" fill="#e0f0ff" stroke="#0066aa" stroke-width="1.5"/>
+    <text x="230" y="775" text-anchor="middle" class="lbl" font-weight="700">Raspberry Pi 4</text>
+    <text x="230" y="791" text-anchor="middle" class="small">+ finned heatsink + fan</text>
+    <text x="230" y="806" text-anchor="middle" class="small">Telemetry, NODE3 portal,</text>
+    <text x="230" y="820" text-anchor="middle" class="small">Octopus Agile integration</text>
+    <text x="230" y="838" text-anchor="middle" class="small">Standoffs to mounting plate</text>
+    <text x="230" y="850" text-anchor="middle" class="small">(in-hand)</text>
+
+    <rect x="340" y="755" width="180" height="100" fill="#e6f0ff" stroke="#0066aa" stroke-width="1.5"/>
+    <text x="430" y="775" text-anchor="middle" class="lbl" font-weight="700">ZTE 4G router</text>
+    <text x="430" y="791" text-anchor="middle" class="small">Prototype substitute for RUT240</text>
+    <text x="430" y="806" text-anchor="middle" class="small">Antennas pigtailed to TOP</text>
+    <text x="430" y="820" text-anchor="middle" class="small">external SMA bulkheads</text>
+    <text x="430" y="836" text-anchor="middle" class="small">LAN → RPi 4</text>
+    <text x="430" y="850" text-anchor="middle" class="small">(in-hand)</text>
+
+    <!-- Spare area -->
+    <rect x="540" y="755" width="120" height="100" fill="none" stroke="#888" stroke-dasharray="3 3"/>
+    <text x="600" y="795" text-anchor="middle" class="small">Spare area</text>
+    <text x="600" y="810" text-anchor="middle" class="small">(cooling fan?</text>
+    <text x="600" y="825" text-anchor="middle" class="small">spare DC-DC?)</text>
+  </g>
+
+  <!-- ===== Cable glands ===== -->
+
+  <!-- RIGHT side wall HV glands (drawn as half-circles on right edge) -->
+  <g>
+    <circle cx="700" cy="155" r="14" class="gland-hv"/>
+    <text x="745" y="160" class="small">M40 — Inverter HV out</text>
+
+    <circle cx="700" cy="200" r="14" class="gland-hv"/>
+    <text x="745" y="205" class="small">M40 — Pack 1 HV (Sumitomo)</text>
+
+    <circle cx="700" cy="245" r="14" class="gland-hv"/>
+    <text x="745" y="250" class="small">M40 — Pack 2 HV (Sumitomo)</text>
+
+    <circle cx="700" cy="290" r="14" class="gland-hv"/>
+    <text x="745" y="295" class="small">M40 — Pack 3 HV (Sumitomo)</text>
+  </g>
+
+  <!-- BOTTOM edge LV glands -->
+  <g>
+    <circle cx="160" cy="960" r="12" class="gland-lv"/>
+    <text x="160" y="985" text-anchor="middle" class="small">M25</text>
+    <text x="160" y="995" text-anchor="middle" class="small">230 V AC mains</text>
+
+    <circle cx="250" cy="960" r="11" class="gland-lv"/>
+    <text x="250" y="985" text-anchor="middle" class="small">M20</text>
+    <text x="250" y="995" text-anchor="middle" class="small">Yazaki daisy</text>
+
+    <circle cx="340" cy="960" r="10" class="gland-lv"/>
+    <text x="340" y="985" text-anchor="middle" class="small">M16</text>
+    <text x="340" y="995" text-anchor="middle" class="small">CAN→FoxESS</text>
+
+    <circle cx="420" cy="960" r="10" class="gland-lv"/>
+    <text x="420" y="985" text-anchor="middle" class="small">M16</text>
+    <text x="420" y="995" text-anchor="middle" class="small">E-stop wire</text>
+
+    <circle cx="500" cy="960" r="10" class="gland-lv"/>
+    <text x="500" y="985" text-anchor="middle" class="small">M16</text>
+    <text x="500" y="995" text-anchor="middle" class="small">Temp probes</text>
+
+    <circle cx="580" cy="960" r="10" class="gland-lv"/>
+    <text x="580" y="985" text-anchor="middle" class="small">M16</text>
+    <text x="580" y="995" text-anchor="middle" class="small">CT clamps</text>
+
+    <circle cx="650" cy="960" r="10" class="gland-lv"/>
+    <text x="650" y="985" text-anchor="middle" class="small">M16</text>
+    <text x="650" y="995" text-anchor="middle" class="small">Spare/vent</text>
+  </g>
+
+  <!-- ===== Door-mounted items ===== -->
+  <g>
+    <circle cx="400" cy="80" r="14" class="estop"/>
+    <text x="400" y="84" text-anchor="middle" fill="white" font-weight="700" font-size="7">E-STOP</text>
+    <text x="425" y="83" class="small">↑ on door (mushroom, latching, NC)</text>
+  </g>
+
+  <!-- PE earth bond stud on left wall -->
+  <circle cx="100" cy="500" r="10" fill="#66cc66" stroke="#004400" stroke-width="2"/>
+  <text x="55" y="503" class="small">PE stud</text>
+  <text x="55" y="514" class="small">(included)</text>
+
+  <!-- Side label -->
+  <text x="450" y="1015" text-anchor="middle" class="small" fill="#aa0000" font-weight="700">⚠ HV glands clustered on RIGHT side wall · LV glands along BOTTOM edge · mains AC kept FAR LEFT, well away from HV cables</text>
+
+  <!-- Wiring hints (LV) -->
+  <g opacity="0.7">
+    <!-- DR-60-12 → E-stop junction -->
+    <path d="M 260 555 Q 480 555 480 555" class="lvwire"/>
+    <!-- E-stop junction → DIN rail 3 (SSR + LilyGo) -->
+    <path d="M 570 595 Q 570 615 570 640" class="lvwire"/>
+    <path d="M 205 640 Q 205 605 480 605" class="lvwire"/>
+    <!-- LilyGo to SSR (GPIO 25/32/33) -->
+    <path d="M 285 685 L 270 685" class="lvwire"/>
+    <!-- LilyGo to Waveshare CAN-B -->
+    <path d="M 405 685 L 420 685" class="lvwire"/>
+  </g>
+
+  <!-- Coordinate/scale note bottom-right -->
+  <text x="880" y="1090" text-anchor="end" class="small">Scale: ~1.5 px = 1 mm · Drawing to scale, components shown larger than minimum for readability</text>
+</svg>
