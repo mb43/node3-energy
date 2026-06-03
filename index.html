@@ -1,7 +1,916 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<meta http-equiv="refresh" content="0; url=dashboard.html">
-<title>NODE-3 Energy Arbitrage Portal</title>
-</head><body>
-<p>Redirecting to <a href="dashboard.html">NODE-3 Portal</a>…</p>
-</body></html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dovecote Systems — Carbon-Neutral Energy Arbitrage & Mobile Resilience</title>
+  <meta name="description" content="Deploying high-capacity, carbon-neutral second-life EV energy storage systems on-demand. Bridging grid constraints and mission-critical power requirements.">
+  <link rel="stylesheet" href="style.css">
+  
+  <style>
+    /* Custom additions to blend with style.css */
+    
+    /* Make canvas logo fully responsive for smaller viewports */
+    .logo-container {
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    .logo-container canvas {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* Standard responsive grid layouts matching style.css breakpoints */
+    .tech-grid, .equipment-showcase, .contact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      margin-bottom: 40px;
+      align-items: start;
+    }
+    
+    .equipment-showcase {
+      margin-top: 48px;
+      align-items: center;
+    }
+    
+    .contact-grid {
+      margin-top: 24px;
+    }
+    
+    @media (max-width: 900px) {
+      .tech-grid, .equipment-showcase, .contact-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+    }
+    
+    /* Typography & clean lists inside Technology section */
+    .tech-title-green {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--green);
+    }
+    .tech-title-teal {
+      font-size: 20px;
+      font-weight: 700;
+      margin-top: 30px;
+      margin-bottom: 16px;
+      color: var(--teal);
+    }
+    .tech-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .tech-list li {
+      display: flex;
+      gap: 10px;
+      font-size: 14px;
+    }
+    .tech-list li span {
+      flex-shrink: 0;
+    }
+
+    /* Contact form styling */
+    .contact-grid input, .contact-grid textarea {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(13, 17, 23, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    
+    .contact-grid input:focus, .contact-grid textarea:focus {
+      outline: none;
+      border-color: var(--green);
+      box-shadow: 0 0 8px rgba(63, 185, 80, 0.2);
+    }
+    
+    /* Nav mobile view toggle (only active below 900px breakpoint) */
+    @media (max-width: 900px) {
+      .nav-links.active {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 64px;
+        left: 0;
+        right: 0;
+        background: rgba(13, 17, 23, 0.96);
+        border-bottom: 1px solid var(--border);
+        padding: 24px;
+        gap: 16px;
+        backdrop-filter: blur(20px);
+        z-index: 999;
+      }
+    }
+    
+    /* Interactive tab styles for schematics in Tech Section */
+    .tech-tabs {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .tech-tab-btn {
+      background: rgba(22, 27, 34, 0.6);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tech-tab-btn:hover {
+      border-color: var(--green-dim);
+      color: var(--text);
+    }
+    .tech-tab-btn.active {
+      background: rgba(63, 185, 80, 0.1);
+      border-color: var(--green);
+      color: var(--green);
+      box-shadow: 0 0 10px rgba(63, 185, 80, 0.1);
+    }
+    .tech-tab-content {
+      display: none;
+    }
+    .tech-tab-content.active {
+      display: block;
+    }
+    
+    /* Image styles inside glass card/schematics */
+    .schematic-img-container {
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 350px;
+      max-height: 600px;
+      overflow: hidden;
+    }
+    .schematic-img-container img {
+      max-width: 100%;
+      max-height: 550px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 15px rgba(63, 185, 80, 0.15));
+    }
+    
+    .equipment-image {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      height: 350px;
+    }
+    .equipment-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    /* Retro scanline overlay on canvas */
+    .scanlines {
+      position: relative;
+      overflow: hidden;
+    }
+    .scanlines::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(
+        rgba(18, 16, 16, 0) 50%, 
+        rgba(0, 0, 0, 0.25) 50%
+      );
+      background-size: 100% 4px;
+      pointer-events: none;
+      border-radius: 8px;
+    }
+
+    /* Scaling typography for ASCII block on small viewports */
+    @media (max-width: 600px) {
+      .topology-box pre {
+        font-size: 10px;
+      }
+      .topology-box {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════
+       NAVIGATION
+       ══════════════════════════════════════════ -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <div class="nav-brand">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--green); filter: drop-shadow(0 0 6px rgba(63, 185, 80, 0.35)); flex-shrink: 0; display: block;">
+          <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+          <path d="M9 3v18"></path>
+          <path d="M15 3v18"></path>
+          <path d="M3 9h18"></path>
+          <path d="M3 15h18"></path>
+        </svg>
+        <div class="nav-logo-text">
+          DOVECOTE SYSTEMS
+        </div>
+      </div>
+      
+      <ul class="nav-links">
+        <li><a href="#home">Home</a></li>
+        <li><a href="#capabilities">Capabilities</a></li>
+        <li><a href="#technology">Technology</a></li>
+        <li><a href="#performance">Performance</a></li>
+        <li><a href="#open-source">Open Source</a></li>
+        <li><a href="#vision">Vision</a></li>
+        <li><a href="#roadmap">Roadmap</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+      
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <a href="https://portal.doesnthavetocosttheearth.com" class="nav-portal" target="_blank">Operator Portal →</a>
+        <button class="nav-hamburger" aria-label="Toggle Menu">☰</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ══════════════════════════════════════════
+       HERO SECTION
+       ══════════════════════════════════════════ -->
+  <header id="home" class="hero">
+    <div class="hero-matrix logo-container scanlines">
+      <canvas id="logo-canvas" width="300" height="300"></canvas>
+    </div>
+    
+    <div class="container">
+      <h1 class="fade-in">Intelligent Infrastructure.<br>Mobile Resilience.</h1>
+      <p class="subtitle fade-in">Deploying high-capacity, carbon-neutral energy storage systems on-demand. We bridge the gap between grid constraints and mission-critical power requirements.</p>
+      <a href="#capabilities" class="btn-primary fade-in">Explore Our Capabilities →</a>
+    </div>
+  </header>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════════
+       CORE CAPABILITIES
+       ══════════════════════════════════════════ -->
+  <section id="capabilities" class="fade-in">
+    <div class="container">
+      <div class="section-label">Capabilities</div>
+      <h2 class="section-title">The Tri-Aspect Footprint</h2>
+      <p class="section-desc">Maximising second-life utility and delivering robust power where legacy infrastructure falls short.</p>
+      
+      <div class="capabilities-grid">
+        <div class="glass-card">
+          <span class="card-icon">⚡</span>
+          <h3 class="card-title">Rapid EV Rescue & Fleet Support</h3>
+          <p class="card-text">Deploying high-density mobile power directly to stranded transport assets. Eliminating downtime and flat-bed recovery overheads with ultra-fast roadside charging.</p>
+        </div>
+        
+        <div class="glass-card">
+          <span class="card-icon">🔋</span>
+          <h3 class="card-title">Off-Grid Event & Infrastructure</h3>
+          <p class="card-text">Replacing noisy, carbon-heavy diesel generators with silent, zero-emission mobile battery storage. Perfect for urban construction, major outdoor events, and eco-sensitive zones.</p>
+        </div>
+        
+        <div class="glass-card">
+          <span class="card-icon">🛡️</span>
+          <h3 class="card-title">Emergency Infrastructure Backup</h3>
+          <p class="card-text">Securing operational continuity for localized data centers, community hubs, and critical utilities during unexpected grid outages or peak demand stress periods.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════════
+       TECHNOLOGY SECTION
+       ══════════════════════════════════════════ -->
+  <section id="technology" class="tech-section fade-in">
+    <div class="container">
+      <div class="section-label">Technology</div>
+      <h2 class="section-title">The NODE-3 Platform</h2>
+      <p class="section-desc">Physical hardware meets intelligent dispatch. A real, high-voltage battery installation executing automated, market-driven arbitrage.</p>
+      
+      <div class="tech-grid">
+        <div>
+          <h3 class="tech-title-green">Hardware Specifications</h3>
+          <ul class="tech-list">
+            <li><span style="color: var(--green);">✔</span> <strong>72 kWh Nominal Storage</strong> (3× Nissan e-NV200 second-life packs)</li>
+            <li><span style="color: var(--green);">✔</span> <strong>FoxESS KH10.5 HV Hybrid Inverter</strong> (10.5 kW nominal output)</li>
+            <li><span style="color: var(--green);">✔</span> <strong>G98 Single-Phase Connection</strong> (3.68 kWh/slot DNO cap, 32A export)</li>
+            <li><span style="color: var(--green);">✔</span> <strong>LilyGo T-2CAN ESP32-S3 Bridge</strong> driving daisy-chained Yazaki SSRs</li>
+            <li><span style="color: var(--green);">✔</span> <strong>Failsafe hardware loop</strong> tied to a latching IP67 physical E-stop</li>
+          </ul>
+          
+          <h3 class="tech-title-teal">Software & Automation</h3>
+          <ul class="tech-list">
+            <li><span style="color: var(--teal);">⚡</span> <strong>LP-Optimal Dispatch:</strong> SciPy HiGHS linear programming solver</li>
+            <li><span style="color: var(--teal);">⚡</span> <strong>48-Slot Rolling Forecast:</strong> Dynamic import/export optimization</li>
+            <li><span style="color: var(--teal);">⚡</span> <strong>Agile Arbitrage:</strong> Automatically targets cheapest slots to charge, highest to export</li>
+            <li><span style="color: var(--teal);">⚡</span> <strong>Homeowner Offset:</strong> Covers up to 12 kWh/day home consumption at zero cost</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 16px; color: var(--text);">System Layout & Schematics</h3>
+          
+          <div class="tech-tabs">
+            <button class="tech-tab-btn active" onclick="switchTab('topology')">Topology (ASCII)</button>
+            <button class="tech-tab-btn" onclick="switchTab('schematic')">Electrical Schematic</button>
+            <button class="tech-tab-btn" onclick="switchTab('layout')">Enclosure Layout</button>
+          </div>
+          
+          <div id="tab-topology" class="tech-tab-content active">
+            <div class="topology-box">
+<pre>
+                        ╔══════════════════════╗
+                        ║   FoxESS KH10.5      ║
+                        ║   HV Hybrid Inverter ║
+                        ╚══════╦═══════════════╝
+                               ║ HV DC (~360V) + CAN
+┌─── CAN-B (isolated) ─────────╫────────┐
+│                              ║        │
+│                      ┌───────╨───────┐│
+│                      │ TOMZN DC 2P   ││  ← MASTER isolator
+│                      │ 1100V 32A     ││
+│                      └───────┬───────┘│
+│                              │        │
+│                 ┌───── +BUSBAR ──────────────────┐
+│                 │ (tinned Cu, 6×30mm × 200mm)    │
+│                 │                                │
+│             ┌───┴───┐    ┌───┴───┐    ┌───┴───┐
+│             │TOMZN  │    │TOMZN  │    │TOMZN  │  ← branch protection
+│             │2P 32A │    │2P 32A │    │2P 32A │
+│             └───┬───┘    └───┬───┘    └───┬───┘
+│                 │            │            │
+│             ╔═══╧═══╗    ╔═══╧═══╗    ╔═══╧═══╗
+│             ║ SDP1  ║    ║ SDP2  ║    ║ SDP3  ║  ← Service Disconnect
+│             ╚═══╤═══╝    ╚═══╤═══╝    ╚═══╤═══╝
+│                 │            │            │
+│             ┌───┴───┐    ┌───┴───┐    ┌───┴───┐
+│             │PACK 1 │    │PACK 2 │    │PACK 3 │
+│             │ BMS+  │    │ BMS+  │    │ BMS+  │
+│             │ INT.  │    │ INT.  │    │ INT.  │
+│             │ CONT. │    │ CONT. │    │ CONT. │
+│             └─┬─┬─┬─┘    └─┬─┬───┘    └─┬─┬───┘
+│               │ │ │        │ │          │ │
+│          CAN  │ │ │ Yazaki │ │  Yazaki  │ │  Yazaki
+│          ─────┘ │ │ ───────┘ │  ────────┘ │  ─────────
+│             ┌───┘ │          │            │
+│             │     │  ┌───────┴────────────┴───┐
+│             │     │  │ DAISY-CHAINED signals: │
+│             │     │  │ • BAT+IGN (Pin 1, 12V) │ ← via E-stop NC
+│             │     │  │ • GND     (Pin 2)      │
+│             │     │  │ • Precharge SSR1 OUT   │
+│             │     │  │ • +Contactor SSR2 OUT  │
+│             │     │  │ • −Contactor SSR3 OUT  │
+│             │     │  └────────────────────────┘
+│             │     │
+│      CAN-A  │     │ Pack 1 only carries CAN
+│             │     │
+│          ┌──┴─────┴────┐
+│          │  LilyGo     │
+│          │  T-2CAN     │  GPIO 25 → SSR1 IN
+│          │  ESP32-S3   │  GPIO 32 → SSR2 IN
+│          │  (DALA)     │  GPIO 33 → SSR3 IN
+│          └─────────────┘
+</pre>
+            </div>
+          </div>
+          
+          <div id="tab-schematic" class="tech-tab-content">
+            <div class="schematic-img-container">
+              <img src="NODE3_DEFINITIVE_Schematic.svg" alt="NODE-3 System Electrical Schematic" onerror="this.src='NODE3_G99_SLD_DSL-SLD-001_RevA_preview.png'">
+            </div>
+          </div>
+          
+          <div id="tab-layout" class="tech-tab-content">
+            <div class="schematic-img-container">
+              <img src="NODE3_DEFINITIVE_BoxLayout.svg" alt="NODE-3 Enclosure Box Layout Diagram">
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Equipment Photos showcase -->
+      <div class="equipment-showcase">
+        <div class="equipment-image">
+          <img src="node3_equipment.jpg" alt="Physical Dovecote NODE-3 energy storage battery rack installation">
+        </div>
+        <div class="glass-card">
+          <h3 class="card-title">Physical Prototype Deployment</h3>
+          <p class="card-text" style="margin-bottom: 12px;">The live NODE-3 rig running inside an IP65 steel enclosure in Southampton. This unit acts as the primary hardware node, constantly feeding back telemetry and testing the limits of second-life grid interaction.</p>
+          <p class="card-text">Through strict temperature controls, branch protection, and automated precharge sequences, the cell life of recycled Nissan EV packs is maximized while guaranteeing silent, domestic safety.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════════
+       PERFORMANCE METRICS
+       ══════════════════════════════════════════ -->
+  <section id="performance" class="fade-in">
+    <div class="container">
+      <div class="section-label">Metrics</div>
+      <h2 class="section-title">Performance & Revenue</h2>
+      <p class="section-desc">Real commercial statistics logged by NODE-3 during continuous grid-arbitrage operation.</p>
+      
+      <div class="specs-grid">
+        <div class="spec-item">
+          <div class="spec-number" data-target="72">0</div>
+          <div class="spec-unit">kWh</div>
+          <div class="spec-label">Battery Capacity</div>
+        </div>
+        
+        <div class="spec-item">
+          <div class="spec-number" data-target="10.5" data-format="decimal">0.0</div>
+          <div class="spec-unit">kW</div>
+          <div class="spec-label">Inverter Output</div>
+        </div>
+        
+        <div class="spec-item">
+          <div class="spec-number" data-target="88" data-format="percent">0%</div>
+          <div class="spec-unit">Efficiency</div>
+          <div class="spec-label">Round-Trip Conversion</div>
+        </div>
+        
+        <div class="spec-item">
+          <div class="spec-number" data-target="3497" data-format="currency">£0</div>
+          <div class="spec-unit">GBP / Year</div>
+          <div class="spec-label">Net Profit Per Node</div>
+        </div>
+        
+        <div class="spec-item">
+          <div class="spec-number" data-target="58" data-format="decimal">0.0</div>
+          <div class="spec-unit">kWh / Day</div>
+          <div class="spec-label">Avg Daily Throughput</div>
+        </div>
+        
+        <div class="spec-item">
+          <div class="spec-number" data-target="26">0</div>
+          <div class="spec-unit">Nodes</div>
+          <div class="spec-label">Scale to £50k+ Income</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════════
+       OPEN SOURCE PHILOSOPHY
+       ══════════════════════════════════════════ -->
+  <section id="open-source" class="fade-in">
+    <div class="container">
+      <div class="section-label">Philosophy</div>
+      <h2 class="section-title">Transparent Infrastructure</h2>
+      <div class="oss-quote">
+        "Built on transparent foundations. Dovecote Systems leverages robust, open-source infrastructure management and telemetry. No proprietary lock-ins. Just raw, accessible, and highly efficient energy engineering."
+      </div>
+      <div class="oss-tags">
+        <span class="oss-tag">DALA Battery-Emulator Firmware</span>
+        <span class="oss-tag">LilyGo T-2CAN ESP32-S3</span>
+        <span class="oss-tag">Python & Flask REST API</span>
+        <span class="oss-tag">MQTT Hardware Bridge</span>
+        <span class="oss-tag">Docker Containerisation</span>
+        <span class="oss-tag">GitHub Actions CI/CD</span>
+      </div>
+    </div>
+  </section>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════════
+       THE DISTRIBUTED ENERGY VISION
+       ══════════════════════════════════════════ -->
+  <section id="vision" class="vision-section fade-in">
+    <div class="container">
+      <div class="section-label">Vision</div>
+      <h2 class="section-title">Distributed Community Power</h2>
+      <div class="vision-quote">
+        "The 21st century future of a distributed community energy provider for the benefit of all is finally here."
+      </div>
+      <div class="vision-grid">
+        <div class="vision-item"><span class="vision-dot"></span>Energy Storage & Battery Recycling</div>
+        <div class="vision-item"><span class="vision-dot"></span>EV 2nd Life Grid Assist</div>
+        <div class="vision-item"><span class="vision-dot"></span>Grid Optimization & Smoothing</div>
+        <div class="vision-item"><span class="vision-dot"></span>Energy Arbitrage Revenue</div>
+        <div class="vision-item"><span class="vision-dot"></span>Virtual Lead Party (VLP) Integration</div>
+        <div class="vision-item"><span class="vision-dot"></span>Balancing Mechanism Participation</div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════════
+       ROADMAP / SCALE SECTION
+       ══════════════════════════════════════════ -->
+  <section id="roadmap" class="fade-in">
+    <div class="container" style="display: flex; flex-direction: column; align-items: center;">
+      <div style="width: 100%; max-width: 700px;">
+        <div class="section-label">Roadmap</div>
+        <h2 class="section-title">Scaling the Fleet</h2>
+        <p class="section-desc">Our phased deployment plan to expand decentralized energy capacity across Southern England.</p>
+        
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-when">Month 0</div>
+            <h4 class="timeline-title">Node-1 Pilot Live</h4>
+            <p class="timeline-desc">Initial 72 kWh battery system and hardware bridge fully operational in Southampton. Proving live LP-optimisation and MQTT telemetry.</p>
+          </div>
+          
+          <div class="timeline-item">
+            <div class="timeline-when">Month 6</div>
+            <h4 class="timeline-title">Fleet Expansion (16 Nodes)</h4>
+            <p class="timeline-desc">Deploying 16 operational nodes in Southern England. Target of £41,161 projected annual network surplus under management.</p>
+          </div>
+          
+          <div class="timeline-item">
+            <div class="timeline-when">Month 10</div>
+            <h4 class="timeline-title">Scale Threshold (26 Nodes)</h4>
+            <p class="timeline-desc">Reaching 26 distributed nodes. Reaching £50,000+ annual income run-rate while supporting local grid balancing.</p>
+          </div>
+          
+          <div class="timeline-item">
+            <div class="timeline-when">Year 2</div>
+            <h4 class="timeline-title">VLP & Balancing Mechanism</h4>
+            <p class="timeline-desc">Registering as a Virtual Lead Party (VLP). Participating directly in the National Grid Balancing Mechanism (BM) for maximum dispatch revenue.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="section-divider">
+
+  <!-- ══════════════════════════════════════════
+       CONTACT SECTION
+       ══════════════════════════════════════════ -->
+  <section id="contact" class="fade-in" style="background: var(--surface); padding-bottom: 60px;">
+    <div class="container">
+      <div class="section-label">Contact</div>
+      <h2 class="section-title">Get in Touch</h2>
+      <p class="section-desc">Discuss virtual power plant integrations, fleet hosting, or investment opportunities.</p>
+      
+      <div class="contact-grid">
+        <div class="glass-card" style="display: flex; flex-direction: column; justify-content: center;">
+          <h3 class="card-title">Corporate Headquarters</h3>
+          <p class="card-text" style="margin-bottom: 20px;">
+            <strong>Dovecote Systems Ltd</strong><br>
+            Company No. 17160178<br>
+            Southampton, Southern England (Region H)
+          </p>
+          <p class="card-text">
+            Email: <a href="mailto:info@doesnthavetocosttheearth.com">info@doesnthavetocosttheearth.com</a><br>
+            Web: <a href="https://doesnthavetocosttheearth.com">doesnthavetocosttheearth.com</a>
+          </p>
+        </div>
+        
+        <div class="glass-card">
+          <form id="contact-form" onsubmit="event.preventDefault(); alert('Thank you for your message. Dovecote Systems will contact you shortly.');">
+            <div style="margin-bottom: 12px;">
+              <label style="display: block; font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Name</label>
+              <input type="text" required placeholder="Your Name">
+            </div>
+            <div style="margin-bottom: 12px;">
+              <label style="display: block; font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Email</label>
+              <input type="email" required placeholder="you@example.com">
+            </div>
+            <div style="margin-bottom: 16px;">
+              <label style="display: block; font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Message</label>
+              <textarea required rows="4" placeholder="How can we help you?"></textarea>
+            </div>
+            <button type="submit" class="btn-primary">Send Message</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════
+       FOOTER
+       ══════════════════════════════════════════ -->
+  <footer class="footer">
+    <div class="footer-company" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--green); flex-shrink: 0;">
+        <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+        <path d="M9 3v18"></path>
+        <path d="M15 3v18"></path>
+        <path d="M3 9h18"></path>
+        <path d="M3 15h18"></path>
+      </svg>
+      DOVECOTE SYSTEMS
+    </div>
+    <div class="footer-details">Southampton, Southern England | Registered Company No. 17160178</div>
+    <div class="footer-details">Director: Matthew Brander</div>
+    <div class="footer-copy">&copy; 2026 Dovecote Systems Ltd. All rights reserved. Doesn't have to cost the earth.</div>
+  </footer>
+
+  <!-- ══════════════════════════════════════════
+       JAVASCRIPT
+       ══════════════════════════════════════════ -->
+  <script>
+    // 1. Mobile Menu Toggle
+    const hamburger = document.querySelector('.nav-hamburger');
+    const navLinks = document.querySelector('.nav-links');
+
+    hamburger.addEventListener('click', () => {
+      navLinks.classList.toggle('active');
+      hamburger.textContent = navLinks.classList.contains('active') ? '✕' : '☰';
+    });
+
+    document.querySelectorAll('.nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        navLinks.classList.remove('active');
+        hamburger.textContent = '☰';
+      });
+    });
+
+    // 2. Interactive Schematic Tabs
+    function switchTab(tabId) {
+      document.querySelectorAll('.tech-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      document.querySelectorAll('.tech-tab-content').forEach(content => {
+        content.classList.remove('active');
+      });
+
+      const clickedBtn = Array.from(document.querySelectorAll('.tech-tab-btn')).find(btn => btn.innerText.toLowerCase().includes(tabId));
+      if (clickedBtn) clickedBtn.classList.add('active');
+      
+      const contentEl = document.getElementById(`tab-${tabId}`);
+      if (contentEl) contentEl.classList.add('active');
+    }
+
+    // 3. IntersectionObserver for Scroll Animations
+    const fadeObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    });
+
+    document.querySelectorAll('.fade-in').forEach(element => {
+      fadeObserver.observe(element);
+    });
+
+    // 4. Eased Number Counter Animations
+    const animateCounters = (entries, observer) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const target = entry.target;
+          const targetVal = parseFloat(target.getAttribute('data-target'));
+          const duration = 2000;
+          const startTime = performance.now();
+          
+          const updateNumber = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            const easeProgress = progress * (2 - progress);
+            const currentVal = targetVal * easeProgress;
+            
+            if (target.getAttribute('data-format') === 'currency') {
+              target.innerText = '£' + Math.floor(currentVal).toLocaleString();
+            } else if (target.getAttribute('data-format') === 'percent') {
+              target.innerText = Math.floor(currentVal) + '%';
+            } else if (target.getAttribute('data-format') === 'decimal') {
+              target.innerText = currentVal.toFixed(1);
+            } else {
+              target.innerText = Math.floor(currentVal);
+            }
+            
+            if (progress < 1) {
+              requestAnimationFrame(updateNumber);
+            } else {
+              if (target.getAttribute('data-format') === 'currency') {
+                target.innerText = '£' + targetVal.toLocaleString();
+              } else if (target.getAttribute('data-format') === 'percent') {
+                target.innerText = targetVal + '%';
+              } else if (target.getAttribute('data-format') === 'decimal') {
+                target.innerText = targetVal.toFixed(1);
+              } else {
+                target.innerText = targetVal;
+              }
+            }
+          };
+          
+          requestAnimationFrame(updateNumber);
+          observer.unobserve(target);
+        }
+      });
+    };
+
+    const counterObserver = new IntersectionObserver(animateCounters, { threshold: 0.1 });
+    document.querySelectorAll('.spec-number[data-target]').forEach(counter => {
+      counterObserver.observe(counter);
+    });
+
+    // 5. Matrix Canvas Logo Animation
+    const canvas = document.getElementById('logo-canvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.querySelector('.logo-container');
+
+    const grid = [
+      ['D', 'O', 'E', 'S', 'N', 'T'],
+      ['H', 'A', 'V', 'E', ' ', ' '],
+      ['T', 'O', ' ', ' ', ' ', ' '],
+      ['C', 'O', 'S', 'T', ' ', ' '],
+      ['T', 'H', 'E', ' ', ' ', ' '],
+      ['E', 'A', 'R', 'T', 'H', ' ']
+    ];
+
+    const cols = 6;
+    const rows = 6;
+    const cellSize = 50;
+
+    ctx.font = "24px 'Courier Prime', 'Courier New', monospace";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const matrixChars = "ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    const cells = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        cells.push({
+          row: r,
+          col: c,
+          targetChar: grid[r][c],
+          currentChar: '',
+          isResolved: false
+        });
+      }
+    }
+
+    const droplets = Array(cols).fill(0).map(() => ({
+      y: -Math.random() * 5,
+      speed: 0.12 + Math.random() * 0.1
+    }));
+
+    let phase = 'scramble';
+    let phaseStartTime = Date.now();
+    let resolveOrder = [];
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function startScramble() {
+      phase = 'scramble';
+      phaseStartTime = Date.now();
+      container.classList.remove('pulse-glow');
+      cells.forEach(cell => {
+        cell.isResolved = false;
+        cell.currentChar = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+      });
+      droplets.forEach(d => {
+        d.y = -Math.random() * 5;
+      });
+      resolveOrder = shuffle([...Array(36).keys()]);
+    }
+
+    startScramble();
+
+    function updateAndDraw() {
+      const now = Date.now();
+      const elapsed = now - phaseStartTime;
+
+      // Clean background clear: solid black in hold phase to wipe ghost trails, semi-transparent in scramble/resolve for trails
+      if (phase === 'hold') {
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, 300, 300);
+      } else {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+        ctx.fillRect(0, 0, 300, 300);
+      }
+
+      // Force-apply explicit text rendering states every single frame to prevent fallback resets
+      ctx.font = "26px 'Courier Prime', 'Courier New', monospace";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Rain droplets movement
+      droplets.forEach(d => {
+        d.y += d.speed;
+        if (d.y > rows + 5) {
+          d.y = -5;
+          d.speed = 0.12 + Math.random() * 0.1;
+        }
+      });
+
+      if (phase === 'scramble') {
+        if (elapsed > 3000) {
+          phase = 'resolve';
+          phaseStartTime = now;
+        }
+      } else if (phase === 'resolve') {
+        const resolveElapsed = now - phaseStartTime;
+        const numToResolve = Math.min(36, Math.floor((resolveElapsed / 1500) * 36));
+        
+        for (let i = 0; i < numToResolve; i++) {
+          const cellIndex = resolveOrder[i];
+          cells[cellIndex].isResolved = true;
+        }
+
+        if (numToResolve === 36) {
+          phase = 'hold';
+          phaseStartTime = now;
+          container.classList.add('pulse-glow');
+        }
+      } else if (phase === 'hold') {
+        if (elapsed > 5000) {
+          startScramble();
+        }
+      }
+
+      // Render cells
+      cells.forEach(cell => {
+        const x = cell.col * cellSize + cellSize / 2;
+        // Shift y slightly down (+2.5px) to correct vertical font metrics centering
+        const y = cell.row * cellSize + cellSize / 2 + 2.5;
+
+        if (cell.isResolved) {
+          ctx.fillStyle = '#83f52c';
+          ctx.shadowColor = '#83f52c';
+          ctx.shadowBlur = 8;
+          ctx.fillText(cell.targetChar, x, y);
+          ctx.shadowBlur = 0;
+        } else {
+          const droplet = droplets[cell.col];
+          const distance = Math.abs(droplet.y - cell.row);
+          
+          if (Math.random() < 0.15) {
+            cell.currentChar = matrixChars[Math.floor(Math.random() * matrixChars.length)];
+          }
+
+          if (distance < 2.5) {
+            const brightness = 1 - (distance / 2.5);
+            ctx.fillStyle = `rgba(131, 245, 44, ${brightness})`;
+            ctx.shadowColor = '#83f52c';
+            ctx.shadowBlur = 4;
+            ctx.fillText(cell.currentChar, x, y);
+            ctx.shadowBlur = 0;
+          } else {
+            ctx.fillStyle = 'rgba(25, 108, 46, 0.35)';
+            ctx.fillText(cell.currentChar, x, y);
+          }
+        }
+      });
+
+      // Render grid borders
+      ctx.strokeStyle = 'rgba(63, 185, 80, 0.2)';
+      ctx.lineWidth = 1;
+      
+      // Draw outer boundary box (slightly offset by 0.5px to prevent clipping)
+      ctx.strokeRect(0.5, 0.5, 299, 299);
+
+      // Draw inner grid lines
+      for (let i = 1; i < cols; i++) {
+        // Vertical lines
+        ctx.beginPath();
+        ctx.moveTo(i * cellSize, 0);
+        ctx.lineTo(i * cellSize, 300);
+        ctx.stroke();
+
+        // Horizontal lines
+        ctx.beginPath();
+        ctx.moveTo(0, i * cellSize);
+        ctx.lineTo(300, i * cellSize);
+        ctx.stroke();
+      }
+
+      requestAnimationFrame(updateAndDraw);
+    }
+
+    requestAnimationFrame(updateAndDraw);
+  </script>
+</body>
+</html>

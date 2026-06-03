@@ -1,8 +1,9 @@
-# NODE-3 Energy Arbitrage Portal
+# NODE-3 Energy Arbitrage Platform & Website
 
-Real-time battery arbitrage dashboard for a single residential Octopus Agile installation.
+Public-facing landing page and real-time battery arbitrage operator portal for Dovecote Systems.
 
-**Live portal:** [View on GitHub Pages](https://mb43.github.io/node3-arbitrage/)
+**Live website:** [doesnthavetocosttheearth.com](https://doesnthavetocosttheearth.com/)
+**Live operator portal:** [doesnthavetocosttheearth.com/dashboard.html](https://doesnthavetocosttheearth.com/dashboard.html) (GitHub Pages) or [portal.doesnthavetocosttheearth.com](https://portal.doesnthavetocosttheearth.com/) (Pi API reverse proxy)
 
 ---
 
@@ -72,6 +73,11 @@ A=Eastern · B=East Midlands · C=London · D=N Wales/Merseyside · E=Midlands �
 ## Architecture
 
 ```
+index.html           Public-facing landing page for Dovecote Systems (doesnthavetocosttheearth.com).
+style.css            Unified CSS design system (dark mode, glassmorphism, responsive utilities).
+dashboard.html       Self-contained operator portal. Displays live telemetry from server,
+                     historical backtest graphs, and rolling 48-slot dispatch schedules.
+
 simulate.py          Rolling-window optimiser + slot simulator. Writes history.csv.
                      Runs every 30 min via GitHub Actions cron.
 
@@ -82,10 +88,6 @@ server.py            Flask REST API + backtest engine.
   /api/backtest      12-month historical backtest (Python, cached 24h)
   /api/trigger       Manually trigger simulate.py (GET=single, POST?mode=backfill)
   /api/status        Server health + data freshness
-
-dashboard.html       Self-contained portal. Live data from server. Historical
-                     backtest from /api/backtest (Python). Forward 48-slot
-                     schedule computed client-side for real-time display only.
 
 .github/workflows/   simulate.yml — 30-min cron + GitHub Pages deploy
 ```

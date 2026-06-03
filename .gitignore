@@ -15,5 +15,10 @@ Dockerfile
 *.env
 # Exclude runtime data
 *.json
+!package.json
+!package-lock.json
 *.csv
 data/
+
+# Frontend dependencies
+node_modules/
