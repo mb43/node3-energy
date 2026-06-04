@@ -747,6 +747,20 @@
     const rows = 6;
     const cellSize = 50;
 
+    // Helper to check if a cell contains a letter in "DOVECOTE"
+    const isDovecoteLetter = (row, col) => {
+      return (
+        (row === 0 && col === 0) || // D
+        (row === 0 && col === 1) || // O
+        (row === 1 && col === 2) || // V
+        (row === 1 && col === 3) || // E
+        (row === 3 && col === 0) || // C
+        (row === 3 && col === 1) || // O
+        (row === 4 && col === 0) || // T
+        (row === 4 && col === 2)    // E
+      );
+    };
+
     ctx.font = "24px 'Courier Prime', 'Courier New', monospace";
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -857,10 +871,21 @@
         // Shift y slightly down (+2.5px) to correct vertical font metrics centering
         const y = cell.row * cellSize + cellSize / 2 + 2.5;
 
+        // Reset to default font at the start of each cell drawing to prevent bold bleeding
+        ctx.font = "26px 'Courier Prime', 'Courier New', monospace";
+
         if (cell.isResolved) {
-          ctx.fillStyle = '#83f52c';
-          ctx.shadowColor = '#83f52c';
-          ctx.shadowBlur = 8;
+          const isBold = isDovecoteLetter(cell.row, cell.col);
+          if (isBold) {
+            ctx.font = "bold 26px 'Courier Prime', 'Courier New', monospace";
+            ctx.fillStyle = '#ffffff'; // Super-bright white for the bold contrast
+            ctx.shadowColor = '#83f52c'; // Neon green glow
+            ctx.shadowBlur = 12;
+          } else {
+            ctx.fillStyle = '#83f52c';
+            ctx.shadowColor = '#83f52c';
+            ctx.shadowBlur = 8;
+          }
           ctx.fillText(cell.targetChar, x, y);
           ctx.shadowBlur = 0;
         } else {
