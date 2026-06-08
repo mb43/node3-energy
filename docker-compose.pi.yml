@@ -1,0 +1,24 @@
+# Pi production override
+# Adds USB device access for RS485 and (optionally) T-2CAN debug serial
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.pi.yml up -d
+#
+# BEFORE RUNNING:
+#   - Plug JZK USB-RS485 adapter into Pi first   → will appear as /dev/ttyUSB0
+#   - Plug T-2CAN USB into Pi second             → will appear as /dev/ttyUSB1
+#     (order determines assignment — verify with: ls -la /dev/ttyUSB*)
+#
+# If only RS485 is plugged in, only ttyUSB0 will exist.
+# Comment out any device line that doesn't yet exist on the Pi or
+# Docker will refuse to start with "no such file or directory".
+
+services:
+  node3:
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0   # JZK USB-RS485 → FoxESS RS485 com port (Modbus RTU)
+    environment:
+      # Override the port to match what the Pi actually sees
+      # Verify device assignment with:  ls -la /dev/ttyUSB*
+      # then adjust to match (ttyUSB0 or ttyUSB1)
+      - FOXESS_RS485_PORT=/dev/ttyUSB0
