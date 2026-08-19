@@ -17,7 +17,7 @@ import subprocess
 import sys
 import threading
 from datetime import datetime, timedelta, timezone
-from flask import Flask, jsonify, send_file, Response, request
+from flask import Flask, jsonify, send_file, Response, request, abort
 from flask_cors import CORS
 import node3_config as _cfg
 
@@ -524,6 +524,29 @@ def index():
 @app.route("/NODE3_Schematic.html")
 def schematic():
     return send_file(os.path.join(BASE_DIR, "NODE3_Schematic.html"))
+
+
+# Diagram assets the schematic/tech pages pull in via <img src="...">. There's
+# no general static-file route in this app (deliberately — avoids exposing the
+# whole BASE_DIR), so every image NODE3_Schematic.html / index.html reference
+# needs an entry in this whitelist or it 404s even though the file sits right
+# there on disk. This was exactly why the schematic page kept "moaning about
+# missing files" — the routes for these never existed, and separately the
+# Dockerfile never copied them into the image either (fixed alongside this).
+_SCHEMATIC_ASSETS = {
+    "NODE3_DEFINITIVE_Schematic.svg",
+    "NODE3_LV_Wiring_Schematic.svg",
+    "NODE3_DEFINITIVE_BoxLayout.svg",
+    "NODE3_Distributed_Topology.svg",
+    "NODE3_Wall_Elevation.svg",
+    "NODE3_G99_SLD_DSL-SLD-001_RevA_preview.png",
+}
+
+@app.route("/<string:asset_name>")
+def schematic_asset(asset_name):
+    if asset_name not in _SCHEMATIC_ASSETS:
+        abort(404)
+    return send_file(os.path.join(BASE_DIR, asset_name))
 
 
 @app.route("/api/node")
