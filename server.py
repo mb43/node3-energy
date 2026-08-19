@@ -19,9 +19,15 @@ import threading
 from datetime import datetime, timedelta, timezone
 from flask import Flask, jsonify, send_file, Response, request
 from flask_cors import CORS
+import node3_config as _cfg
 
 app = Flask(__name__)
 CORS(app)
+
+# Shared runtime settings (battery capacity, import/export rates) — single
+# source of truth, see node3_config.py. Loaded once at import; each request
+# that needs current values re-reads via _cfg.load_config() so /api/settings
+# updates take effect without a restart.
 
 # ─────────────────────────────────────────────
 # BATTERY-EMULATOR MQTT — real SOC feed
@@ -46,8 +52,8 @@ def _on_battery_message(client, userdata, msg):
         soc_pct = payload.get("SOC") or payload.get("soc")
         if soc_pct is None:
             return
-        # Convert % to kWh (battery = 72 kWh nominal)
-        battery_kwh = 72.0
+        # Convert % to kWh using the configured battery capacity (node3_config)
+        battery_kwh = _cfg.load_config()["battery_kwh"]
         soc_kwh = round(float(soc_pct) / 100.0 * battery_kwh, 2)
 
         state_path = os.path.join(BASE_DIR, "fleet_state.json")
@@ -204,23 +210,26 @@ def normalize_state(state):
 
 # ─────────────────────────────────────────────
 # BACKTEST ENGINE
-# Single-source-of-truth algorithm — same logic as simulate.py.
+# Actually uses simulate.py's LP-optimal plan_optimal_dispatch() now (fixed 19
+# Aug 2026) — it previously claimed to be "the same logic as simulate.py" but
+# was in fact a pure percentile-threshold heuristic with no LP/scipy
+# involvement whatsoever, directly violating Matt's standing "LP dispatch is
+# permanent, never revert to greedy/percentile" rule for the headline
+# "12-month backtest" figure the dashboard shows next to the live 24hr number.
 # Called by /api/backtest; result cached 24h in backtest_cache.json.
 # ─────────────────────────────────────────────
+import simulate as _sim   # reuse the real LP dispatch engine — do not re-implement it here
 
-# Constants must match simulate.py
-_BT_BATTERY_KWH      = 72.0
-_BT_MIN_SOC_KWH      = 7.2
-_BT_CHARGE_KWH_SLOT  = 5.25          # inverter max: FoxESS KH10.5 @ 10.5kW × 0.5h (NOT export-capped)
-_BT_EXPORT_KWH       = 3.68          # G98 single-phase export cap per slot
+# Battery/rate constants now sourced from node3_config (single source of
+# truth, see node3_config.py) instead of a hand-typed, drifted-out-of-sync
+# copy. _BT_CHARGE_KWH_SLOT/_BT_EXPORT_KWH are re-read fresh at the top of
+# _run_backtest() each call so a settings change takes effect without a
+# restart.
 _BT_RTE              = 0.88          # round-trip efficiency
-_BT_BUY_PCT          = 35
-_BT_SELL_PCT         = 60
 _BT_VLP_P            = 40.0          # Very Large Price threshold
 _BT_EXPORT_DEF_P     = 15.0          # flat fallback when live export prices absent
 _BT_DAILY_LOAD_KWH   = 12.0
 _BT_SVT_REF_P        = 25.0          # Ofgem Standard Variable Tariff reference
-_BT_MIN_PROFIT_P     = 3.0           # min net p/kWh after RTE before charging
 _BT_REGION           = os.environ.get("AGILE_REGION", "H")  # Southern England
 
 # Elexon PC1 half-hourly load profile — identical to JavaScript HOME_LOAD_PROFILE
@@ -234,14 +243,6 @@ _PC1_RAW = [
 ]
 _PC1_SUM     = sum(_PC1_RAW)
 _PC1_PROFILE = [v / _PC1_SUM for v in _PC1_RAW]
-
-
-def _bt_percentile(values, pct):
-    if not values:
-        return 0.0
-    s = sorted(values)
-    idx = max(0, min(len(s) - 1, int(len(s) * pct / 100)))
-    return s[idx]
 
 
 def _bt_home_load(dt_utc):
@@ -284,10 +285,13 @@ def _bt_discover(is_export=False):
 
 def _run_backtest(months=12):
     """
-    Fetch 12 months of Octopus Agile import + export prices and run the
-    rolling-window arbitrage simulation.  This is the ONLY implementation
-    of the algorithm — simulate.py, the live forward schedule, and this
-    backtest all share the same constants and logic.
+    Fetch 12 months of Octopus Agile import + export prices and replay them
+    through simulate.py's real LP-optimal plan_optimal_dispatch() (fixed 19
+    Aug 2026 — this used to be a hand-rolled percentile-threshold heuristic
+    that never touched scipy at all, despite the comment here previously
+    claiming otherwise). Replans every 96 slots (48h) with a 96-slot lookahead,
+    using the real running SOC — the same cadence and inputs the live system
+    uses when fresh Agile prices are published once daily.
 
     Returns a dict matching the format expected by dashboard.html's
     renderHistoricalResults() function.
@@ -328,7 +332,17 @@ def _run_backtest(months=12):
     def get_exp(slot):
         return ep_map.get(slot['valid_from'][:16], _BT_EXPORT_DEF_P)
 
-    # ── Rolling-window simulation ─────────────────────────────
+    # ── LP-optimal simulation ──────────────────────────────────
+    # Replans with simulate.py's real plan_optimal_dispatch() every time the
+    # plan runs out (every 96 slots / 48h, since each replan covers a 96-slot
+    # lookahead window), using the actual running SOC as the starting point —
+    # not a per-slot percentile threshold.
+    _bt_cfg           = _cfg.load_config()
+    _BT_BATTERY_KWH   = _bt_cfg["battery_kwh"]
+    _BT_MIN_SOC_KWH   = _BT_BATTERY_KWH * (_bt_cfg["min_soc_pct"] / 100.0)
+    _BT_EXPORT_KWH    = _bt_cfg["export_kw"] * 0.5
+    _BT_CHARGE_KWH_SLOT = _bt_cfg["import_kw"] * 0.5
+
     n   = len(import_prices)
     soc = _BT_BATTERY_KWH * 0.5   # start at 50% SOC
 
@@ -341,6 +355,8 @@ def _run_backtest(months=12):
     total_sell_slots     = 0
     monthly              = {}
 
+    dispatch_plan = {}   # valid_from -> 'charge' | 'discharge' | 'idle', filled as we go
+
     for idx in range(n):
         slot  = import_prices[idx]
         price = float(slot['value_inc_vat'])
@@ -348,20 +364,17 @@ def _run_backtest(months=12):
         dt    = datetime.fromisoformat(vf)
         key   = dt.strftime('%Y-%m')
 
-        # Rolling 48-slot lookahead window
-        w_end   = min(idx + 48, n)
-        window  = import_prices[idx:w_end]
-        w_vals  = [float(s['value_inc_vat']) for s in window]
-
-        buy_pct_thr  = _bt_percentile(w_vals, _BT_BUY_PCT)
-        sell_pct_thr = _bt_percentile(w_vals, _BT_SELL_PCT)
-
-        # Dynamic buy ceiling: best export in window × RTE − min_profit
-        # Prevents charging when no profitable export opportunity exists.
-        best_exp  = max((get_exp(s) for s in window), default=_BT_EXPORT_DEF_P)
-        dyn_ceil  = best_exp * _BT_RTE - _BT_MIN_PROFIT_P
-        fwd_buy   = min(buy_pct_thr, dyn_ceil) if dyn_ceil > 0 else -math.inf
-        fwd_sell  = sell_pct_thr
+        # Replan (real LP, not a heuristic) whenever we've run off the end of
+        # the current plan — happens every 96 slots by construction (the window
+        # requested below is 96 slots wide).
+        if slot['valid_from'] not in dispatch_plan:
+            window = import_prices[idx: idx + 96]
+            dispatch_plan.update(
+                _sim.plan_optimal_dispatch(window, soc, battery_kwh=_BT_BATTERY_KWH,
+                                            min_soc_kwh=_BT_MIN_SOC_KWH,
+                                            export_kwh_cap=_BT_EXPORT_KWH)
+            )
+        planned = dispatch_plan.get(slot['valid_from'])
 
         # Initialise month bucket
         if key not in monthly:
@@ -371,48 +384,50 @@ def _run_backtest(months=12):
                 'priceSum': 0.0, 'buyPriceSum': 0.0, 'sellPriceSum': 0.0,
                 'chargeKwh': 0.0, 'dischargeKwh': 0.0,
                 'homeEnergySaved': 0.0, 'homeEnergyAccum': 0.0, 'homeKwh': 0.0,
-                'buyThrSum': 0.0, 'sellThrSum': 0.0,
                 'socMin': float('inf'), 'socMax': float('-inf'),
             }
 
         mo             = monthly[key]
         mo['slots']   += 1
         mo['priceSum'] += price
-        if math.isfinite(fwd_buy):
-            mo['buyThrSum'] += fwd_buy
-        mo['sellThrSum'] += fwd_sell
 
         slot_profit   = 0.0
-        always_charge = price < 0
         is_vlp        = price >= _BT_VLP_P
         home_load     = _bt_home_load(dt)
 
-        if is_vlp and soc > _BT_MIN_SOC_KWH + 0.1:
-            # VLP: serve house first, then export remainder up to DNO export cap.
-            # DNO cap (_BT_EXPORT_KWH) is a GRID export limit only — house serving
-            # is local (behind the meter) and does NOT reduce the export headroom.
-            avail     = soc - _BT_MIN_SOC_KWH
-            house     = min(home_load, avail)
-            grid_disc = min(_BT_EXPORT_KWH, max(0.0, avail - house))
-            moved     = house + grid_disc
-            if moved > 0.01:
-                soc -= moved
-                if house > 0.01:
-                    slot_profit += house * price / 100.0
-                if grid_disc > 0.01:
-                    exp_p = get_exp(slot)
-                    income = grid_disc * _BT_RTE * exp_p / 100.0
-                    slot_profit           += income
-                    mo['exportIncome']    += income
-                    mo['sellSlots']       += 1
-                    mo['sellPriceSum']    += exp_p
-                    mo['dischargeKwh']    += grid_disc
-                    total_export_income   += income
-                    total_discharge_kwh   += grid_disc
-                    total_sell_price_sum  += exp_p
-                    total_sell_slots      += 1
+        # Home load ALWAYS drains SOC, every slot — matching simulate.py's
+        # simulate_slot() exactly (see its comment: "home load already
+        # deducted from SOC above. Do NOT re-deduct house_served here — that
+        # was the previous double-deduction bug"). Previously this backtest
+        # only drained SOC for home load during VLP slots and separately
+        # "sold" the avoided import as revenue — a different, inconsistent
+        # physical model from the live system, found + fixed 19 Aug 2026 so
+        # the 12-month backtest's SOC trajectory (and therefore its
+        # charge/discharge decisions) genuinely matches live behaviour. The
+        # separate 'homeEnergySaved' stat below (Agile vs SVT) is unaffected
+        # — that's an independent informational figure, not part of the SOC/
+        # dispatch mechanics.
+        soc = max(0.0, soc - home_load)
 
-        elif always_charge or price <= fwd_buy:
+        if is_vlp and soc > _BT_MIN_SOC_KWH + 0.1:
+            # VLP: export whatever's available above the reserve floor.
+            avail     = soc - _BT_MIN_SOC_KWH
+            grid_disc = min(_BT_EXPORT_KWH, avail)
+            if grid_disc > 0.01:
+                exp_p = get_exp(slot)
+                income = grid_disc * _BT_RTE * exp_p / 100.0
+                soc                   -= grid_disc
+                slot_profit           += income
+                mo['exportIncome']    += income
+                mo['sellSlots']       += 1
+                mo['sellPriceSum']    += exp_p
+                mo['dischargeKwh']    += grid_disc
+                total_export_income   += income
+                total_discharge_kwh   += grid_disc
+                total_sell_price_sum  += exp_p
+                total_sell_slots      += 1
+
+        elif planned == 'charge':
             charge = min(_BT_CHARGE_KWH_SLOT, _BT_BATTERY_KWH - soc)
             if charge > 0.01:
                 soc               += charge
@@ -425,7 +440,7 @@ def _run_backtest(months=12):
                 total_charge_cost += cost
                 total_charge_kwh  += charge
 
-        elif price >= fwd_sell and soc > _BT_MIN_SOC_KWH + 0.1:
+        elif planned == 'discharge' and soc > _BT_MIN_SOC_KWH + 0.1:
             avail = soc - _BT_MIN_SOC_KWH
             disc  = min(_BT_EXPORT_KWH, avail)
             if disc > 0.01:
@@ -455,9 +470,13 @@ def _run_backtest(months=12):
         total_home_saved       += home_val
 
     # ── Post-process monthly averages ────────────────────────
+    # buyThr/sellThr previously meant "percentile threshold" under the old
+    # heuristic; under LP dispatch there's no fixed threshold, so these now
+    # report the actual average price paid/received on executed charge/sell
+    # slots that month instead — more meaningful for the chart that plots them.
     for m in monthly.values():
-        m['buyThr']  = m['buyThrSum']  / m['slots'] if m['slots'] > 0 else 0.0
-        m['sellThr'] = m['sellThrSum'] / m['slots'] if m['slots'] > 0 else 0.0
+        m['buyThr']  = m['buyPriceSum']  / m['chargeSlots'] if m['chargeSlots'] > 0 else 0.0
+        m['sellThr'] = m['sellPriceSum'] / m['sellSlots']   if m['sellSlots']   > 0 else 0.0
         if not math.isfinite(m['socMin']): m['socMin'] = 0.0
         if not math.isfinite(m['socMax']): m['socMax'] = 0.0
 
@@ -491,7 +510,15 @@ def _run_backtest(months=12):
 # ─────────────────────────────────────────────
 @app.route("/")
 def index():
-    return send_file(os.path.join(BASE_DIR, "dashboard.html"))
+    # Explicit no-store — dashboard.html is edited/live-mounted frequently and
+    # Matt has been bitten by a stale browser copy hiding new features (e.g.
+    # the ⚙ SETTINGS button) that were already live on disk. Flask's default
+    # send_file() relies on conditional GET (Last-Modified/ETag), which is
+    # usually fine but gives the browser room to serve straight from disk
+    # cache on a plain reload — force it to always re-fetch.
+    resp = send_file(os.path.join(BASE_DIR, "dashboard.html"))
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return resp
 
 
 @app.route("/NODE3_Schematic.html")
@@ -524,6 +551,46 @@ def api_history():
     """Historical simulation results — up to 200 rows."""
     limit = request.args.get("limit", 200, type=int)
     return jsonify(load_history(max_rows=limit))
+
+
+@app.route("/api/settings", methods=["GET", "POST"])
+def api_settings():
+    """
+    Operator-configurable physical parameters — battery capacity, import
+    (charge) rate, export (discharge) rate, min SOC floor. Single source of
+    truth (node3_config.py / node3_config.json) read by simulate.py and every
+    dispatch/backtest engine in this file. Defaults: 72kWh / 10kW / 6kW.
+
+    GET  -> current settings
+    POST -> JSON body with any subset of {battery_kwh, import_kw, export_kw,
+            min_soc_pct}; merges onto existing settings and persists. Takes
+            effect on the NEXT simulate.py run (it reads config at import
+            time) and immediately for server.py's own endpoints (which
+            re-read config per request).
+    """
+    if request.method == "GET":
+        return jsonify(_cfg.load_config())
+
+    if not _check_api_key():
+        return jsonify({"error": "invalid or missing API key"}), 401
+
+    body = request.get_json(silent=True) or {}
+    updates = {}
+    for key in ("battery_kwh", "import_kw", "export_kw", "min_soc_pct"):
+        if key in body:
+            try:
+                v = float(body[key])
+            except (TypeError, ValueError):
+                return jsonify({"error": f"{key} must be numeric"}), 400
+            if v <= 0:
+                return jsonify({"error": f"{key} must be > 0"}), 400
+            updates[key] = v
+    if not updates:
+        return jsonify({"error": "no valid settings fields in request body"}), 400
+
+    merged = _cfg.save_config(updates)
+    print(f"[SETTINGS] Updated: {updates} -> {merged}")
+    return jsonify(merged)
 
 
 @app.route("/api/status")
@@ -608,17 +675,32 @@ def api_plan():
             "exportP": round(exp, 4),
         })
 
-    # Annotate with forward SoC simulation (Python constants)
-    # Asymmetric rates: FoxESS KH10.5 charges at inverter max (5.25 kWh/slot).
-    # Export is DNO-capped: G98 = 3.68 kWh/slot (32A), G99 = 5.75 kWh/slot (50A).
-    # Charging rate is the same in both scenarios — only export cap changes.
-    CHARGE_KWH      = 5.25   # inverter max: FoxESS KH10.5 @ 10.5kW × 0.5h
-    EXPORT_KWH_G98  = 3.68   # G98 DNO export cap (active)
-    EXPORT_KWH_G99  = 5.75   # G99 DNO export cap (pending ref 260420-000198)
+    # Annotate with forward SoC simulation. Rates now sourced from node3_config
+    # (single source of truth — see node3_config.py) instead of a hardcoded
+    # copy that had drifted to CHARGE_KWH=5.25 regardless of the active export
+    # cap, a repeat of a bug Matt had already ordered fixed once before.
+    # G98 (Matt's actual live connection) uses the configurable import/export
+    # settings. G99 stays a fixed, real DNO-defined figure (50A/5.75kWh per
+    # slot) for the comparison scenario — it's a different physical grid
+    # connection, not a tunable operating choice.
+    _plan_cfg       = _cfg.load_config()
+    BAT_KWH         = _plan_cfg["battery_kwh"]
+    MIN_SOC         = BAT_KWH * (_plan_cfg["min_soc_pct"] / 100.0)
+    CHARGE_KWH      = _plan_cfg["import_kw"] * 0.5    # configurable charge rate
+    EXPORT_KWH_G98  = _plan_cfg["export_kw"] * 0.5    # configurable export rate
+    EXPORT_KWH_G99  = 5.75   # fixed — G99 DNO export cap (pending ref 260420-000198)
     RTE             = 0.88
-    BAT_KWH         = 72.0
-    MIN_SOC         = 7.2
-    DAILY_LOAD_KWH  = 12.0   # homeowner allowance: 12 kWh/day free, excess billed at cost
+    # DAILY_LOAD_KWH is the assumed PHYSICAL home consumption (drains the
+    # battery every slot in the SOC trace below) — separate from the BILLING
+    # free allowance (FREE_ALLOWANCE_KWH). These used to be the same number
+    # (12.0) by coincidence, which meant excess_kwh below was ALWAYS zero —
+    # the free allowance exactly matched modelled consumption, so nothing
+    # ever fell into the "billed at cost" bracket. Matt's tariff design
+    # (19 Aug): homeowner gets 10 kWh/day free from the battery; anything
+    # the house draws above that, Dovecote bills back at avg buy price +10%.
+    DAILY_LOAD_KWH      = 12.0   # modelled physical home consumption (kWh/day)
+    FREE_ALLOWANCE_KWH  = 10.0   # homeowner's free-from-battery allowance (kWh/day)
+    EXCESS_MARKUP        = 1.10  # excess billed at avg buy price × this (10% margin)
     LOAD_PER_SLOT   = DAILY_LOAD_KWH / 48.0
 
     raw   = load_json("fleet_state.json") or {}
@@ -657,17 +739,20 @@ def api_plan():
 
         s["planSoc"] = round(soc, 2)
 
-    # House load within the free 12 kWh/day allowance → Dovecote absorbs it
-    # Excess above allowance → homeowner pays back at cost (recovery offsets Dovecote's spend)
+    # House load within the free 10 kWh/day allowance → Dovecote absorbs it.
+    # Anything the house draws above that allowance → homeowner pays it back
+    # at avg buy price + 10% (Dovecote's margin on the excess), not at cost.
     house_load_kwh_total  = LOAD_PER_SLOT * n_slots
     house_days            = n_slots / 48.0
-    free_allowance_kwh    = DAILY_LOAD_KWH * house_days          # e.g. 1.3125 days = 15.75 kWh
+    free_allowance_kwh    = FREE_ALLOWANCE_KWH * house_days      # e.g. 1.3125 days = 13.125 kWh
     excess_kwh            = max(0.0, house_load_kwh_total - free_allowance_kwh)
-    # For the planning window all load is within the allowance (free_allowance = total load)
-    # excess_kwh will be >0 only if the homeowner's actual usage exceeds the allowance
+    # Modelled consumption (DAILY_LOAD_KWH=12) now sits above the free
+    # allowance (FREE_ALLOWANCE_KWH=10) by design, so excess_kwh is
+    # genuinely >0 (≈2kWh/day) rather than always zero as it was when both
+    # constants were the same number.
     avg_import_p          = (total_charge_cost / (len(ch_slots) * CHARGE_KWH)
                              if ch_slots else sum(s["importP"] for s in slots) / n_slots)
-    house_recovery        = excess_kwh * avg_import_p / 100      # homeowner pays this back
+    house_recovery         = excess_kwh * avg_import_p * EXCESS_MARKUP / 100  # homeowner pays this back, +10% margin
     # hosting_cost = net electricity value given free to homeowner (their grid import savings)
     # Capped at 0 (can't be negative) and at total_charge_cost when no trades.
     hosting_cost_absorbed = max(0.0, min(house_load_cost - house_recovery, total_charge_cost))
@@ -679,8 +764,8 @@ def api_plan():
     arbitrage_net  = net_g98 - hosting_cost_absorbed             # Dovecote's share after hosting
 
     # ── G99 net — independent SOC simulation with G99 export cap, same charge rate ──
-    # Charge rate is unchanged (inverter-limited at 5.25 kWh/slot).
-    # Only export cap increases: 3.68 → 5.75 kWh/slot.
+    # Charge rate is unchanged (configurable import rate, default 5.0 kWh/slot).
+    # Only export cap increases: configurable G98 export → fixed 5.75 kWh/slot (G99).
     soc_g99        = float(state.get("soc_kwh", BAT_KWH * 0.5))
     total_rev_g99  = 0.0
     total_cost_g99 = 0.0
@@ -744,20 +829,29 @@ def api_backtest():
         try:
             with open(cache_path) as f:
                 cached = json.load(f)
-            age_h = (time.time() - cached.get('_cached_at', 0)) / 3600
+            cached_at = cached.get('_cached_at', 0)
+            age_h = (time.time() - cached_at) / 3600
             if age_h < 24:
                 print(f'[BACKTEST] Cache hit ({age_h:.1f}h old)')
-                return jsonify(cached['data'])
+                out = dict(cached['data'])
+                # Surface generation time in the payload itself — not just the
+                # server-side cache wrapper — so the dashboard can show the user
+                # exactly how fresh these numbers are instead of presenting them
+                # as unconditionally live. See stale-data watchdog, 19 Aug 2026.
+                out['_generated_at'] = datetime.fromtimestamp(cached_at, tz=timezone.utc).isoformat()
+                return jsonify(out)
         except Exception as e:
             print(f'[BACKTEST] Cache read error: {e}')
 
     try:
         data = _run_backtest()
+        now_ts = time.time()
         try:
             with open(cache_path, 'w') as f:
-                json.dump({'_cached_at': time.time(), 'data': data}, f)
+                json.dump({'_cached_at': now_ts, 'data': data}, f)
         except Exception as e:
             print(f'[BACKTEST] Cache write error: {e}')
+        data['_generated_at'] = datetime.fromtimestamp(now_ts, tz=timezone.utc).isoformat()
         return jsonify(data)
     except Exception as e:
         import traceback
@@ -775,7 +869,9 @@ def api_backtest_lp():
       - LP:    scipy HiGHS linear programme — globally optimal for the known 48-slot window
       - Greedy: percentile-threshold heuristic — matches the old algorithm
 
-    Uses symmetric G98 rates (3.68 kWh/slot charge & discharge).
+    Rates sourced from node3_config (single source of truth) — default 72kWh /
+    10kW import / 6kW export for G98; G99 export stays fixed at the real DNO
+    figure (50A/5.75kWh per slot) since it models a different grid connection.
     Results cached 24h in backtest_lp_cache.json.  Add ?force=1 to rerun.
     """
     cache_path = os.path.join(BASE_DIR, "backtest_lp_cache.json")
@@ -799,11 +895,14 @@ def api_backtest_lp():
         return jsonify({'error': 'scipy not installed — run docker compose build --no-cache'}), 500
 
     # ── Constants ────────────────────────────────────────────────────────────
-    BATTERY        = 72.0
-    MIN_SOC        = 7.2
-    CHARGE_KWH     = 5.25    # inverter max: FoxESS KH10.5 @ 10.5kW × 0.5h (both G98 & G99)
-    EXPORT_G98     = 3.68    # G98 DNO export cap: 32A × 230V × 0.5h
-    EXPORT_G99     = 5.75    # G99 DNO export cap: 50A × 230V × 0.5h (pending)
+    # Sourced from node3_config (single source of truth) instead of a
+    # hardcoded 5.25-vs-3.68 mismatch — see node3_config.py.
+    _lp_cfg        = _cfg.load_config()
+    BATTERY        = _lp_cfg["battery_kwh"]
+    MIN_SOC        = BATTERY * (_lp_cfg["min_soc_pct"] / 100.0)
+    CHARGE_KWH     = _lp_cfg["import_kw"] * 0.5   # configurable, both G98 & G99 (same inverter)
+    EXPORT_G98     = _lp_cfg["export_kw"] * 0.5   # configurable G98 export rate
+    EXPORT_G99     = 5.75    # fixed — G99 DNO export cap: 50A × 230V × 0.5h (pending)
     RTE            = 0.88
     VLP_P          = 40.0
     LOAD_DAY       = 12.0

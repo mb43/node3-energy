@@ -42,6 +42,7 @@ ENV VARS
 import os, json, time, hashlib, logging
 from datetime import datetime, timezone
 from pathlib import Path
+import node3_config as _cfg
 
 BASE_DIR           = Path(__file__).parent
 DISPATCH_PLAN_FILE = BASE_DIR / "dispatch_plan.json"
@@ -77,8 +78,45 @@ MODBUS_REG_SOC          = 0x0103   # R   battery SOC (%)
 # Work mode register values
 MODBUS_WM = {"SelfUse": 0, "ForceChg": 6, "ForceDischg": 7}
 
-# DNO export caps
-EXPORT_W = {"none": 0, "g98": 3680, "g99": 5750}
+# DNO export caps — FOUND BROKEN 19 Aug 2026: these were the kWh-per-HALF-HOUR-
+# SLOT figures (3.68kWh, 5.75kWh) multiplied by 1000 and mislabeled as Watts.
+# MODBUS_REG_EXPORT_LIMIT / feedInLimitPower both expect a continuous POWER
+# figure, not an energy-per-slot figure — converting kWh/half-hour -> continuous
+# W requires dividing by 0.5h (i.e. x2), which was never done. Every real
+# "full_export" command sent to the inverter was capping export at HALF the
+# legal/intended limit (fail-safe direction — under, not over — but a
+# persistent ~50% under-realisation of export revenue that was invisible from
+# the software side, since simulate.py/server.py have no knowledge that this
+# file was independently re-capping exports).
+#
+# Real DNO legal continuous power maxima (hard safety ceiling — NEVER send
+# more than this regardless of what node3_config's export_kw is set to):
+_G98_LEGAL_MAX_W = 7360    # 32A x 230V single-phase
+_G99_LEGAL_MAX_W = 11500   # 50A x 230V single-phase (pending ref 260420-000198)
+
+
+def get_export_w():
+    """
+    Export power cap (Watts) per mode, honouring the operator-configurable
+    export_kw setting (node3_config.json / /api/settings) for G98 — Matt's
+    actual live connection — while hard-clamping to the real legal maximum as
+    a safety backstop against a mistyped setting. G99 stays FIXED at the real
+    DNO figure (not tied to the configurable setting): it represents a
+    different physical grid connection, not a tunable operating choice — same
+    convention as simulate.py/server.py's EXPORT_KWH_G99.
+    """
+    try:
+        configured_w = _cfg.load_config()["export_kw"] * 1000.0
+    except Exception:
+        configured_w = _G98_LEGAL_MAX_W
+    return {
+        "none": 0,
+        "g98":  min(max(0.0, configured_w), _G98_LEGAL_MAX_W),
+        "g99":  _G99_LEGAL_MAX_W,
+    }
+
+
+EXPORT_W = get_export_w()   # snapshot at import; resolve_command() re-reads live via get_export_w()
 
 DEFAULT_MODE = {
     "operational_mode": "pre_commissioning",
@@ -156,13 +194,14 @@ def get_current_slot_action():
 
 # ── Command resolution ────────────────────────────────────────────────────────
 def resolve_command(action, mode, g99):
-    cap = EXPORT_W["g99"] if g99 else EXPORT_W["g98"]
+    export_w = get_export_w()   # re-read live so a settings change takes effect immediately
+    cap = export_w["g99"] if g99 else export_w["g98"]
     if mode == "pre_commissioning":
         return {"work_mode": None, "export_limit_w": None, "send": False,
                 "reason": "pre_commissioning — no hardware commands"}
     if mode == "self_consumption":
         wm = "ForceChg" if action == "charge" else "SelfUse"
-        return {"work_mode": wm, "export_limit_w": EXPORT_W["none"],
+        return {"work_mode": wm, "export_limit_w": export_w["none"],
                 "send": True, "reason": f"{action} -> {wm}, 0W export (no G99)"}
     if mode == "full_export":
         wm = {"charge": "ForceChg", "discharge": "ForceDischg"}.get(action, "SelfUse")

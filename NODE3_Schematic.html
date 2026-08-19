@@ -2,608 +2,171 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>NODE-3 / G99 SLD — Dovecote Systems Ltd — DSL-SLD-001 Rev B</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NODE-3 Electrical Schematic — Dovecote Systems Ltd</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0b0f1a; font-family: 'Courier New', monospace; padding: 16px; }
-  .title { color: #94a3b8; font-size: 12px; margin-bottom: 10px; letter-spacing: 0.05em; }
-  .wrap { background: #080c16; border: 1px solid #1e293b; border-radius: 4px; overflow: auto; }
-  .legend { display: flex; gap: 28px; padding: 10px 16px; border-top: 1px solid #1e293b; flex-wrap: wrap; }
-  .li { display: flex; align-items: center; gap: 7px; font-size: 10px; color: #64748b; }
-  .ll { width: 28px; height: 3px; border-radius: 2px; }
-  .ld { width: 28px; height: 0; border-top: 2px dashed; }
-  @page { size: 1650px 1380px; margin: 0; }
-  @media print { body { padding: 8px; background: #0b0f1a; } }
+  :root {
+    --bg:          #0d1117;
+    --surface:     #161b22;
+    --surface2:    #21262d;
+    --border:      #30363d;
+    --text:        #e6edf3;
+    --muted:       #8b949e;
+    --green:       #3fb950;
+    --amber:       #d29922;
+    --red:         #f85149;
+    --blue:        #58a6ff;
+    --purple:      #bc8cff;
+    --font:        'Courier New', 'Consolas', monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--font); }
+  header {
+    padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--surface);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  }
+  header h1 { font-size: 15px; margin: 0; letter-spacing: 0.03em; color: var(--text); }
+  header .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  header a.back { color: var(--blue); text-decoration: none; font-size: 12px; border: 1px solid var(--border); padding: 5px 10px; border-radius: 6px; }
+  header a.back:hover { background: var(--surface2); }
+
+  .tabs { display: flex; gap: 6px; padding: 12px 20px 0; background: var(--bg); flex-wrap: wrap; }
+  .tab-btn {
+    background: var(--surface); color: var(--muted); border: 1px solid var(--border); border-bottom: none;
+    padding: 8px 16px; font-family: var(--font); font-size: 12px; letter-spacing: 0.04em; cursor: pointer;
+    border-radius: 6px 6px 0 0;
+  }
+  .tab-btn.active { background: var(--surface2); color: var(--text); border-color: var(--blue); }
+  .tab-panel { display: none; padding: 16px 20px 30px; }
+  .tab-panel.active { display: block; }
+
+  .diagram-card {
+    background: #ffffff; border: 1px solid var(--border); border-radius: 8px; overflow: auto; padding: 8px;
+  }
+  .diagram-card img { display: block; width: 100%; min-width: 1100px; }
+
+  .warn-banner {
+    background: #2a0f0f; border: 1px solid var(--red); color: #ffb4ac; padding: 10px 14px; border-radius: 6px;
+    font-size: 12px; margin-bottom: 14px; line-height: 1.5;
+  }
+  .warn-banner b { color: #ff7b6f; }
+
+  h2.section-h { font-size: 14px; color: var(--blue); border-bottom: 1px solid var(--border); padding-bottom: 6px; margin: 26px 0 12px; letter-spacing: 0.03em; }
+  p.note { font-size: 12px; color: var(--muted); margin: 6px 0 16px; }
+
+  table.wire-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
+  table.wire-table th, table.wire-table td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+  table.wire-table th { background: var(--surface2); color: var(--text); font-weight: 700; }
+  table.wire-table td { color: var(--text); background: var(--surface); }
+  table.wire-table tr.only1 td { background: #0e2414; color: var(--green); }
+  table.wire-table tr.noconnect td { background: #2a0f0f; color: #ff9c92; }
+  table.wire-table td.mono, table.wire-table th.mono { font-family: var(--font); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+
+  footer { padding: 16px 20px 40px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); margin-top: 20px; }
+  footer a { color: var(--blue); }
 </style>
 </head>
 <body>
-<div class="title">NODE-3 "SLAB" — SINGLE LINE DIAGRAM / G99 APPLICATION &nbsp;|&nbsp; DSL-SLD-001 Rev B &nbsp;|&nbsp; Dovecote Systems Ltd &nbsp;|&nbsp; 29 April 2026 &nbsp;|&nbsp; For G99 submission to SSEN / commissioning electrician</div>
-<div class="wrap">
-<svg width="1560" height="1220" viewBox="0 0 1560 1220" xmlns="http://www.w3.org/2000/svg">
 
-<!-- ═══ BACKGROUND ═══ -->
-<rect width="1560" height="1220" fill="#080c16"/>
-<defs>
-  <pattern id="g" width="40" height="40" patternUnits="userSpaceOnUse">
-    <path d="M40 0L0 0 0 40" fill="none" stroke="#0f172a" stroke-width="0.8"/>
-  </pattern>
-  <filter id="glow">
-    <feGaussianBlur stdDeviation="2" result="blur"/>
-    <feComposite in="SourceGraphic" in2="blur" operator="over"/>
-  </filter>
-</defs>
-<rect width="1560" height="1010" fill="url(#g)"/>
-<!-- Grid pattern does not extend into title block zone -->
-
-<!-- ═══ ZONE LABELS ═══ -->
-<line x1="248" y1="0" x2="248" y2="1010" stroke="#0f172a" stroke-width="1.5"/>
-<line x1="900" y1="0" x2="900" y2="1010" stroke="#0f172a" stroke-width="1.5"/>
-<text x="12" y="16" fill="#1e3a5f" font-size="9" font-family="Courier New" letter-spacing="1">── AC SUPPLY ──────────</text>
-<text x="260" y="16" fill="#2d1b00" font-size="9" font-family="Courier New" letter-spacing="1">── HV DC POWER PATH ─────────────────────────────────</text>
-<text x="912" y="16" fill="#1a1040" font-size="9" font-family="Courier New" letter-spacing="1">── CAN / COMMS / 12V CONTROL ──────────────────</text>
-
-<!-- ══════════════════════════════════════════════════════════════════════
-     AC SUPPLY CHAIN
-══════════════════════════════════════════════════════════════════════ -->
-
-<!-- SSEN Grid symbol -->
-<circle cx="110" cy="68" r="32" fill="none" stroke="#3b82f6" stroke-width="2"/>
-<path d="M88,68 Q96,52 104,68 Q112,84 120,68 Q128,52 132,68" fill="none" stroke="#3b82f6" stroke-width="2.5"/>
-<text x="110" y="114" text-anchor="middle" fill="#3b82f6" font-size="10" font-weight="bold">SSEN GRID</text>
-<text x="110" y="127" text-anchor="middle" fill="#475569" font-size="9">230V 50Hz Single Phase</text>
-<text x="110" y="139" text-anchor="middle" fill="#475569" font-size="9">Region H — Southern England</text>
-
-<!-- Grid → Meter -->
-<line x1="110" y1="100" x2="110" y2="162" stroke="#3b82f6" stroke-width="3"/>
-
-<!-- Export/Import Meter -->
-<rect x="28" y="162" width="164" height="66" rx="4" fill="#0c1a30" stroke="#3b82f6" stroke-width="1.5"/>
-<text x="110" y="177" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">EXPORT / IMPORT METER</text>
-<text x="110" y="190" text-anchor="middle" fill="#93c5fd" font-size="8">SMETS2 — Bidirectional</text>
-<text x="110" y="203" text-anchor="middle" fill="#334155" font-size="8">MPAN 2000022678841</text>
-<text x="110" y="215" text-anchor="middle" fill="#334155" font-size="8">Octopus Agile In+Out</text>
-<text x="110" y="225" text-anchor="middle" fill="#334155" font-size="7">G99 Export Metering Point</text>
-
-<!-- CT clamp marker -->
-<ellipse cx="110" cy="248" rx="10" ry="7" fill="none" stroke="#4ade80" stroke-width="1.5"/>
-<line x1="100" y1="248" x2="120" y2="248" stroke="#4ade80" stroke-width="1"/>
-<text x="124" y="252" fill="#4ade80" font-size="8">CT×2</text>
-<text x="124" y="262" fill="#4ade80" font-size="8">SCT-013</text>
-
-<!-- Meter → CU -->
-<line x1="110" y1="228" x2="110" y2="298" stroke="#3b82f6" stroke-width="3"/>
-
-<!-- Consumer Unit -->
-<rect x="28" y="298" width="164" height="66" rx="4" fill="#0c1a30" stroke="#3b82f6" stroke-width="1.5"/>
-<text x="110" y="316" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="bold">CONSUMER UNIT</text>
-<text x="110" y="330" text-anchor="middle" fill="#475569" font-size="9">50A MCB — Type B</text>
-<text x="110" y="344" text-anchor="middle" fill="#334155" font-size="8">New dedicated BESS circuit</text>
-<text x="110" y="356" text-anchor="middle" fill="#334155" font-size="8">RCD protection upstream</text>
-
-<!-- CU → AC Isolator -->
-<line x1="110" y1="364" x2="110" y2="414" stroke="#3b82f6" stroke-width="3"/>
-
-<!-- AC Isolator -->
-<rect x="28" y="414" width="164" height="66" rx="4" fill="#0c1a30" stroke="#3b82f6" stroke-width="1.5"/>
-<text x="110" y="432" text-anchor="middle" fill="#93c5fd" font-size="10" font-weight="bold">AC ISOLATOR</text>
-<text x="110" y="446" text-anchor="middle" fill="#475569" font-size="9">IP66, 32A, lockable</text>
-<text x="110" y="460" text-anchor="middle" fill="#334155" font-size="8">Adjacent to enclosure</text>
-<text x="110" y="472" text-anchor="middle" fill="#334155" font-size="8">G99 compliant isolation point</text>
-
-<!-- AC Isolator → FoxESS AC input — bidirectional import/export bus -->
-<polyline points="192,447 248,447 248,222 530,222" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linejoin="round"/>
-<text x="258" y="217" fill="#3b82f6" font-size="9">230V AC L+N+PE  ↕ bidirectional</text>
-
-<!-- ══════════════════════════════════════════════════════════════════════
-     FOXESS KH10.5 INVERTER
-══════════════════════════════════════════════════════════════════════ -->
-
-<!-- Main box -->
-<rect x="530" y="60" width="260" height="320" rx="6" fill="#111827" stroke="#818cf8" stroke-width="2"/>
-<!-- Header bar -->
-<rect x="530" y="60" width="260" height="28" rx="6" fill="#4338ca"/>
-<text x="660" y="79" text-anchor="middle" fill="#fff" font-size="11" font-weight="bold" letter-spacing="0.5">FoxESS KH10.5 HV</text>
-
-<text x="660" y="108" text-anchor="middle" fill="#a5b4fc" font-size="10" font-weight="bold">10.5kW Hybrid Inverter</text>
-<text x="660" y="123" text-anchor="middle" fill="#475569" font-size="9">Single Phase 230V AC / 50Hz</text>
-<text x="660" y="137" text-anchor="middle" fill="#475569" font-size="9">G99 Type Tested — ENA Register</text>
-
-<line x1="545" y1="150" x2="775" y2="150" stroke="#1e293b" stroke-width="1"/>
-<text x="660" y="166" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="bold">Interface Protection (G99 defaults)</text>
-<text x="660" y="180" text-anchor="middle" fill="#334155" font-size="9">UF: 47.5 Hz &nbsp;|&nbsp; OF: 51.5 Hz</text>
-<text x="660" y="194" text-anchor="middle" fill="#334155" font-size="9">UV: 0.75 pu (172.5V) &nbsp;|&nbsp; OV: 1.1 pu (253V)</text>
-<text x="660" y="208" text-anchor="middle" fill="#334155" font-size="9">ROCOF: 1 Hz/s &nbsp;|&nbsp; Vector Shift: 6°</text>
-<text x="660" y="222" text-anchor="middle" fill="#334155" font-size="9">Anti-island: ROCOF + Vector Shift</text>
-<text x="660" y="236" text-anchor="middle" fill="#334155" font-size="9">Reconnect delay: 20 s</text>
-
-<line x1="545" y1="248" x2="775" y2="248" stroke="#1e293b" stroke-width="1"/>
-<text x="660" y="264" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="bold">Battery Port — Proprietary Connector</text>
-<text x="660" y="278" text-anchor="middle" fill="#f97316" font-size="9">DC+ &nbsp; DC− &nbsp; CAN-H &nbsp; CAN-L &nbsp; 12V-aux</text>
-<text x="660" y="292" text-anchor="middle" fill="#334155" font-size="9">All conductors in one FoxESS cable</text>
-<text x="660" y="306" text-anchor="middle" fill="#334155" font-size="9">Supplied with inverter — do not replace</text>
-<text x="660" y="323" text-anchor="middle" fill="#ef4444" font-size="8">⚠ CAN pins: up to 110V vs PE — isolate!</text>
-<text x="660" y="337" text-anchor="middle" fill="#334155" font-size="8">See CAN isolator in comms section →</text>
-
-<!-- AC input port -->
-<circle cx="530" cy="222" r="6" fill="#3b82f6"/>
-<text x="518" y="226" text-anchor="end" fill="#3b82f6" font-size="9">AC IN</text>
-
-<!-- Export route annotation: FoxESS AC port → bidirectional bus → Export/Import Meter → SSEN Grid -->
-<text x="400" y="28" text-anchor="middle" fill="#3b82f6" font-size="9" font-weight="bold">↕ BIDIRECTIONAL AC BUS  —  Import drawn from / Export fed to SSEN Grid via Export/Import Meter</text>
-
-<!-- Battery port exit (bottom) -->
-<circle cx="660" cy="380" r="7" fill="#f97316"/>
-<line x1="660" y1="387" x2="660" y2="430" stroke="#f97316" stroke-width="5"/>
-
-<!-- CAN port (right side of FoxESS) -->
-<circle cx="790" cy="278" r="5" fill="#c084fc"/>
-<text x="800" y="282" fill="#c084fc" font-size="9">CAN</text>
-
-<!-- Label on FoxESS cable -->
-<rect x="672" y="393" width="120" height="34" rx="3" fill="#1c1000" stroke="#f97316" stroke-width="1"/>
-<text x="732" y="407" text-anchor="middle" fill="#f97316" font-size="9" font-weight="bold">FoxESS</text>
-<text x="732" y="420" text-anchor="middle" fill="#78350f" font-size="8">Proprietary Battery Cable</text>
-
-<!-- ══════════════════════════════════════════════════════════════════════
-     HV JUNCTION BOX
-══════════════════════════════════════════════════════════════════════ -->
-
-<!-- Outer box -->
-<rect x="260" y="430" width="620" height="310" rx="6" fill="#0e0e18" stroke="#f97316" stroke-width="2" stroke-dasharray="10,3"/>
-<!-- Header -->
-<rect x="260" y="430" width="620" height="24" rx="4" fill="#7c2d12"/>
-<text x="570" y="447" text-anchor="middle" fill="#fed7aa" font-size="10" font-weight="bold" letter-spacing="0.3">HV JUNCTION BOX — Rittal AE 1380.500 IP66 — 400 × 400 × 210 mm</text>
-
-<!-- FoxESS cable enters JB top -->
-<line x1="660" y1="430" x2="660" y2="460" stroke="#f97316" stroke-width="5"/>
-
-<!-- +ve conductor route: down, left to SW200-22 -->
-<polyline points="660,460 660,475 700,475" fill="none" stroke="#f97316" stroke-width="4" stroke-linejoin="round"/>
-<!-- -ve conductor route: down, splits off -->
-<polyline points="660,460 660,490 360,490" fill="none" stroke="#2563eb" stroke-width="3" stroke-linejoin="round"/>
-
-<!-- SW200-22 CONTACTOR -->
-<rect x="700" y="458" width="140" height="60" rx="4" fill="#1a0a0a" stroke="#ef4444" stroke-width="2"/>
-<text x="770" y="476" text-anchor="middle" fill="#fca5a5" font-size="9" font-weight="bold">SW200-22</text>
-<text x="770" y="489" text-anchor="middle" fill="#94a3b8" font-size="8">200A DC Contactor</text>
-<text x="770" y="501" text-anchor="middle" fill="#ef4444" font-size="8">Magnetic Blowouts ✓</text>
-<text x="770" y="512" text-anchor="middle" fill="#334155" font-size="7">12V coil — NO contact</text>
-
-<!-- After contactor: +ve flows down to +ve busbar -->
-<line x1="840" y1="475" x2="840" y2="540" stroke="#f97316" stroke-width="4"/>
-<polyline points="700,475 660,475" fill="none" stroke="#f97316" stroke-width="4"/>
-
-<!-- Actually contactor is inline: FoxESS+ → left contact → right contact → +ve busbar
-     Let me show correctly: +ve enters left of contactor (x=700), exits right (x=840), then down to busbar -->
-<!-- +ve busbar (horizontal, y=540) -->
-<line x1="280" y1="540" x2="860" y2="540" stroke="#f97316" stroke-width="3.5"/>
-<text x="268" y="537" text-anchor="end" fill="#f97316" font-size="9">+ve</text>
-<!-- -ve busbar (horizontal, y=600) -->
-<line x1="280" y1="600" x2="860" y2="600" stroke="#2563eb" stroke-width="3.5"/>
-<text x="268" y="604" text-anchor="end" fill="#3b82f6" font-size="9">−ve</text>
-
-<!-- -ve from FoxESS cable down to -ve busbar -->
-<line x1="360" y1="490" x2="360" y2="600" stroke="#2563eb" stroke-width="3"/>
-
-<!-- Coil control wires from SW200-22 (green dashed to right) -->
-<line x1="840" y1="488" x2="910" y2="488" stroke="#4ade80" stroke-width="1.5" stroke-dasharray="4,2"/>
-<text x="912" y="484" fill="#4ade80" font-size="8">12V coil →</text>
-<text x="912" y="494" fill="#4ade80" font-size="8">E-stop NC</text>
-
-<!-- ─── BRANCH FUSES × 3 ─── -->
-<!-- Fuse 1 (x=340) -->
-<line x1="340" y1="540" x2="340" y2="565" stroke="#f97316" stroke-width="3"/>
-<rect x="318" y="565" width="44" height="24" rx="3" fill="#1a0a00" stroke="#fb923c" stroke-width="1.5"/>
-<text x="340" y="575" text-anchor="middle" fill="#fb923c" font-size="7" font-weight="bold">KLDR125</text>
-<text x="340" y="584" text-anchor="middle" fill="#78350f" font-size="7">125A 600VDC</text>
-<line x1="340" y1="589" x2="340" y2="610" stroke="#f97316" stroke-width="3"/>
-
-<!-- Fuse 2 (x=560) -->
-<line x1="560" y1="540" x2="560" y2="565" stroke="#f97316" stroke-width="3"/>
-<rect x="538" y="565" width="44" height="24" rx="3" fill="#1a0a00" stroke="#fb923c" stroke-width="1.5"/>
-<text x="560" y="575" text-anchor="middle" fill="#fb923c" font-size="7" font-weight="bold">KLDR125</text>
-<text x="560" y="584" text-anchor="middle" fill="#78350f" font-size="7">125A 600VDC</text>
-<line x1="560" y1="589" x2="560" y2="610" stroke="#f97316" stroke-width="3"/>
-
-<!-- Fuse 3 (x=780) -->
-<line x1="780" y1="540" x2="780" y2="565" stroke="#f97316" stroke-width="3"/>
-<rect x="758" y="565" width="44" height="24" rx="3" fill="#1a0a00" stroke="#fb923c" stroke-width="1.5"/>
-<text x="780" y="575" text-anchor="middle" fill="#fb923c" font-size="7" font-weight="bold">KLDR125</text>
-<text x="780" y="584" text-anchor="middle" fill="#78350f" font-size="7">125A 600VDC</text>
-<line x1="780" y1="589" x2="780" y2="610" stroke="#f97316" stroke-width="3"/>
-
-<!-- Anderson SB175 connectors × 3 -->
-<!-- Connector 1 (x=340) -->
-<line x1="340" y1="610" x2="340" y2="633" stroke="#f97316" stroke-width="3"/>
-<line x1="340" y1="600" x2="340" y2="623" stroke="#2563eb" stroke-width="3"/>
-<!-- wait, I need to route -ve busbar connections to connector too -->
-<!-- -ve branch drops from busbar at x=340 separately -->
-<rect x="308" y="652" width="64" height="38" rx="4" fill="#0c1500" stroke="#84cc16" stroke-width="2"/>
-<text x="340" y="666" text-anchor="middle" fill="#a3e635" font-size="8" font-weight="bold">SB175</text>
-<text x="340" y="678" text-anchor="middle" fill="#4d7c0f" font-size="7">Anderson 600VDC</text>
-<text x="340" y="688" text-anchor="middle" fill="#4d7c0f" font-size="7">175A  grey</text>
-
-<!-- Connector 2 (x=560) -->
-<line x1="560" y1="610" x2="560" y2="633" stroke="#f97316" stroke-width="3"/>
-<rect x="528" y="652" width="64" height="38" rx="4" fill="#0c1500" stroke="#84cc16" stroke-width="2"/>
-<text x="560" y="666" text-anchor="middle" fill="#a3e635" font-size="8" font-weight="bold">SB175</text>
-<text x="560" y="678" text-anchor="middle" fill="#4d7c0f" font-size="7">Anderson 600VDC</text>
-<text x="560" y="688" text-anchor="middle" fill="#4d7c0f" font-size="7">175A  grey</text>
-
-<!-- Connector 3 (x=780) -->
-<line x1="780" y1="610" x2="780" y2="633" stroke="#f97316" stroke-width="3"/>
-<rect x="748" y="652" width="64" height="38" rx="4" fill="#0c1500" stroke="#84cc16" stroke-width="2"/>
-<text x="780" y="666" text-anchor="middle" fill="#a3e635" font-size="8" font-weight="bold">SB175</text>
-<text x="780" y="678" text-anchor="middle" fill="#4d7c0f" font-size="7">Anderson 600VDC</text>
-<text x="780" y="688" text-anchor="middle" fill="#4d7c0f" font-size="7">175A  grey</text>
-
-<!-- -ve drops from busbar to connectors (left of +ve line) -->
-<line x1="326" y1="600" x2="326" y2="652" stroke="#2563eb" stroke-width="2.5"/>
-<line x1="546" y1="600" x2="546" y2="652" stroke="#2563eb" stroke-width="2.5"/>
-<line x1="766" y1="600" x2="766" y2="652" stroke="#2563eb" stroke-width="2.5"/>
-
-<!-- JB bottom - cable exits -->
-<line x1="340" y1="690" x2="340" y2="740" stroke="#f97316" stroke-width="4"/>
-<line x1="560" y1="690" x2="560" y2="740" stroke="#f97316" stroke-width="4"/>
-<line x1="780" y1="690" x2="780" y2="740" stroke="#f97316" stroke-width="4"/>
-
-<!-- Cable labels -->
-<text x="340" y="735" text-anchor="middle" fill="#78350f" font-size="8">35mm² H07RN-F</text>
-<text x="560" y="735" text-anchor="middle" fill="#78350f" font-size="8">35mm² H07RN-F</text>
-<text x="780" y="735" text-anchor="middle" fill="#78350f" font-size="8">35mm² H07RN-F</text>
-
-<!-- ══════════════════════════════════════════════════════════════════════
-     BATTERY PACKS × 3
-══════════════════════════════════════════════════════════════════════ -->
-
-<!-- Pack 1 -->
-<rect x="260" y="748" width="165" height="175" rx="6" fill="#0e1a0e" stroke="#22c55e" stroke-width="2"/>
-<rect x="260" y="748" width="165" height="22" rx="4" fill="#14532d"/>
-<text x="342" y="763" text-anchor="middle" fill="#86efac" font-size="9" font-weight="bold">PACK 1</text>
-<text x="342" y="783" text-anchor="middle" fill="#22c55e" font-size="9">Nissan e-NV200 24kWh</text>
-<text x="342" y="797" text-anchor="middle" fill="#166534" font-size="8">360V DC / 24kWh / NMC</text>
-<text x="342" y="811" text-anchor="middle" fill="#166534" font-size="8">1578 × 1102 × 266 mm</text>
-<text x="342" y="825" text-anchor="middle" fill="#166534" font-size="8">~262 kg &nbsp;|&nbsp; 96S NMC cells</text>
-<!-- SDP label -->
-<rect x="284" y="834" width="116" height="20" rx="3" fill="#7c2d12"/>
-<text x="342" y="848" text-anchor="middle" fill="#fed7aa" font-size="8" font-weight="bold">⚠ SDP — pull before work</text>
-<!-- BMS connector label -->
-<text x="342" y="872" text-anchor="middle" fill="#4ade80" font-size="8">BMS: Yazaki 36-pin</text>
-<text x="342" y="884" text-anchor="middle" fill="#4ade80" font-size="8">7287-1065-30</text>
-<text x="342" y="898" text-anchor="middle" fill="#334155" font-size="8">CAN-H: pin 3 &nbsp; CAN-L: pin 4</text>
-<text x="342" y="910" text-anchor="middle" fill="#334155" font-size="8">12V: pin 1 &nbsp; GND: pin 2</text>
-
-<!-- M8 stud terminals visible on pack top -->
-<circle cx="315" cy="748" r="5" fill="#f97316" stroke="#1a1a1a" stroke-width="1"/>
-<text x="315" y="745" text-anchor="middle" fill="#f97316" font-size="7">+</text>
-<circle cx="335" cy="748" r="5" fill="#3b82f6" stroke="#1a1a1a" stroke-width="1"/>
-<text x="335" y="745" text-anchor="middle" fill="#3b82f6" font-size="7">−</text>
-<text x="325" y="736" text-anchor="middle" fill="#64748b" font-size="7">M8 HV studs</text>
-
-<!-- Cable from JB to Pack 1 -->
-<line x1="340" y1="740" x2="340" y2="748" stroke="#f97316" stroke-width="4"/>
-
-<!-- Pack 2 -->
-<rect x="478" y="748" width="165" height="175" rx="6" fill="#0e1a0e" stroke="#22c55e" stroke-width="2"/>
-<rect x="478" y="748" width="165" height="22" rx="4" fill="#14532d"/>
-<text x="560" y="763" text-anchor="middle" fill="#86efac" font-size="9" font-weight="bold">PACK 2</text>
-<text x="560" y="783" text-anchor="middle" fill="#22c55e" font-size="9">Nissan e-NV200 24kWh</text>
-<text x="560" y="797" text-anchor="middle" fill="#166534" font-size="8">360V DC / 24kWh / NMC</text>
-<text x="560" y="811" text-anchor="middle" fill="#166534" font-size="8">1578 × 1102 × 266 mm</text>
-<text x="560" y="825" text-anchor="middle" fill="#166534" font-size="8">~262 kg &nbsp;|&nbsp; 96S NMC cells</text>
-<rect x="502" y="834" width="116" height="20" rx="3" fill="#7c2d12"/>
-<text x="560" y="848" text-anchor="middle" fill="#fed7aa" font-size="8" font-weight="bold">⚠ SDP — pull before work</text>
-<text x="560" y="872" text-anchor="middle" fill="#334155" font-size="8">BMS powered — not</text>
-<text x="560" y="884" text-anchor="middle" fill="#334155" font-size="8">connected to DALA</text>
-<text x="560" y="898" text-anchor="middle" fill="#334155" font-size="8">(OEM protection active)</text>
-<circle cx="533" cy="748" r="5" fill="#f97316" stroke="#1a1a1a" stroke-width="1"/>
-<circle cx="553" cy="748" r="5" fill="#3b82f6" stroke="#1a1a1a" stroke-width="1"/>
-<line x1="560" y1="740" x2="560" y2="748" stroke="#f97316" stroke-width="4"/>
-
-<!-- Pack 3 -->
-<rect x="696" y="748" width="165" height="175" rx="6" fill="#0e1a0e" stroke="#22c55e" stroke-width="2"/>
-<rect x="696" y="748" width="165" height="22" rx="4" fill="#14532d"/>
-<text x="778" y="763" text-anchor="middle" fill="#86efac" font-size="9" font-weight="bold">PACK 3</text>
-<text x="778" y="783" text-anchor="middle" fill="#22c55e" font-size="9">Nissan e-NV200 24kWh</text>
-<text x="778" y="797" text-anchor="middle" fill="#166534" font-size="8">360V DC / 24kWh / NMC</text>
-<text x="778" y="811" text-anchor="middle" fill="#166534" font-size="8">1578 × 1102 × 266 mm</text>
-<text x="778" y="825" text-anchor="middle" fill="#166534" font-size="8">~262 kg &nbsp;|&nbsp; 96S NMC cells</text>
-<rect x="720" y="834" width="116" height="20" rx="3" fill="#7c2d12"/>
-<text x="778" y="848" text-anchor="middle" fill="#fed7aa" font-size="8" font-weight="bold">⚠ SDP — pull before work</text>
-<text x="778" y="872" text-anchor="middle" fill="#334155" font-size="8">BMS powered — not</text>
-<text x="778" y="884" text-anchor="middle" fill="#334155" font-size="8">connected to DALA</text>
-<text x="778" y="898" text-anchor="middle" fill="#334155" font-size="8">(OEM protection active)</text>
-<circle cx="751" cy="748" r="5" fill="#f97316" stroke="#1a1a1a" stroke-width="1"/>
-<circle cx="771" cy="748" r="5" fill="#3b82f6" stroke="#1a1a1a" stroke-width="1"/>
-<line x1="780" y1="740" x2="780" y2="748" stroke="#f97316" stroke-width="4"/>
-
-<!-- Total array label -->
-<text x="560" y="946" text-anchor="middle" fill="#166534" font-size="10" font-weight="bold">TOTAL ARRAY: 72 kWh &nbsp;|&nbsp; 360V DC &nbsp;|&nbsp; 3× Packs in Parallel &nbsp;|&nbsp; ~786 kg</text>
-<text x="560" y="960" text-anchor="middle" fill="#334155" font-size="9">All packs share DC busbar — SDP on each pack before any DC work</text>
-
-<!-- Parallel connection bars between packs (HV busbars) -->
-<line x1="425" y1="768" x2="478" y2="768" stroke="#f97316" stroke-width="2.5"/>
-<line x1="643" y1="768" x2="696" y2="768" stroke="#f97316" stroke-width="2.5"/>
-<text x="451" y="763" text-anchor="middle" fill="#78350f" font-size="7">M8 busbar</text>
-<text x="669" y="763" text-anchor="middle" fill="#78350f" font-size="7">M8 busbar</text>
-
-<!-- ══════════════════════════════════════════════════════════════════════
-     CAN / COMMS / CONTROL (right panel)
-══════════════════════════════════════════════════════════════════════ -->
-
-<!-- CAN path from Pack 1 BMS (Yazaki connector) -->
-<!-- From pack 1 BMS up to CAN isolator -->
-<polyline points="342,923 342,970 930,970 930,640" fill="none" stroke="#c084fc" stroke-width="2" stroke-dasharray="6,3" stroke-linejoin="round"/>
-<text x="620" y="985" text-anchor="middle" fill="#c084fc" font-size="8">CAN bus from Pack 1 OEM BMS (Yazaki 36-pin pin 3/4)</text>
-
-<!-- CAN ISOLATOR -->
-<rect x="910" y="600" width="150" height="58" rx="4" fill="#1a0d2e" stroke="#c084fc" stroke-width="1.5"/>
-<text x="985" y="618" text-anchor="middle" fill="#d8b4fe" font-size="9" font-weight="bold">CAN ISOLATOR</text>
-<text x="985" y="631" text-anchor="middle" fill="#7c3aed" font-size="8">Waveshare MCP2551</text>
-<text x="985" y="644" text-anchor="middle" fill="#ef4444" font-size="8">⚠ Mandatory — 110V hazard</text>
-<text x="985" y="656" text-anchor="middle" fill="#4b1d96" font-size="7">Isolates FoxESS CAN from PE</text>
-
-<!-- CAN Isolator → LilyGo T-2CAN -->
-<line x1="985" y1="600" x2="985" y2="530" stroke="#c084fc" stroke-width="2" stroke-dasharray="6,3"/>
-
-<!-- LILYGO T-2CAN (DALA) -->
-<rect x="910" y="450" width="150" height="78" rx="4" fill="#0d1f0d" stroke="#4ade80" stroke-width="2"/>
-<rect x="910" y="450" width="150" height="20" rx="4" fill="#166534"/>
-<text x="985" y="464" text-anchor="middle" fill="#86efac" font-size="9" font-weight="bold">LilyGo T-2CAN</text>
-<text x="985" y="482" text-anchor="middle" fill="#22c55e" font-size="8">DALA Battery-Emulator</text>
-<text x="985" y="494" text-anchor="middle" fill="#166534" font-size="8">CAN-A: Nissan BMS</text>
-<text x="985" y="506" text-anchor="middle" fill="#166534" font-size="8">CAN-B: FoxESS HV2600</text>
-<text x="985" y="518" text-anchor="middle" fill="#166534" font-size="8">Protocol: FOXESS_CAN</text>
-
-<!-- LilyGo → FoxESS CAN port (purple dashed line, left to FoxESS) -->
-<polyline points="910,489 870,489 870,278 790,278" fill="none" stroke="#c084fc" stroke-width="2" stroke-dasharray="6,3" stroke-linejoin="round"/>
-<text x="860" y="385" fill="#c084fc" font-size="8" transform="rotate(-90,860,385)">CAN FoxESS HV2600 →</text>
-
-<!-- LilyGo USB → Raspberry Pi -->
-<line x1="1060" y1="489" x2="1110" y2="489" stroke="#64748b" stroke-width="2"/>
-<text x="1085" y="484" text-anchor="middle" fill="#64748b" font-size="8">USB</text>
-
-<!-- RASPBERRY PI 4 -->
-<rect x="1110" y="450" width="150" height="72" rx="4" fill="#0d0d1f" stroke="#818cf8" stroke-width="1.5"/>
-<text x="1185" y="468" text-anchor="middle" fill="#a5b4fc" font-size="9" font-weight="bold">Raspberry Pi 4</text>
-<text x="1185" y="482" text-anchor="middle" fill="#475569" font-size="8">4GB RAM</text>
-<text x="1185" y="496" text-anchor="middle" fill="#475569" font-size="8">Flask API / telemetry</text>
-<text x="1185" y="510" text-anchor="middle" fill="#475569" font-size="8">→ Node-3 portal</text>
-
-<!-- RPi → Teltonika -->
-<line x1="1185" y1="522" x2="1185" y2="565" stroke="#64748b" stroke-width="2"/>
-
-<!-- TELTONIKA RUT240 -->
-<rect x="1110" y="565" width="150" height="62" rx="4" fill="#0d0d1f" stroke="#818cf8" stroke-width="1.5"/>
-<text x="1185" y="583" text-anchor="middle" fill="#a5b4fc" font-size="9" font-weight="bold">Teltonika RUT240</text>
-<text x="1185" y="597" text-anchor="middle" fill="#475569" font-size="8">4G/WiFi DIN rail</text>
-<text x="1185" y="611" text-anchor="middle" fill="#475569" font-size="8">→ Node-3 API</text>
-<text x="1185" y="622" text-anchor="middle" fill="#475569" font-size="8">→ GitHub history.csv</text>
-
-<!-- RPi → 4G antenna (top) -->
-<line x1="1260" y1="580" x2="1320" y2="580" stroke="#64748b" stroke-width="1.5" stroke-dasharray="3,2"/>
-<text x="1325" y="584" fill="#334155" font-size="8">4G ↗</text>
-
-<!-- CT clamps → RPi GPIO -->
-<line x1="248" y1="248" x2="900" y2="248" stroke="#4ade80" stroke-width="1.5" stroke-dasharray="4,3"/>
-<line x1="900" y1="248" x2="1110" y2="470" stroke="#4ade80" stroke-width="1.5" stroke-dasharray="4,3"/>
-<text x="680" y="244" fill="#4ade80" font-size="8">CT signal (YHDC SCT-013) → RPi GPIO</text>
-
-<!-- DS18B20 temp sensors -->
-<rect x="1110" y="660" width="150" height="70" rx="4" fill="#0a1a1a" stroke="#22d3ee" stroke-width="1.5"/>
-<text x="1185" y="677" text-anchor="middle" fill="#67e8f9" font-size="9" font-weight="bold">DS18B20 × 6</text>
-<text x="1185" y="691" text-anchor="middle" fill="#475569" font-size="8">2 per pack</text>
-<text x="1185" y="705" text-anchor="middle" fill="#475569" font-size="8">1-Wire → RPi GPIO</text>
-<text x="1185" y="718" text-anchor="middle" fill="#475569" font-size="8">Alarm at 45°C</text>
-
-<!-- Temp sensor → RPi -->
-<line x1="1185" y1="660" x2="1185" y2="627" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="3,2"/>
-
-<!-- Temp sensors to packs (dashed line to battery area) -->
-<polyline points="1110,690 900,690 900,840 861,840" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="3,2" stroke-linejoin="round"/>
-<text x="890" y="850" text-anchor="end" fill="#22d3ee" font-size="8">T°</text>
-
-<!-- ══════════════════════════════════════════════════════════════════════
-     12V CONTROL RAIL
-══════════════════════════════════════════════════════════════════════ -->
-
-<!-- MORNSUN DC-DC -->
-<rect x="910" y="290" width="150" height="62" rx="4" fill="#1a1500" stroke="#fbbf24" stroke-width="1.5"/>
-<text x="985" y="308" text-anchor="middle" fill="#fde68a" font-size="9" font-weight="bold">Mornsun DC-DC</text>
-<text x="985" y="322" text-anchor="middle" fill="#92400e" font-size="8">12V 5A isolated</text>
-<text x="985" y="336" text-anchor="middle" fill="#92400e" font-size="8">In: 360V DC (from array)</text>
-<text x="985" y="348" text-anchor="middle" fill="#92400e" font-size="8">Out: 12V DC rail</text>
-
-<!-- 12V rail (horizontal green line) -->
-<line x1="985" y1="352" x2="985" y2="380" stroke="#fbbf24" stroke-width="2"/>
-<line x1="910" y1="380" x2="1380" y2="380" stroke="#fbbf24" stroke-width="2"/>
-<text x="900" y="376" text-anchor="end" fill="#fbbf24" font-size="8">12V RAIL</text>
-
-<!-- 12V → SW200-22 coil (down-left to JB) -->
-<polyline points="930,380 930,488 910,488" fill="none" stroke="#4ade80" stroke-width="1.5" stroke-dasharray="4,2" stroke-linejoin="round"/>
-
-<!-- 12V → LilyGo (via 5V buck) -->
-<rect x="1068" y="365" width="100" height="36" rx="3" fill="#0f1a0f" stroke="#4ade80" stroke-width="1"/>
-<text x="1118" y="380" text-anchor="middle" fill="#86efac" font-size="8">12V→5V Buck</text>
-<text x="1118" y="392" text-anchor="middle" fill="#4d7c0f" font-size="7">DROK DIN mini</text>
-<line x1="1068" y1="380" x2="910" y2="380" stroke="#4ade80" stroke-width="1.5" stroke-dasharray="3,2"/>
-<line x1="1118" y1="401" x2="1118" y2="450" stroke="#4ade80" stroke-width="1.5" stroke-dasharray="3,2"/>
-<text x="1124" y="430" fill="#4ade80" font-size="8">5V</text>
-
-<!-- 12V → RPi -->
-<line x1="1168" y1="380" x2="1168" y2="450" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="3,2"/>
-<text x="1174" y="420" fill="#fbbf24" font-size="8">12V</text>
-
-<!-- 12V → BMS 12V wake (to Yazaki pin 1) -->
-<polyline points="970,380 970,970 342,970" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="3,2" stroke-linejoin="round"/>
-<text x="800" y="965" fill="#fbbf24" font-size="8">12V BMS wake → Yazaki pin 1</text>
-
-<!-- Input to Mornsun from HV array -->
-<polyline points="985,290 985,260 560,260 560,430" fill="none" stroke="#f97316" stroke-width="2" stroke-dasharray="4,3" stroke-linejoin="round"/>
-<text x="700" y="255" fill="#78350f" font-size="8">360V DC (from array) → Mornsun input</text>
-
-<!-- E-STOP -->
-<rect x="910" y="160" width="150" height="60" rx="4" fill="#1a0a0a" stroke="#ef4444" stroke-width="2"/>
-<text x="985" y="178" text-anchor="middle" fill="#fca5a5" font-size="9" font-weight="bold">E-STOP</text>
-<text x="985" y="192" text-anchor="middle" fill="#94a3b8" font-size="8">IP67 mushroom — latching</text>
-<text x="985" y="206" text-anchor="middle" fill="#ef4444" font-size="8">NC contact — 24V series</text>
-<text x="985" y="216" text-anchor="middle" fill="#334155" font-size="7">Opens SW200-22 coil on press</text>
-<!-- E-stop in control line -->
-<line x1="985" y1="220" x2="985" y2="290" stroke="#ef4444" stroke-width="2" stroke-dasharray="4,2"/>
-<text x="996" y="258" fill="#ef4444" font-size="8">coil ctrl</text>
-
-<!-- ══════════════════════════════════════════════════════════════════════
-     STATUS LED + QR PLATE labels
-══════════════════════════════════════════════════════════════════════ -->
-<rect x="1300" y="450" width="140" height="72" rx="4" fill="#0d0d0a" stroke="#84cc16" stroke-width="1"/>
-<text x="1370" y="467" text-anchor="middle" fill="#a3e635" font-size="8" font-weight="bold">STATUS LED STRIP</text>
-<text x="1370" y="480" text-anchor="middle" fill="#4d7c0f" font-size="7">12V RGBW weatherproof</text>
-<text x="1370" y="492" text-anchor="middle" fill="#4d7c0f" font-size="7">Green = charging</text>
-<text x="1370" y="504" text-anchor="middle" fill="#4d7c0f" font-size="7">Amber = idle</text>
-<text x="1370" y="516" text-anchor="middle" fill="#4d7c0f" font-size="7">Red = fault</text>
-<line x1="1300" y1="480" x2="1260" y2="480" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="3,2"/>
-
-<!-- ══════════════════════════════════════════════════════════════════════
-     LEGEND (bottom)
-══════════════════════════════════════════════════════════════════════ -->
-<rect x="10" y="978" width="1540" height="26" rx="0" fill="#050810" stroke="#1e293b" stroke-width="1"/>
-<!-- Legend items -->
-<line x1="30" y1="991" x2="60" y2="991" stroke="#f97316" stroke-width="4"/>
-<text x="66" y="995" fill="#f97316" font-size="9">HV DC 400V</text>
-
-<line x1="160" y1="991" x2="190" y2="991" stroke="#3b82f6" stroke-width="3"/>
-<text x="196" y="995" fill="#3b82f6" font-size="9">AC 230V</text>
-
-<line x1="286" y1="991" x2="316" y2="991" stroke="#4ade80" stroke-width="2" stroke-dasharray="5,3"/>
-<text x="322" y="995" fill="#4ade80" font-size="9">12V LV DC / Control</text>
-
-<line x1="460" y1="991" x2="490" y2="991" stroke="#c084fc" stroke-width="2" stroke-dasharray="5,3"/>
-<text x="496" y="995" fill="#c084fc" font-size="9">CAN Bus (comms)</text>
-
-<line x1="630" y1="991" x2="660" y2="991" stroke="#fbbf24" stroke-width="2" stroke-dasharray="3,2"/>
-<text x="666" y="995" fill="#fbbf24" font-size="9">12V Power Rail</text>
-
-<line x1="790" y1="991" x2="820" y2="991" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="3,2"/>
-<text x="826" y="995" fill="#22d3ee" font-size="9">Temperature Signal</text>
-
-<line x1="980" y1="991" x2="1010" y2="991" stroke="#64748b" stroke-width="2"/>
-<text x="1016" y="995" fill="#64748b" font-size="9">USB / Data</text>
-
-<text x="1100" y="995" fill="#334155" font-size="9">Dovecote Systems Ltd &nbsp;|&nbsp; NODE-3 G99 SLD &nbsp;|&nbsp; DSL-SLD-001 Rev B &nbsp;|&nbsp; 29 Apr 2026</text>
-
-
-<!-- ══════════════════════════════════════════════════════════════════════
-     DNO / CUSTOMER DEMARCATION LINE  (G99 SLD — mandatory element)
-     Positioned between SSEN Grid output (y=100) and Smart Meter (y=162)
-══════════════════════════════════════════════════════════════════════ -->
-<line x1="6" y1="150" x2="242" y2="150" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="8,4"/>
-<!-- End tick marks -->
-<line x1="6" y1="144" x2="6" y2="156" stroke="#ef4444" stroke-width="2"/>
-<line x1="242" y1="144" x2="242" y2="156" stroke="#ef4444" stroke-width="2"/>
-<!-- Label box to the right of the AC wire -->
-<rect x="117" y="141" width="124" height="17" rx="2" fill="#150000" stroke="#ef4444" stroke-width="1"/>
-<text x="179" y="154" text-anchor="middle" fill="#ef4444" font-size="7.5" font-weight="bold">POC — DNO BOUNDARY</text>
-
-<!-- ══════════════════════════════════════════════════════════════════════
-     TN-C-S EARTHING (PME) — Main Earthing Terminal at Consumer Unit
-     BS 7671 / ENA G99 requires earthing arrangement to be shown
-══════════════════════════════════════════════════════════════════════ -->
-<!-- Lead line from right edge of Consumer Unit to earth symbol -->
-<line x1="192" y1="340" x2="230" y2="340" stroke="#4ade80" stroke-width="2"/>
-<!-- Vertical stem -->
-<line x1="230" y1="325" x2="230" y2="353" stroke="#4ade80" stroke-width="2"/>
-<!-- Earth symbol: three horizontal bars, descending width -->
-<line x1="215" y1="353" x2="245" y2="353" stroke="#4ade80" stroke-width="2.5"/>
-<line x1="219" y1="360" x2="241" y2="360" stroke="#4ade80" stroke-width="2"/>
-<line x1="223" y1="367" x2="237" y2="367" stroke="#4ade80" stroke-width="1.5"/>
-<!-- Label -->
-<text x="230" y="381" text-anchor="middle" fill="#4ade80" font-size="7.5" font-weight="bold">PME Earth</text>
-<text x="230" y="392" text-anchor="middle" fill="#22c55e" font-size="7">TN-C-S</text>
-
-<!-- ══════════════════════════════════════════════════════════════════════
-     FORMAL G99 SLD TITLE BLOCK — Drawing DSL-SLD-001 Rev B
-     ENA EREC G99 Issue 1 — Required for formal application submission
-══════════════════════════════════════════════════════════════════════ -->
-<!-- Outer border -->
-<rect x="10" y="1015" width="1540" height="198" fill="#05080f" stroke="#475569" stroke-width="2"/>
-<!-- Title stripe -->
-<rect x="10" y="1015" width="1540" height="34" fill="#0d1424" stroke="none"/>
-<line x1="10" y1="1049" x2="1550" y2="1049" stroke="#475569" stroke-width="1.5"/>
-<text x="780" y="1039" text-anchor="middle" fill="#f8fafc" font-size="13" font-weight="bold" letter-spacing="0.5">SINGLE LINE DIAGRAM — G99 APPLICATION  |  ENA EREC G99 Issue 1  |  Battery Energy Storage System (BESS)</text>
-
-<!-- ── Row 2: Project details ── -->
-<!-- Vertical dividers -->
-<line x1="510" y1="1049" x2="510" y2="1133" stroke="#334155" stroke-width="1"/>
-<line x1="810" y1="1049" x2="810" y2="1133" stroke="#334155" stroke-width="1"/>
-<line x1="1040" y1="1049" x2="1040" y2="1133" stroke="#334155" stroke-width="1"/>
-<line x1="1270" y1="1049" x2="1270" y2="1133" stroke="#334155" stroke-width="1"/>
-<!-- Row 2 bottom border -->
-<line x1="10" y1="1133" x2="1550" y2="1133" stroke="#475569" stroke-width="1.5"/>
-
-<!-- ADDRESS cell (x=10–510) -->
-<text x="18" y="1063" fill="#64748b" font-size="8">PROJECT / SITE ADDRESS</text>
-<text x="18" y="1079" fill="#f8fafc" font-size="11" font-weight="bold">179 King Georges Avenue</text>
-<text x="18" y="1094" fill="#94a3b8" font-size="10">Southampton, SO15 4LD</text>
-<text x="18" y="1108" fill="#94a3b8" font-size="10">Hampshire, England</text>
-
-<!-- MPAN / NETWORK cell (x=510–810) -->
-<text x="518" y="1063" fill="#64748b" font-size="8">MPAN</text>
-<text x="518" y="1080" fill="#f8fafc" font-size="13" font-weight="bold" font-family="Courier New">2000022678841</text>
-<text x="518" y="1098" fill="#64748b" font-size="8">NETWORK OPERATOR / REGION</text>
-<text x="518" y="1112" fill="#94a3b8" font-size="9">SSEN — Southern England (Region H)</text>
-
-<!-- DRAWING NUMBER cell (x=810–1040) -->
-<text x="818" y="1063" fill="#64748b" font-size="8">DRAWING NUMBER</text>
-<text x="818" y="1080" fill="#f8fafc" font-size="12" font-weight="bold" font-family="Courier New">DSL-SLD-001</text>
-<text x="818" y="1101" fill="#64748b" font-size="8">REVISION</text>
-<text x="818" y="1117" fill="#f8fafc" font-size="12" font-weight="bold">Rev A</text>
-
-<!-- DATE / SCALE cell (x=1040–1270) -->
-<text x="1048" y="1063" fill="#64748b" font-size="8">DATE OF ISSUE</text>
-<text x="1048" y="1080" fill="#f8fafc" font-size="11" font-weight="bold">29 April 2026</text>
-<text x="1048" y="1101" fill="#64748b" font-size="8">SCALE</text>
-<text x="1048" y="1117" fill="#94a3b8" font-size="10">Not to scale</text>
-
-<!-- GENERATING PLANT cell (x=1270–1550) -->
-<text x="1278" y="1063" fill="#64748b" font-size="8">GENERATING PLANT</text>
-<text x="1278" y="1079" fill="#f8fafc" font-size="10" font-weight="bold">FoxESS KH10.5 HV Inverter</text>
-<text x="1278" y="1093" fill="#94a3b8" font-size="9">Export capacity: 10.5 kW single-phase</text>
-<text x="1278" y="1107" fill="#94a3b8" font-size="9">G99 type-tested — ENA Register</text>
-<text x="1278" y="1121" fill="#94a3b8" font-size="9">Storage: 3 × 24 kWh = 72 kWh BESS</text>
-
-<!-- ── Row 3: People / Company ── -->
-<!-- Vertical dividers -->
-<line x1="520" y1="1133" x2="520" y2="1213" stroke="#334155" stroke-width="1"/>
-<line x1="1010" y1="1133" x2="1010" y2="1213" stroke="#334155" stroke-width="1"/>
-
-<!-- PREPARED BY cell (x=10–520) -->
-<text x="18" y="1149" fill="#64748b" font-size="8">PREPARED BY</text>
-<text x="18" y="1165" fill="#f8fafc" font-size="11" font-weight="bold">Solent Renewables</text>
-<text x="18" y="1180" fill="#94a3b8" font-size="9">Sonny — G99 Competent Person  |  sonny@solentrenewables.com</text>
-<text x="18" y="1193" fill="#64748b" font-size="8">NAPIT / MCS Reg No: _________________________</text>
-<text x="18" y="1207" fill="#334155" font-size="7.5">Signature: _________________________  Date: ___________</text>
-
-<!-- CHECKED BY cell (x=520–1010) -->
-<text x="528" y="1149" fill="#64748b" font-size="8">CHECKED BY / CLIENT</text>
-<text x="528" y="1165" fill="#f8fafc" font-size="11" font-weight="bold">Matthew Brander</text>
-<text x="528" y="1180" fill="#94a3b8" font-size="9">Director, Dovecote Systems Ltd</text>
-<text x="528" y="1194" fill="#94a3b8" font-size="9">matt.brander@gmail.com</text>
-<text x="528" y="1207" fill="#334155" font-size="7.5">Signature: ___________________________</text>
-
-<!-- APPLICANT / COMPANY cell (x=1010–1550) -->
-<text x="1018" y="1149" fill="#64748b" font-size="8">APPLICANT / COMPANY</text>
-<text x="1018" y="1165" fill="#f8fafc" font-size="12" font-weight="bold">Dovecote Systems Ltd</text>
-<text x="1018" y="1180" fill="#94a3b8" font-size="9">Company No. 17160178  |  Incorporated 15 April 2026</text>
-<text x="1018" y="1194" fill="#94a3b8" font-size="9">G99 Application — BESS 10.5 kW export  |  Single Phase 230V</text>
-<text x="1018" y="1207" fill="#64748b" font-size="8">Prepared for submission to SSEN (Southern Electric Power Distribution plc)</text>
-
-</svg>
+<header>
+  <div>
+    <h1>NODE-3 ELECTRICAL SCHEMATIC — Dovecote Systems Ltd</h1>
+    <div class="sub">Source of truth: NODE3_DEFINITIVE.md (30 May 2026) · single-BMS-read mode · pack-internal contactors, no Albright</div>
+  </div>
+  <a class="back" href="dashboard.html">← Back to Portal</a>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchSchematicTab('full')">⚡ FULL SYSTEM (HV + LV)</button>
+  <button class="tab-btn" onclick="switchSchematicTab('lv')">🔧 LV CONTROL &amp; COMMS WIRING</button>
+  <button class="tab-btn" onclick="switchSchematicTab('table')">📋 CONNECTION TABLES</button>
 </div>
-<div class="legend" style="color:#334155; font-size:10px; padding: 8px 16px;">
-  All connections shown are verified against component datasheets. REMA connectors (96V-rated) removed and replaced with Anderson SB175 (600VDC).
-  Batrium WatchMon removed — replaced with DALA Battery-Emulator on LilyGo T-2CAN (confirmed FoxESS KH CAN protocol).
-  CAN isolator is mandatory due to up to 110V potential on FoxESS CAN pins relative to PE.
-  SW200-22 magnetic blowout contactor required — plain SW200 unsuitable at 400V DC.
+
+<div id="panel-full" class="tab-panel active">
+  <div class="warn-banner"><b>⚠ HIGH VOLTAGE DC — 360–403V nominal.</b> A shock at this voltage is lethal. Class 0 (1000V) gloves, insulated tools, one-handed working, buddy + E-stop plan before any pack is connected. Never work alone on energised DC.</div>
+  <div class="diagram-card">
+    <img src="NODE3_DEFINITIVE_Schematic.svg" alt="NODE-3 full system electrical schematic — HV busbar, breakers, packs, LV control" onerror="this.parentElement.innerHTML='<p style=&quot;color:#f85149;padding:20px;font-family:monospace;&quot;>Could not load NODE3_DEFINITIVE_Schematic.svg — check the file is present in this folder.</p>'">
+  </div>
+  <p class="note">Full HV + LV topology: TOMZN master/branch breakers, Service Disconnect Plugs, 3× Nissan e-NV200 packs in parallel, FoxESS KH10.5. For the LV-only control/comms wiring in isolation, use the tab above.</p>
 </div>
+
+<div id="panel-lv" class="tab-panel">
+  <div class="diagram-card">
+    <img src="NODE3_LV_Wiring_Schematic.svg" alt="NODE-3 LV control and comms wiring diagram — 12V rail, E-stop, LilyGo, SSR-04, CAN-A/CAN-B" onerror="this.parentElement.innerHTML='<p style=&quot;color:#f85149;padding:20px;font-family:monospace;&quot;>Could not load NODE3_LV_Wiring_Schematic.svg — check the file is present in this folder.</p>'">
+  </div>
+  <p class="note">12V rail, E-stop, LilyGo T-2CAN, SSR-04, CAN-A/CAN-B and the Yazaki daisy chain only — HV busbar/breakers deliberately omitted here for clarity. See "Connection Tables" tab for the pin-by-pin wiring list.</p>
+</div>
+
+<div id="panel-table" class="tab-panel">
+  <h2 class="section-h">Yazaki 7287-1065-30 (36-pin) — pins actually wired, per pack</h2>
+  <p class="note">The 5 LV signals below are wired IDENTICALLY on all 3 packs (same wires daisy-chain pack→pack→pack). CAN-H/CAN-L (pins 3/4) are the one exception — Pack 1 only.</p>
+  <table class="wire-table">
+    <tr><th>Pin</th><th>Signal</th><th class="mono">Pack 1</th><th class="mono">Pack 2</th><th class="mono">Pack 3</th></tr>
+    <tr><td>1</td><td>BAT+IGN (12V wake)</td><td>✅ from 12V rail via E-stop NC + 1A fuse</td><td>✅ same rail (daisy)</td><td>✅ same rail (daisy)</td></tr>
+    <tr><td>2</td><td>GND</td><td>✅ to common LV GND</td><td>✅</td><td>✅</td></tr>
+    <tr class="only1"><td>3</td><td>CAN-H</td><td>✅ to LilyGo CAN-A H</td><td>❌ leave open</td><td>❌ leave open</td></tr>
+    <tr class="only1"><td>4</td><td>CAN-L</td><td>✅ to LilyGo CAN-A L</td><td>❌ leave open</td><td>❌ leave open</td></tr>
+    <tr><td>—</td><td>Precharge coil</td><td>✅ from SSR-04 OUT1 (12V switched)</td><td>✅ daisy</td><td>✅ daisy</td></tr>
+    <tr><td>—</td><td>+Contactor coil</td><td>✅ from SSR-04 OUT2</td><td>✅ daisy</td><td>✅ daisy</td></tr>
+    <tr><td>—</td><td>−Contactor coil</td><td>✅ from SSR-04 OUT3</td><td>✅ daisy</td><td>✅ daisy</td></tr>
+    <tr class="noconnect"><td>5–36</td><td>Cell taps + NTCs</td><td colspan="3">🚫 DO NOT CONNECT — leave isolated in heatshrink, label "do not touch"</td></tr>
+  </table>
+  <p class="note">Exact coil pin numbers for Precharge / +Cont / −Cont: read off the DALA "Detailed connection diagram, with automatic contactor control via SSR" image on the <a href="https://github.com/dalathegreat/Battery-Emulator/wiki/Battery:-Nissan-LEAF---e%E2%80%90NV200#wiring-diagram" style="color:var(--blue)" target="_blank" rel="noopener">DALA Battery-Emulator wiki (Nissan LEAF / e-NV200)</a>. Nissan's wiring sets these — once known they apply identically to all 3 packs. Pack 1's CAN bus needs a 120Ω termination resistor across CAN-H/L at the LilyGo end (the pack itself already terminates at the BMS end).</p>
+
+  <h2 class="section-h">LilyGo T-2CAN — GPIO usage</h2>
+  <table class="wire-table">
+    <tr><th>GPIO / pin</th><th>Role</th><th>Wired to</th></tr>
+    <tr><td class="mono">25</td><td>Precharge SSR drive (3.3V)</td><td>SSR-04 channel 1 IN</td></tr>
+    <tr><td class="mono">32</td><td>+Contactor SSR drive (3.3V)</td><td>SSR-04 channel 2 IN</td></tr>
+    <tr><td class="mono">33</td><td>−Contactor SSR drive (3.3V)</td><td>SSR-04 channel 3 IN</td></tr>
+    <tr><td class="mono">GND</td><td>Common return</td><td>SSR-04 IN-common</td></tr>
+    <tr><td class="mono">CAN-A</td><td>Pack 1 BMS read</td><td>Yazaki Pack 1 pins 3 / 4</td></tr>
+    <tr><td class="mono">CAN-B</td><td>FoxESS comms</td><td>Waveshare isolated CAN HAT input</td></tr>
+    <tr><td class="mono">5V / VIN</td><td>Module power</td><td>DROK 12V→5V buck output</td></tr>
+  </table>
+  <p class="note">The T-2CAN has two on-board CAN channels. The Waveshare isolated HAT sits between CAN-B and the FoxESS for galvanic isolation — the FoxESS HV2600 CAN can float at up to ±110V DC to PE and would destroy an unisolated transceiver (and could injure you). This isolator is mandatory, not optional.</p>
+
+  <h2 class="section-h">SSR-04 channel allocation</h2>
+  <table class="wire-table">
+    <tr><th>Channel</th><th>IN−</th><th>IN+ from LilyGo</th><th>OUT (switches 12V to coil)</th></tr>
+    <tr><td>1</td><td>GND</td><td class="mono">GPIO 25</td><td>Precharge coil pin — all 3 Yazakis</td></tr>
+    <tr><td>2</td><td>GND</td><td class="mono">GPIO 32</td><td>+Contactor coil pin — all 3 Yazakis</td></tr>
+    <tr><td>3</td><td>GND</td><td class="mono">GPIO 33</td><td>−Contactor coil pin — all 3 Yazakis</td></tr>
+    <tr><td>4</td><td>—</td><td>—</td><td>Spare (E-stop status LED / fan)</td></tr>
+  </table>
+  <p class="note">Each SSR-04 OUT switches 12V from the same rail that feeds Pin 1. Sequence (driven by LilyGo firmware): precharge ON → wait → +cont ON → −cont ON → precharge OFF. Each pack's internal BMS sees its own coil signal arrive and operates its own internal contactor accordingly.</p>
+
+  <h2 class="section-h">Safety chain — what opens the circuit</h2>
+  <table class="wire-table">
+    <tr><th>Fault</th><th>What happens</th></tr>
+    <tr><td>Single cell overvoltage in any pack</td><td>That pack's own BMS opens its internal contactors. Other 2 packs stay live. In single-BMS-read mode, LilyGo won't directly see a Pack 2/3 fault — relies on that pack's own protection.</td></tr>
+    <tr><td>LilyGo crash / firmware fault</td><td>SSR drive signals go LOW → coil voltage drops → all contactors open. Failsafe by design.</td></tr>
+    <tr><td>12V rail loss</td><td>Pin 1 BAT+IGN drops → BMSes go to sleep → contactors open.</td></tr>
+    <tr><td>Mains AC loss</td><td>DR-60-12 has ~50ms hold-up, then 12V drops, then contactors open. Whole bus dies safely.</td></tr>
+    <tr><td>Person needs to disconnect NOW</td><td><b>E-stop</b> — drops Pin 1 across all 3 packs simultaneously, ~100ms.</td></tr>
+    <tr><td>Service work</td><td>Pull Service Disconnect Plugs (with HV gloves). Each SDP physically breaks the cell string.</td></tr>
+    <tr><td>Branch fault on one pack</td><td>That pack's TOMZN branch breaker trips. Other 2 carry on.</td></tr>
+    <tr><td>Inverter fault</td><td>Master TOMZN trips manually, or FoxESS opens its internal DC contactor.</td></tr>
+  </table>
+  <p class="note">Full pre-energise checklist and 14-step commissioning sequence: see <b>NODE3_DEFINITIVE.md §8</b> in this folder. Do not energise to grid until G99 export approval is confirmed.</p>
+</div>
+
+<footer>
+  Dovecote Systems Ltd — NODE-3 · This page reflects the current definitive design (NODE3_DEFINITIVE.md, supersedes the earlier Albright/Anderson-SB175 SLD). Wiring diagrams here are for build reference only — always verify against current datasheets and get a qualified electrician's sign-off before energising to grid.
+</footer>
+
+<script>
+  function switchSchematicTab(id) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + id).classList.add('active');
+    var idx = id === 'full' ? 0 : (id === 'lv' ? 1 : 2);
+    document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+  }
+</script>
+
 </body>
 </html>

@@ -18,14 +18,30 @@ services:
       - ./fleet_state.json:/app/fleet_state.json
       - ./history.csv:/app/history.csv
       - ./prices.json:/app/prices.json
+      # Persist operator-configurable settings (battery/import/export/min-SOC)
+      # across restarts — without this bind mount, any settings saved via the
+      # dashboard's SETTINGS panel would vanish on every --force-recreate,
+      # since node3_config.json would only exist inside the ephemeral
+      # container filesystem.
+      - ./node3_config.json:/app/node3_config.json
       # Live-mount source files — edits take effect without rebuild
       - ./dashboard.html:/app/dashboard.html
       - ./index.html:/app/index.html
       - ./simulate.py:/app/simulate.py
       - ./server.py:/app/server.py
+      - ./node3_config.py:/app/node3_config.py
       - ./hardware_bridge.py:/app/hardware_bridge.py
       - ./node3_mode.json:/app/node3_mode.json
       - ./NODE3_Schematic.html:/app/NODE3_Schematic.html
+      # Schematic diagram assets — NOT baked into the image (Dockerfile only
+      # COPYs server.py/simulate.py/dashboard.html/index.html) and were never
+      # mounted here either, so the SCHEMATIC tab's images always 404'd
+      # inside the container even though the files sit right there on disk.
+      # Must match server.py's _SAFE_ASSETS whitelist exactly.
+      - ./NODE3_DEFINITIVE_Schematic.svg:/app/NODE3_DEFINITIVE_Schematic.svg
+      - ./NODE3_LV_Wiring_Schematic.svg:/app/NODE3_LV_Wiring_Schematic.svg
+      - ./NODE3_DEFINITIVE_BoxLayout.svg:/app/NODE3_DEFINITIVE_BoxLayout.svg
+      - ./NODE3_G99_SLD_DSL-SLD-001_RevA_preview.png:/app/NODE3_G99_SLD_DSL-SLD-001_RevA_preview.png
     #devices:
      # - /dev/ttyUSB1:/dev/ttyUSB1
     environment:

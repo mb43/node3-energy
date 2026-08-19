@@ -242,7 +242,7 @@
       </ul>
       
       <div style="display: flex; align-items: center; gap: 16px;">
-        <a href="https://portal.doesnthavetocosttheearth.com" class="nav-portal" target="_blank">Operator Portal →</a>
+        <a href="http://dovecoteltd.co.uk:8585" class="nav-portal" target="_blank">Operator Portal →</a>
         <button class="nav-hamburger" aria-label="Toggle Menu">☰</button>
       </div>
     </div>
@@ -333,6 +333,7 @@
           <div class="tech-tabs">
             <button class="tech-tab-btn active" onclick="switchTab('topology')">Topology (ASCII)</button>
             <button class="tech-tab-btn" onclick="switchTab('schematic')">Electrical Schematic</button>
+            <button class="tech-tab-btn" onclick="switchTab('wiring')">LV Control Wiring</button>
             <button class="tech-tab-btn" onclick="switchTab('layout')">Enclosure Layout</button>
           </div>
           
@@ -399,7 +400,13 @@
               <img src="NODE3_DEFINITIVE_Schematic.svg" alt="NODE-3 System Electrical Schematic" onerror="this.src='NODE3_G99_SLD_DSL-SLD-001_RevA_preview.png'">
             </div>
           </div>
-          
+
+          <div id="tab-wiring" class="tech-tab-content">
+            <div class="schematic-img-container">
+              <img src="NODE3_LV_Wiring_Schematic.svg" alt="NODE-3 LV Control and Comms Wiring Diagram — 12V rail, E-stop, LilyGo, SSR-04, CAN-A/CAN-B">
+            </div>
+          </div>
+
           <div id="tab-layout" class="tech-tab-content">
             <div class="schematic-img-container">
               <img src="NODE3_DEFINITIVE_BoxLayout.svg" alt="NODE-3 Enclosure Box Layout Diagram">
@@ -581,7 +588,7 @@
           </p>
           <p class="card-text">
             Email: <a href="mailto:info@doesnthavetocosttheearth.com">info@doesnthavetocosttheearth.com</a><br>
-            Web: <a href="https://doesnthavetocosttheearth.com">doesnthavetocosttheearth.com</a>
+            Web: <a href="https://dovecoteltd.co.uk">dovecoteltd.co.uk</a>
           </p>
         </div>
         

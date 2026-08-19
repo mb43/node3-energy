@@ -1,0 +1,256 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1030" font-family="Inter, Arial, sans-serif" font-size="12">
+  <style>
+    .lv12   { stroke: #0066cc; stroke-width: 3; fill: none; }
+    .lv12sw { stroke: #0066cc; stroke-width: 2.5; fill: none; stroke-dasharray: 7 4; }
+    .gpio   { stroke: #e67e22; stroke-width: 2; fill: none; stroke-dasharray: 4 3; }
+    .cana   { stroke: #009933; stroke-width: 2.2; fill: none; }
+    .canb   { stroke: #7a2ec2; stroke-width: 2.2; fill: none; }
+    .gnd    { stroke: #555555; stroke-width: 2.5; fill: none; }
+    .box    { fill: #ffffff; stroke: #000000; stroke-width: 1.5; }
+    .pack   { fill: #fff3d6; stroke: #b08800; stroke-width: 2; }
+    .ssr    { fill: #f0f0ff; stroke: #4444aa; stroke-width: 1.5; }
+    .psu    { fill: #e8f6ff; stroke: #0066cc; stroke-width: 1.5; }
+    .can    { fill: #f5edff; stroke: #7a2ec2; stroke-width: 1.5; }
+    .estop  { fill: #ff0000; stroke: #800000; stroke-width: 2; }
+    .term   { fill: #fff; stroke: #333; stroke-width: 1.2; }
+    .pin    { fill: #fafafa; stroke: #999; stroke-width: 1; }
+    .lbl    { font-size: 10.5px; fill: #222; }
+    .lblw   { font-size: 10.5px; fill: #222; font-weight: 700; }
+    .ttl    { font-size: 15px; font-weight: 700; fill: #000; }
+    .small  { font-size: 8.7px; fill: #555; }
+    .legend { font-size: 10.5px; fill: #222; }
+    .warn   { font-size: 9px; fill: #aa0000; font-weight: 700; }
+  </style>
+
+  <!-- ============ TITLE ============ -->
+  <text x="800" y="24" text-anchor="middle" class="ttl">NODE-3 — LV Control &amp; Comms Wiring (12V / CAN / GPIO only — HV busbar &amp; breakers NOT shown, see full schematic)</text>
+  <text x="800" y="41" text-anchor="middle" class="small">Source of truth: NODE3_DEFINITIVE.md §5–§7 · single-BMS-read mode · all 3 packs daisy-chained identically except CAN</text>
+
+  <!-- ============ LEGEND ============ -->
+  <g transform="translate(20, 56)">
+    <line x1="0" y1="0" x2="26" y2="0" class="lv12"/>
+    <text x="31" y="4" class="legend">12V source rail</text>
+    <line x1="165" y1="0" x2="191" y2="0" class="lv12sw"/>
+    <text x="196" y="4" class="legend">12V switched (E-stop/SSR out)</text>
+    <line x1="430" y1="0" x2="456" y2="0" class="gpio"/>
+    <text x="461" y="4" class="legend">3.3V GPIO signal</text>
+    <line x1="610" y1="0" x2="636" y2="0" class="cana"/>
+    <text x="641" y="4" class="legend">CAN-A (Pack 1 BMS)</text>
+    <line x1="800" y1="0" x2="826" y2="0" class="canb"/>
+    <text x="831" y="4" class="legend">CAN-B (to FoxESS, isolated)</text>
+    <line x1="1030" y1="0" x2="1056" y2="0" class="gnd"/>
+    <text x="1061" y="4" class="legend">GND / 0V</text>
+  </g>
+
+  <!-- ============ PSU ============ -->
+  <rect x="30" y="90" width="200" height="80" class="psu"/>
+  <text x="130" y="112" text-anchor="middle" class="ttl" font-size="12">Mean Well DR-60-12</text>
+  <text x="130" y="128" text-anchor="middle" class="lbl">230V AC → 12V DC 5A</text>
+  <text x="130" y="142" text-anchor="middle" class="small">DIN rail, powers ALL LV loads</text>
+  <text x="130" y="155" text-anchor="middle" class="small">(Pin1 feed, SSR outputs, DROK 5V, RPi)</text>
+  <text x="130" y="168" text-anchor="middle" class="small">Hold-up ~50ms if mains lost</text>
+
+  <!-- 12V rail across the top -->
+  <line x1="230" y1="110" x2="1550" y2="110" class="lv12"/>
+  <text x="1556" y="114" class="legend">12V RAIL</text>
+
+  <!-- GND rail across the top -->
+  <line x1="230" y1="150" x2="1350" y2="150" class="gnd"/>
+  <text x="1356" y="154" class="legend">GND / 0V COMMON</text>
+
+  <!-- E-STOP (own quiet corner, top-right, clear of everything else) -->
+  <circle cx="1470" cy="70" r="22" class="estop"/>
+  <text x="1470" y="74" text-anchor="middle" fill="white" font-weight="700" font-size="8.5">E-STOP</text>
+  <text x="1470" y="34" text-anchor="middle" class="small">NC mushroom, IP67</text>
+  <text x="1394" y="63" text-anchor="end" class="warn">Breaks ONLY the Pin1</text>
+  <text x="1394" y="75" text-anchor="end" class="warn">(BAT+IGN) feed — all 3</text>
+  <text x="1394" y="87" text-anchor="end" class="warn">packs sleep in ~100ms</text>
+  <line x1="1470" y1="92" x2="1470" y2="110" class="lv12"/>
+
+  <!-- 12V rail tap down through E-stop to PIN1 bus (own lane, far right) -->
+  <path d="M 1470 110 L 1470 500" class="lv12sw"/>
+
+  <!-- 12V rail tap to DROK buck -->
+  <line x1="330" y1="110" x2="330" y2="225" class="lv12"/>
+  <!-- 12V rail tap to SSR-04 supply (crosses CAN-B logic line harmlessly, no junction) -->
+  <line x1="800" y1="110" x2="800" y2="320" class="lv12"/>
+
+  <!-- GND rail taps -->
+  <line x1="330" y1="150" x2="330" y2="350" class="gnd"/>
+  <line x1="330" y1="350" x2="255" y2="350" class="gnd"/>
+  <line x1="900" y1="150" x2="900" y2="525" class="gnd"/>
+
+  <!-- ============ DROK BUCK ============ -->
+  <rect x="255" y="225" width="150" height="55" class="box"/>
+  <text x="330" y="245" text-anchor="middle" class="lblw">DROK 12V→5V buck</text>
+  <text x="330" y="260" text-anchor="middle" class="small">3A, powers LilyGo 5V/VIN</text>
+  <text x="330" y="273" text-anchor="middle" class="small">GND shared with LV common</text>
+  <line x1="330" y1="280" x2="330" y2="320" class="lv12"/>
+  <text x="336" y="304" class="small">5V</text>
+
+  <!-- ============ LILYGO T-2CAN ============ -->
+  <rect x="210" y="320" width="220" height="130" class="box"/>
+  <rect x="210" y="320" width="220" height="22" fill="#166534"/>
+  <text x="320" y="336" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">LilyGo T-2CAN (ESP32-S3)</text>
+  <text x="320" y="358" text-anchor="middle" class="lbl">DALA firmware — "Nissan Leaf 3P"</text>
+  <text x="320" y="372" text-anchor="middle" class="small">CAN-A: Pack 1 BMS read</text>
+  <text x="320" y="385" text-anchor="middle" class="small">CAN-B: FoxESS (via isolator, routed above)</text>
+  <text x="320" y="398" text-anchor="middle" class="small">5V/VIN from DROK, GND common</text>
+  <text x="320" y="411" text-anchor="middle" class="small">Web UI on Wi-Fi for live BMS status</text>
+  <text x="320" y="424" text-anchor="middle" class="small">3 GPIO lines exit right → SSR-04 IN1-3</text>
+  <text x="320" y="440" text-anchor="middle" class="lblw" fill="#e67e22">GPIO 25/32/33 →</text>
+
+  <!-- CAN-B logic-side: routed ABOVE both boxes in clear space (y=300), avoids all box interiors -->
+  <path d="M 320 320 L 320 300 L 900 300 L 900 320" class="canb"/>
+  <text x="610" y="294" text-anchor="middle" class="small" fill="#7a2ec2">CAN-B (LilyGo → isolator, logic side)</text>
+  <rect x="420" y="292" width="40" height="16" class="term"/>
+  <text x="440" y="304" text-anchor="middle" class="small">120Ω</text>
+
+  <!-- GPIO out to SSR-04, well clear of both boxes and the CAN-B line above -->
+  <path d="M 430 356 L 610 356" class="gpio"/>
+  <text x="520" y="349" text-anchor="middle" class="small" fill="#e67e22">GPIO25 → IN1 (precharge)</text>
+  <path d="M 430 374 L 610 374" class="gpio"/>
+  <text x="520" y="367" text-anchor="middle" class="small" fill="#e67e22">GPIO32 → IN2 (+cont.)</text>
+  <path d="M 430 392 L 610 392" class="gpio"/>
+  <text x="520" y="410" text-anchor="middle" class="small" fill="#e67e22">GPIO33 → IN3 (−cont.)</text>
+
+  <!-- ============ SSR-04 ============ -->
+  <rect x="610" y="320" width="220" height="130" class="ssr"/>
+  <rect x="610" y="320" width="220" height="22" fill="#4444aa"/>
+  <text x="720" y="336" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">SSR-04 (4-ch solid-state relay)</text>
+  <text x="720" y="358" class="small" text-anchor="middle">IN1/2/3 ← LilyGo GPIO (3.3V)</text>
+  <text x="720" y="371" class="small" text-anchor="middle">IN-common = LV GND</text>
+  <text x="720" y="384" class="small" text-anchor="middle">Load supply = 12V rail (tap left)</text>
+  <text x="720" y="399" class="small" text-anchor="middle" font-weight="700">OUT1 → Precharge coil bus</text>
+  <text x="720" y="412" class="small" text-anchor="middle" font-weight="700">OUT2 → +Contactor coil bus</text>
+  <text x="720" y="425" class="small" text-anchor="middle" font-weight="700">OUT3 → −Contactor coil bus</text>
+  <text x="720" y="438" class="small" text-anchor="middle">CH4 = spare (E-stop LED / fan)</text>
+
+  <!-- SSR outputs down to buses (own lanes, clear of everything) -->
+  <path d="M 660 450 L 660 525" class="lv12sw"/>
+  <path d="M 720 450 L 720 550" class="lv12sw"/>
+  <path d="M 780 450 L 780 575" class="lv12sw"/>
+
+  <!-- ============ CAN-A: Pack1 <-> LilyGo ============ -->
+  <path d="M 210 370 Q 130 370 130 650" class="cana"/>
+  <text x="95" y="490" class="small" fill="#009933" transform="rotate(-90,95,490)">CAN-A H/L (Pack 1 only)</text>
+  <rect x="108" y="362" width="44" height="16" class="term"/>
+  <text x="130" y="374" text-anchor="middle" class="small">120Ω term</text>
+  <text x="130" y="342" text-anchor="middle" class="small">(add here — pack end</text>
+  <text x="130" y="353" text-anchor="middle" class="small">already terminated)</text>
+
+  <!-- ============ Waveshare isolated CAN HAT ============ -->
+  <rect x="900" y="320" width="220" height="90" class="can"/>
+  <rect x="900" y="320" width="220" height="22" fill="#7a2ec2"/>
+  <text x="1010" y="336" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">Waveshare 2-CH Isolated CAN HAT</text>
+  <text x="1010" y="356" text-anchor="middle" class="small">Logic side ← LilyGo CAN-B</text>
+  <text x="1010" y="369" text-anchor="middle" class="small">Isolated side → FoxESS CAN port</text>
+  <text x="1010" y="384" text-anchor="middle" class="warn">Mandatory — FoxESS CAN pins can</text>
+  <text x="1010" y="396" text-anchor="middle" class="warn">float up to ±110V vs PE</text>
+
+  <!-- CAN-B isolated segment: Waveshare -> FoxESS, routed clear of E-stop -->
+  <path d="M 1120 350 L 1260 350 L 1260 210" class="canb"/>
+  <circle cx="1260" cy="210" r="4" fill="#7a2ec2"/>
+  <text x="1270" y="206" class="small" fill="#7a2ec2">→ FoxESS KH10.5</text>
+  <text x="1270" y="218" class="small" fill="#7a2ec2">CAN port (see full SLD)</text>
+  <rect x="1190" y="342" width="40" height="16" class="term"/>
+  <text x="1210" y="354" text-anchor="middle" class="small">120Ω</text>
+  <text x="1150" y="330" class="small" fill="#7a2ec2">(isolated side, after HAT)</text>
+
+  <!-- ============ FIVE HORIZONTAL DAISY BUSES ============ -->
+  <line x1="150" y1="500" x2="1470" y2="500" class="lv12sw"/>
+  <text x="1476" y="504" class="legend" fill="#0066cc">PIN1 BUS (12V, via E-stop)</text>
+
+  <line x1="150" y1="525" x2="1350" y2="525" class="gnd"/>
+  <text x="1356" y="529" class="legend">GND BUS (Yazaki Pin 2)</text>
+
+  <line x1="150" y1="550" x2="1350" y2="550" class="lv12sw"/>
+  <text x="1356" y="554" class="legend" fill="#0066cc">PRECHARGE COIL BUS (OUT1)</text>
+
+  <line x1="150" y1="575" x2="1350" y2="575" class="lv12sw"/>
+  <text x="1356" y="579" class="legend" fill="#0066cc">+CONTACTOR COIL BUS (OUT2)</text>
+
+  <line x1="150" y1="600" x2="1350" y2="600" class="lv12sw"/>
+  <text x="1356" y="604" class="legend" fill="#0066cc">−CONTACTOR COIL BUS (OUT3)</text>
+
+  <!-- ============ 3 PACKS with Yazaki mini pin table ============ -->
+  <g>
+    <!-- PACK 1 -->
+    <rect x="190" y="650" width="290" height="235" class="pack"/>
+    <text x="335" y="670" text-anchor="middle" class="ttl" font-size="12">PACK 1 — Nissan e-NV200</text>
+    <text x="335" y="685" text-anchor="middle" class="small">Yazaki 7287-1065-30, 36-pin</text>
+    <g font-family="monospace">
+      <rect x="206" y="694" width="258" height="18" class="pin"/><text x="214" y="707" class="small">Pin 1  BAT+IGN (12V wake)  ← PIN1 BUS</text>
+      <rect x="206" y="714" width="258" height="18" class="pin"/><text x="214" y="727" class="small">Pin 2  GND                ← GND BUS</text>
+      <rect x="206" y="734" width="258" height="18" fill="#e8ffe8" stroke="#009933"/><text x="214" y="747" class="small" fill="#009933" font-weight="700">Pin 3  CAN-H → LilyGo CAN-A H (ONLY here)</text>
+      <rect x="206" y="754" width="258" height="18" fill="#e8ffe8" stroke="#009933"/><text x="214" y="767" class="small" fill="#009933" font-weight="700">Pin 4  CAN-L → LilyGo CAN-A L (ONLY here)</text>
+      <rect x="206" y="774" width="258" height="18" class="pin"/><text x="214" y="787" class="small">Precharge coil  ← PRECHARGE BUS</text>
+      <rect x="206" y="794" width="258" height="18" class="pin"/><text x="214" y="807" class="small">+Cont. coil     ← +CONT BUS</text>
+      <rect x="206" y="814" width="258" height="18" class="pin"/><text x="214" y="827" class="small">−Cont. coil     ← −CONT BUS</text>
+      <rect x="206" y="834" width="258" height="18" fill="#ffe8e8" stroke="#aa0000"/><text x="335" y="847" text-anchor="middle" class="small" fill="#aa0000" font-weight="700">Pins 5–36: cell taps/NTC — DO NOT CONNECT</text>
+    </g>
+    <text x="335" y="866" text-anchor="middle" class="small">Exact coil pin numbers: DALA wiki "Nissan LEAF / e-NV200"</text>
+
+    <!-- PACK 2 -->
+    <rect x="510" y="650" width="290" height="235" class="pack"/>
+    <text x="655" y="670" text-anchor="middle" class="ttl" font-size="12">PACK 2 — Nissan e-NV200</text>
+    <text x="655" y="685" text-anchor="middle" class="small">Yazaki 7287-1065-30, 36-pin</text>
+    <g font-family="monospace">
+      <rect x="526" y="694" width="258" height="18" class="pin"/><text x="534" y="707" class="small">Pin 1  BAT+IGN (12V wake)  ← PIN1 BUS</text>
+      <rect x="526" y="714" width="258" height="18" class="pin"/><text x="534" y="727" class="small">Pin 2  GND                ← GND BUS</text>
+      <rect x="526" y="734" width="258" height="18" fill="#f2f2f2" stroke="#999"/><text x="534" y="747" class="small">Pin 3  CAN-H — leave open (not wired)</text>
+      <rect x="526" y="754" width="258" height="18" fill="#f2f2f2" stroke="#999"/><text x="534" y="767" class="small">Pin 4  CAN-L — leave open (not wired)</text>
+      <rect x="526" y="774" width="258" height="18" class="pin"/><text x="534" y="787" class="small">Precharge coil  ← PRECHARGE BUS</text>
+      <rect x="526" y="794" width="258" height="18" class="pin"/><text x="534" y="807" class="small">+Cont. coil     ← +CONT BUS</text>
+      <rect x="526" y="814" width="258" height="18" class="pin"/><text x="534" y="827" class="small">−Cont. coil     ← −CONT BUS</text>
+      <rect x="526" y="834" width="258" height="18" fill="#ffe8e8" stroke="#aa0000"/><text x="655" y="847" text-anchor="middle" class="small" fill="#aa0000" font-weight="700">Pins 5–36: cell taps/NTC — DO NOT CONNECT</text>
+    </g>
+    <text x="655" y="866" text-anchor="middle" class="small">Own internal BMS runs OEM protection unattended</text>
+
+    <!-- PACK 3 -->
+    <rect x="830" y="650" width="290" height="235" class="pack"/>
+    <text x="975" y="670" text-anchor="middle" class="ttl" font-size="12">PACK 3 — Nissan e-NV200</text>
+    <text x="975" y="685" text-anchor="middle" class="small">Yazaki 7287-1065-30, 36-pin</text>
+    <g font-family="monospace">
+      <rect x="846" y="694" width="258" height="18" class="pin"/><text x="854" y="707" class="small">Pin 1  BAT+IGN (12V wake)  ← PIN1 BUS</text>
+      <rect x="846" y="714" width="258" height="18" class="pin"/><text x="854" y="727" class="small">Pin 2  GND                ← GND BUS</text>
+      <rect x="846" y="734" width="258" height="18" fill="#f2f2f2" stroke="#999"/><text x="854" y="747" class="small">Pin 3  CAN-H — leave open (not wired)</text>
+      <rect x="846" y="754" width="258" height="18" fill="#f2f2f2" stroke="#999"/><text x="854" y="767" class="small">Pin 4  CAN-L — leave open (not wired)</text>
+      <rect x="846" y="774" width="258" height="18" class="pin"/><text x="854" y="787" class="small">Precharge coil  ← PRECHARGE BUS</text>
+      <rect x="846" y="794" width="258" height="18" class="pin"/><text x="854" y="807" class="small">+Cont. coil     ← +CONT BUS</text>
+      <rect x="846" y="814" width="258" height="18" class="pin"/><text x="854" y="827" class="small">−Cont. coil     ← −CONT BUS</text>
+      <rect x="846" y="834" width="258" height="18" fill="#ffe8e8" stroke="#aa0000"/><text x="975" y="847" text-anchor="middle" class="small" fill="#aa0000" font-weight="700">Pins 5–36: cell taps/NTC — DO NOT CONNECT</text>
+    </g>
+    <text x="975" y="866" text-anchor="middle" class="small">Own internal BMS runs OEM protection unattended</text>
+  </g>
+
+  <!-- vertical drops from buses into each pack's Yazaki block -->
+  <g>
+    <line x1="335" y1="500" x2="335" y2="694" class="lv12sw"/>
+    <line x1="347" y1="525" x2="347" y2="714" class="gnd"/>
+    <line x1="359" y1="550" x2="359" y2="774" class="lv12sw"/>
+    <line x1="371" y1="575" x2="371" y2="794" class="lv12sw"/>
+    <line x1="383" y1="600" x2="383" y2="814" class="lv12sw"/>
+
+    <line x1="655" y1="500" x2="655" y2="694" class="lv12sw"/>
+    <line x1="667" y1="525" x2="667" y2="714" class="gnd"/>
+    <line x1="679" y1="550" x2="679" y2="774" class="lv12sw"/>
+    <line x1="691" y1="575" x2="691" y2="794" class="lv12sw"/>
+    <line x1="703" y1="600" x2="703" y2="814" class="lv12sw"/>
+
+    <line x1="975" y1="500" x2="975" y2="694" class="lv12sw"/>
+    <line x1="987" y1="525" x2="987" y2="714" class="gnd"/>
+    <line x1="999" y1="550" x2="999" y2="774" class="lv12sw"/>
+    <line x1="1011" y1="575" x2="1011" y2="794" class="lv12sw"/>
+    <line x1="1023" y1="600" x2="1023" y2="814" class="lv12sw"/>
+  </g>
+
+  <!-- ============ NOTES ============ -->
+  <rect x="20" y="915" width="1560" height="100" fill="#fffbe0" stroke="#aa8800" stroke-width="1"/>
+  <text x="32" y="932" class="lblw">Key rules for LV wiring:</text>
+  <text x="32" y="947" class="lbl">• The 5 daisy signals (Pin1, GND, Precharge, +Cont, −Cont) are IDENTICAL wiring on all 3 Yazaki connectors — same 5 wires run pack-to-pack-to-pack.</text>
+  <text x="32" y="962" class="lbl">• CAN-A (pins 3/4) is the ONE exception — only Pack 1 connects it. Packs 2 &amp; 3 leave pins 3/4 open, insulated, labelled "do not touch".</text>
+  <text x="32" y="977" class="lbl">• Add a 120Ω termination resistor across CAN-H/L at the LilyGo end of CAN-A. On CAN-B, add one at the LilyGo end AND one at the FoxESS end (after the isolator).</text>
+  <text x="32" y="992" class="lbl">• E-stop is wired in series with the Pin1 (BAT+IGN) feed ONLY — it does not cut the 12V rail feeding LilyGo/SSR-04, so status/telemetry stays alive when tripped.</text>
+  <text x="32" y="1007" class="lbl">• Bench-test LV side fully (LilyGo web UI shows Pack 1 BMS data, SSR outputs measured with DMM) BEFORE inserting any Service Disconnect Plug. See NODE3_DEFINITIVE.md §8 commissioning sequence.</text>
+</svg>

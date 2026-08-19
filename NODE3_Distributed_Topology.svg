@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 850" font-family="Inter, Arial, sans-serif" font-size="12">
+  <style>
+    .pack { fill: #fff3d6; stroke: #b08800; stroke-width: 2; }
+    .pbox { fill: #ffe0e0; stroke: #aa0000; stroke-width: 2; }
+    .hvbox { fill: #ffd5d5; stroke: #800000; stroke-width: 2; }
+    .lvbox { fill: #e0f0ff; stroke: #0044aa; stroke-width: 2; }
+    .piwan { fill: #e6ffe6; stroke: #006600; stroke-width: 2; }
+    .inverter { fill: #f0f0f0; stroke: #000; stroke-width: 2; }
+    .hv { stroke: #cc0000; stroke-width: 3; fill: none; }
+    .lv { stroke: #0066cc; stroke-width: 2; fill: none; }
+    .can { stroke: #009933; stroke-width: 2; fill: none; }
+    .gnd { stroke: #555; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    .ttl { font-size: 13px; font-weight: 700; fill: #000; }
+    .lbl { font-size: 11px; fill: #222; }
+    .small { font-size: 9px; fill: #555; }
+    .key { font-size: 10px; font-weight: 700; }
+  </style>
+
+  <text x="600" y="25" text-anchor="middle" class="ttl">NODE-3 Distributed Topology — small boxes near each pack + central busbar + LV control + Pi/WAN</text>
+  <text x="600" y="42" text-anchor="middle" class="small">~30 cm OEM aux cables stay short; bespoke-length 35 mm² runs go to the central busbar</text>
+
+  <!-- ====== Top row: 3 packs ====== -->
+  <g>
+    <rect x="60"  y="80" width="170" height="100" class="pack" rx="6"/>
+    <text x="145" y="105" text-anchor="middle" class="ttl">PACK 1</text>
+    <text x="145" y="122" text-anchor="middle" class="small">Nissan e-NV200 24 kWh</text>
+    <text x="145" y="138" text-anchor="middle" class="small">OEM Sumitomo HV (~30 cm)</text>
+    <text x="145" y="154" text-anchor="middle" class="small">Yazaki 36-pin (BMS)</text>
+    <text x="145" y="170" text-anchor="middle" class="small">SDP green flag</text>
+
+    <rect x="515" y="80" width="170" height="100" class="pack" rx="6"/>
+    <text x="600" y="105" text-anchor="middle" class="ttl">PACK 2</text>
+    <text x="600" y="122" text-anchor="middle" class="small">Nissan e-NV200 24 kWh</text>
+    <text x="600" y="138" text-anchor="middle" class="small">OEM Sumitomo HV (~30 cm)</text>
+    <text x="600" y="154" text-anchor="middle" class="small">Yazaki 36-pin (BMS)</text>
+    <text x="600" y="170" text-anchor="middle" class="small">SDP green flag</text>
+
+    <rect x="970" y="80" width="170" height="100" class="pack" rx="6"/>
+    <text x="1055" y="105" text-anchor="middle" class="ttl">PACK 3</text>
+    <text x="1055" y="122" text-anchor="middle" class="small">Nissan e-NV200 24 kWh</text>
+    <text x="1055" y="138" text-anchor="middle" class="small">OEM Sumitomo HV (~30 cm)</text>
+    <text x="1055" y="154" text-anchor="middle" class="small">Yazaki 36-pin (BMS)</text>
+    <text x="1055" y="170" text-anchor="middle" class="small">SDP green flag</text>
+  </g>
+
+  <!-- ====== Row 2: 3 per-pack breaker boxes ====== -->
+  <g>
+    <rect x="60" y="220" width="170" height="100" class="pbox" rx="6"/>
+    <text x="145" y="240" text-anchor="middle" class="ttl">Pack 1 BREAKER BOX</text>
+    <text x="145" y="256" text-anchor="middle" class="small">Small steel IP65, ~150×150×80</text>
+    <text x="145" y="271" text-anchor="middle" class="small">1× TOMZN DC 2P 32A</text>
+    <text x="145" y="285" text-anchor="middle" class="small">M40 in (Sumitomo cable)</text>
+    <text x="145" y="299" text-anchor="middle" class="small">M40 out (35 mm² to central)</text>
+    <text x="145" y="313" text-anchor="middle" class="small">PE bonded</text>
+
+    <rect x="515" y="220" width="170" height="100" class="pbox" rx="6"/>
+    <text x="600" y="240" text-anchor="middle" class="ttl">Pack 2 BREAKER BOX</text>
+    <text x="600" y="256" text-anchor="middle" class="small">Small steel IP65, ~150×150×80</text>
+    <text x="600" y="271" text-anchor="middle" class="small">1× TOMZN DC 2P 32A</text>
+    <text x="600" y="285" text-anchor="middle" class="small">M40 in (Sumitomo cable)</text>
+    <text x="600" y="299" text-anchor="middle" class="small">M40 out (35 mm² to central)</text>
+    <text x="600" y="313" text-anchor="middle" class="small">PE bonded</text>
+
+    <rect x="970" y="220" width="170" height="100" class="pbox" rx="6"/>
+    <text x="1055" y="240" text-anchor="middle" class="ttl">Pack 3 BREAKER BOX</text>
+    <text x="1055" y="256" text-anchor="middle" class="small">Small steel IP65, ~150×150×80</text>
+    <text x="1055" y="271" text-anchor="middle" class="small">1× TOMZN DC 2P 32A</text>
+    <text x="1055" y="285" text-anchor="middle" class="small">M40 in (Sumitomo cable)</text>
+    <text x="1055" y="299" text-anchor="middle" class="small">M40 out (35 mm² to central)</text>
+    <text x="1055" y="313" text-anchor="middle" class="small">PE bonded</text>
+  </g>
+
+  <!-- HV cables: pack → breaker box (short OEM) -->
+  <line x1="145" y1="180" x2="145" y2="220" class="hv"/>
+  <line x1="600" y1="180" x2="600" y2="220" class="hv"/>
+  <line x1="1055" y1="180" x2="1055" y2="220" class="hv"/>
+  <text x="155" y="200" class="small" fill="#cc0000">OEM Sumitomo, ~30 cm</text>
+  <text x="610" y="200" class="small" fill="#cc0000">OEM Sumitomo, ~30 cm</text>
+  <text x="1065" y="200" class="small" fill="#cc0000">OEM Sumitomo, ~30 cm</text>
+
+  <!-- ====== Central busbar box ====== -->
+  <rect x="380" y="430" width="440" height="140" class="hvbox" rx="6"/>
+  <text x="600" y="455" text-anchor="middle" class="ttl">CENTRAL HV BUSBAR BOX</text>
+  <text x="600" y="473" text-anchor="middle" class="small">Steel IP65, ~250×200×150 (TLC CMSB-class)</text>
+  <text x="600" y="491" text-anchor="middle" class="small">• + busbar (tinned Cu 6×30 mm × 200 mm on insulated standoffs)</text>
+  <text x="600" y="506" text-anchor="middle" class="small">• − busbar (same)</text>
+  <text x="600" y="521" text-anchor="middle" class="small">• 1× TOMZN DC 2P 32A — MASTER isolator (BUY 4th)</text>
+  <text x="600" y="536" text-anchor="middle" class="small">• Phoenix USLKG 6 PE busbar — bonded to mains earth</text>
+  <text x="600" y="551" text-anchor="middle" class="small">• 3× M40 glands in (one per pack), 1× M40 gland out (to inverter)</text>
+  <text x="600" y="566" text-anchor="middle" class="small">• NO LV inside — keeps clean HV/LV segregation between enclosures</text>
+
+  <!-- HV cables: breaker box → central busbar -->
+  <path d="M 145 320 L 145 400 L 420 400 L 420 430" class="hv"/>
+  <path d="M 600 320 L 600 430" class="hv"/>
+  <path d="M 1055 320 L 1055 400 L 780 400 L 780 430" class="hv"/>
+  <text x="240" y="395" class="small" fill="#cc0000">35 mm² orange H07RN-F · bespoke length · hex-crimped M8 lugs</text>
+
+  <!-- ====== Inverter ====== -->
+  <rect x="970" y="600" width="170" height="100" class="inverter" rx="6"/>
+  <text x="1055" y="625" text-anchor="middle" class="ttl">FoxESS KH10.5</text>
+  <text x="1055" y="643" text-anchor="middle" class="small">HV Hybrid Inverter</text>
+  <text x="1055" y="660" text-anchor="middle" class="small">10.5 kW · 230 V AC out</text>
+  <text x="1055" y="678" text-anchor="middle" class="small">G99 grid-tied</text>
+
+  <!-- HV: busbar box → inverter -->
+  <path d="M 820 500 L 970 500 L 970 600" class="hv"/>
+  <text x="830" y="495" class="small" fill="#cc0000">35 mm² to inverter</text>
+
+  <!-- ====== LV / Control box ====== -->
+  <rect x="60" y="430" width="280" height="200" class="lvbox" rx="6"/>
+  <text x="200" y="455" text-anchor="middle" class="ttl">LV / CONTROL BOX</text>
+  <text x="200" y="473" text-anchor="middle" class="small">Plastic IP54/65, ~300×200×150 — NO HV inside</text>
+  <text x="200" y="492" text-anchor="middle" class="small">• Mean Well DR-60-12 PSU (230 VAC → 12 VDC)</text>
+  <text x="200" y="507" text-anchor="middle" class="small">• LilyGo T-2CAN ESP32-S3 (DALA)</text>
+  <text x="200" y="522" text-anchor="middle" class="small">• SSR-04 5DD-CN (3 channels used)</text>
+  <text x="200" y="537" text-anchor="middle" class="small">• Waveshare 2-CH Isolated CAN HAT</text>
+  <text x="200" y="552" text-anchor="middle" class="small">• DROK 12→5V buck, terminal blocks</text>
+  <text x="200" y="567" text-anchor="middle" class="small">• MCP3008 ADC for CT/temp inputs</text>
+  <text x="200" y="582" text-anchor="middle" class="small">• E-stop button on lid (NC, latching)</text>
+  <text x="200" y="600" text-anchor="middle" class="small">• 230 VAC mains in via M25 gland</text>
+  <text x="200" y="616" text-anchor="middle" class="small">• 5-cond. multicore out to Yazaki daisy point</text>
+
+  <!-- ====== Pi / WAN box (existing plastic clear-lid) ====== -->
+  <rect x="60" y="690" width="280" height="120" class="piwan" rx="6"/>
+  <text x="200" y="713" text-anchor="middle" class="ttl">Pi + WAN BOX (existing)</text>
+  <text x="200" y="730" text-anchor="middle" class="small">Plastic, clear-gasket clip lid</text>
+  <text x="200" y="747" text-anchor="middle" class="small">• Raspberry Pi 4 4GB + heatsink/fan</text>
+  <text x="200" y="762" text-anchor="middle" class="small">• ZTE 4G router (LAN → Pi)</text>
+  <text x="200" y="777" text-anchor="middle" class="small">• 12 V feed from LV box (or own DROK)</text>
+  <text x="200" y="792" text-anchor="middle" class="small">• Telemetry, NODE3 portal,</text>
+  <text x="200" y="805" text-anchor="middle" class="small">  Octopus Agile integration</text>
+
+  <!-- ====== Yazaki daisy junction (annotation node) ====== -->
+  <rect x="380" y="610" width="440" height="60" fill="#fff8e0" stroke="#aa8800" stroke-width="1.5" rx="4"/>
+  <text x="600" y="630" text-anchor="middle" class="lbl" font-weight="700">YAZAKI DAISY JUNCTION (small junction box near packs OR inside one breaker box)</text>
+  <text x="600" y="647" text-anchor="middle" class="small">3× Yazaki harnesses meet here. Common bus: BAT+IGN (Pin 1), GND, Precharge coil, +Cont coil, −Cont coil</text>
+  <text x="600" y="660" text-anchor="middle" class="small">Single 5-conductor (CY shielded) multicore goes back to LV/control box. Only Pack 1's CAN-H/CAN-L joins it (2 extra cores).</text>
+
+  <!-- LV / CAN routing -->
+  <!-- Yazaki harnesses (3) into daisy -->
+  <path d="M 200 180 Q 200 360 380 640" class="lv"/>
+  <path d="M 575 180 Q 540 400 540 610" class="lv"/>
+  <path d="M 1010 180 Q 800 400 800 610" class="lv"/>
+  <text x="240" y="370" class="small" fill="#0066cc">Yazaki 1 (CAN+coils)</text>
+  <text x="460" y="370" class="small" fill="#0066cc">Yazaki 2 (coils)</text>
+  <text x="850" y="370" class="small" fill="#0066cc">Yazaki 3 (coils)</text>
+
+  <!-- Daisy → LV control box -->
+  <path d="M 380 640 L 340 640 L 340 530 L 340 530" class="lv"/>
+
+  <!-- LV → Pi/WAN box -->
+  <line x1="200" y1="630" x2="200" y2="690" class="gnd"/>
+  <text x="210" y="660" class="small">12 V + LAN</text>
+
+  <!-- CAN from LV box to FoxESS -->
+  <path d="M 340 540 Q 880 540 970 640" class="can"/>
+  <text x="650" y="580" class="small" fill="#009933">CAN to FoxESS (isolated, via Waveshare HAT)</text>
+
+  <!-- Earth bonding rail -->
+  <line x1="40" y1="830" x2="1160" y2="830" class="gnd"/>
+  <text x="600" y="845" text-anchor="middle" class="small">PE earth — all metal boxes + pack chassis + inverter chassis bonded to single point</text>
+
+  <!-- Legend -->
+  <g transform="translate(870, 750)">
+    <rect x="0" y="0" width="290" height="80" fill="#fffbe0" stroke="#aa8800" stroke-width="1"/>
+    <text x="10" y="18" class="key" fill="#cc0000">━━━ HV DC (35 mm² orange)</text>
+    <text x="10" y="34" class="key" fill="#0066cc">━━━ LV 12 V (multicore CY)</text>
+    <text x="10" y="50" class="key" fill="#009933">━━━ CAN bus (isolated to FoxESS)</text>
+    <text x="10" y="66" class="key" fill="#555">─ ─ ─ Earth bonding</text>
+  </g>
+</svg>

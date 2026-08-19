@@ -12,8 +12,8 @@
 
 | # | Action | Owner | Deadline | Notes |
 |---|--------|-------|----------|-------|
-| 1 | **Accept G99 offer FJJ907/1 via SSEN portal** | Matt | **27 Aug 2026** | ssen.co.uk — £0, 5.5kW export. Do this NOW to unblock commissioning + ElectronConnect eligibility. |
-| 2 | **Reply to Andrea Keith — request 10.5kW formal load increase quote** | Matt | ASAP | andrea.keith@sse.com. One email does both: accept 5.5kW AND request 10.5kW cost. Draft in this doc ↓ |
+| 1 | ~~Accept G99 offer FJJ907/1~~ | Matt | ✅ **DONE 2 Jun 2026** | Acceptance + 10.5kW load increase request sent to Andrea Keith. |
+| 2 | ~~Send VPP/VLP chase emails~~ | Matt | ✅ **DONE 2 Jun 2026** | Octopus, Elexon (CS0019840), Flexitricity all sent |
 | 3 | **Submit Service Agreement on ElectronConnect (mini-competition)** | Matt | **8–22 June 2026** | Window opens 8 June 11am. Log into electronconnect.net. Accept T&Cs — no consultant needed, it's a form. |
 | 4 | **Provide updated SLD to SSEN** | Matt | Before commissioning | Current SLD: DSL-SLD-001 Rev B. Required before energisation. |
 | 5 | **Chase Octopus VPP** | Matt | Soon | power@octopus.energy — sent 20 Apr, no reply. Key aggregator candidate for long-term BM/VLP revenue. |
@@ -41,7 +41,8 @@
 | 14 May 2026 | NorthMicroGen sent second "more info" request (same items, chasing) | ✅ Received |
 | 16 May 2026 | Matt replied with full 7-attachment package | ✅ Done |
 | 29 May 2026 | **SSEN issued Quotation FJJ907/1** — offer for 5.5kW export at £0 | ✅ Received |
-| 27 Aug 2026 | Offer expiry (90 days from 29 May) | ⏳ Pending acceptance |
+| 2 Jun 2026 | **Acceptance email sent to Andrea Keith** + 10.5kW load increase quote requested | ✅ Done |
+| 27 Aug 2026 | Offer expiry (90 days from 29 May) | ✅ Accepted — no longer at risk |
 
 ### Documents Submitted (16 May 2026 response)
 1. `G99_MoreInfo_Response.pdf` — Covering letter confirming site details
@@ -109,9 +110,9 @@
 | Party | Action Taken | Date | Status | Next Action |
 |-------|-------------|------|--------|-------------|
 | **Engage Consulting** | Proposal received (28 Apr), Matt replied positively (29 Apr), Tom suggested 7 May follow-up call | 30 Apr 2026 | ⏸️ **ON HOLD** — Matt cannot afford fees at this stage. Will proceed via aggregator route instead. | No action needed for now. |
-| **Octopus VPP** | Email to power@octopus.energy (subject: VPP Participation Enquiry) | 20 Apr 2026 | ❓ Awaiting response | Chase if no reply received |
-| **Elexon VLP** | Case CS0019840 submitted via support.elexon.co.uk | 20 Apr 2026 | ❓ Awaiting response | Chase Elexon re VLP eligibility at 10.5kW, BSC registration process |
-| **Flexitricity** | Email enquiry sent | 20 Apr 2026 | ❓ Awaiting response | Chase if no reply |
+| **Octopus VPP** | Chase email sent to power@octopus.energy | 2 Jun 2026 | ⏳ Awaiting response | — |
+| **Elexon VLP** | Chase sent via CS0019840 portal — chasing promised market entry email + Market Design input | 2 Jun 2026 | ⏳ Awaiting response | — |
+| **Flexitricity** | First contact email sent to info@flexitricity.com | 2 Jun 2026 | ⏳ Awaiting response | — |
 
 ### Commercial Context
 - **Agile arbitrage only**: ~£350/yr — not worth pursuing alone

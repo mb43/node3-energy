@@ -25,33 +25,81 @@ import requests
 from datetime import datetime, timedelta, timezone
 
 # ---------------------------------------------
+# LP OPTIMISER AVAILABILITY CHECK
+# ---------------------------------------------
+# plan_optimal_dispatch() needs scipy for the actual LP solve. If it's missing,
+# the code silently falls back to a crude greedy heuristic with a mis-calibrated
+# breakeven threshold — it will happily keep "charging" a full battery and barely
+# ever discharge, quietly bleeding money with zero visible warning. Check once,
+# loudly, at import time, so this can never again fail silently in production.
+try:
+    import scipy.optimize  # noqa: F401
+    import numpy  # noqa: F401
+    SCIPY_AVAILABLE = True
+except ImportError as _scipy_err:
+    SCIPY_AVAILABLE = False
+    print("=" * 70)
+    print("[FATAL WARNING] scipy/numpy NOT AVAILABLE — LP-optimal dispatch is")
+    print("                 DISABLED. Falling back to crude greedy heuristic.")
+    print("                 Import error: " + str(_scipy_err))
+    print("                 Fix: pip3 install -r requirements.txt")
+    print("                 This WILL cause poor/negative arbitrage results.")
+    print("=" * 70)
+
+# ---------------------------------------------
 # CONFIGURATION
 # ---------------------------------------------
-BATTERY_KWH        = 72.0    # 3x Nissan e-NV200 packs = 72kWh nominal
-MIN_SOC_KWH        = 7.2     # 10% absolute floor (protection — hardware limit)
+# Battery capacity, import (charge) rate and export (discharge) rate are now
+# operator-configurable — see node3_config.py / node3_config.json, editable via
+# /api/settings + the dashboard SETTINGS panel. Defaults set 19 Aug 2026 per
+# Matt's explicit instruction: 72kWh / 10kW import / 6kW export.
+#
+# NOTE ON ASYMMETRIC RATES: an earlier standing instruction ("symmetric rates
+# hard rule") required charge == export, added after a genuine bug where the
+# LP was silently falling back to a crude greedy heuristic whose breakeven
+# formula got mis-calibrated by asymmetric caps, making every session look
+# like a loss. Root-caused 19 Aug 2026: the REAL bug was scipy/numpy being
+# missing (see SCIPY_AVAILABLE below) causing a SILENT fallback with zero
+# warning — confirmed by reproducing the live dispatch_plan.json byte-for-byte
+# from that fallback. With the LP actually running (now guaranteed visible via
+# lp_available + the dashboard banner if it ever breaks again), asymmetric
+# import/export caps were directly tested and confirmed safe — the LP simply
+# never schedules a charge it can't profitably use, for any starting SOC from
+# empty to full. Matt has since explicitly asked for independently configurable
+# import/export rates (10kW / 6kW), so asymmetric-by-design is intentional
+# here, not a regression of the old bug.
+import node3_config as _cfg
+_CFG = _cfg.load_config()
+
+BATTERY_KWH        = _CFG["battery_kwh"]    # 3x Nissan e-NV200 packs, default 72kWh
+MIN_SOC_KWH        = BATTERY_KWH * (_CFG["min_soc_pct"] / 100.0)   # default 10% floor
 RESERVE_SOC_KWH    = 36.0    # 50% operational reserve — maintain this between sessions
                               # Regular trades only use capacity ABOVE this floor.
                               # VLP events (>=40p) may draw into the reserve down to MIN_SOC.
-                              # Purpose: 72kWh battery must always be ready to capitalise on
+                              # Purpose: battery must always be ready to capitalise on
                               # price spikes; starting depleted destroys arbitrage capacity.
-INITIAL_SOC_KWH    = 36.0    # starting SOC assumption when real state unavailable (50%)
-INVERTER_KW        = 10.5    # FoxESS KH10.5 hard inverter limit — never exceeded
+INITIAL_SOC_KWH    = BATTERY_KWH * 0.5   # starting SOC assumption when real state unavailable
+INVERTER_KW        = _CFG["import_kw"]   # configurable import/charge rate (default 10kW)
 DAILY_LOAD_KWH     = 12.0    # household consumption per day
 SOLAR_KWP          = 0.0     # no solar modelled (pure arbitrage)
 SOLAR_EFFICIENCY   = 0.18    # panel efficiency
 ROUND_TRIP_EFF     = 0.88    # FoxESS + Nissan cell round-trip efficiency
 
-# ── DNO export caps (asymmetric: charging is inverter-limited, export is DNO-limited) ──
-# G98 caps EXPORT at 3.68 kWh/slot (32A × 230V × 0.5h) — does NOT cap charging.
-# Charging rate is set by the FoxESS KH10.5 inverter: 10.5 kW = 5.25 kWh/slot.
-# G99 raises EXPORT cap to 5.75 kWh/slot (50A × 230V × 0.5h). Charging unchanged.
-EXPORT_KWH_G98     = 3.68    # 32A × 230V × 0.5h  — G98 DNO export cap (active)
-EXPORT_KWH_G99     = 5.75    # 50A × 230V × 0.5h  — G99 target (ref 260420-000198)
+# ── Export caps ────────────────────────────────────────────────────────────
+# G98 (Matt's actual current DNO connection) uses the configurable export_kw
+# setting (default 6kW / 3.0 kWh-per-slot) — a self-imposed operating limit,
+# safely below the real G98 legal maximum (32A = 7.36kW = 3.68 kWh/slot).
+# G99 stays a FIXED, real DNO-defined figure (50A = 11.5kW = 5.75 kWh/slot):
+# it represents a hypothetical upgraded grid connection for the comparison
+# tabs, not a tunable operating choice, so it is intentionally NOT wired to
+# node3_config.
+EXPORT_KWH_G98     = _CFG["export_kw"] * 0.5   # configurable, default 3.0 kWh/slot (6kW)
+EXPORT_KWH_G99     = 5.75    # 50A × 230V × 0.5h — fixed G99 target (ref 260420-000198)
 EXPORT_KWH         = EXPORT_KWH_G98   # current active export cap
 
-# ── Charge rate — inverter max, independent of DNO export cap ────────────────
-CHARGE_RATE_KW     = INVERTER_KW     # 10.5 kW — FoxESS KH10.5 inverter max
-CHARGE_KWH         = CHARGE_RATE_KW * 0.5  # 5.25 kWh/slot — charge at full inverter rate
+# ── Charge rate — configurable import limit, independent of export cap ─────
+CHARGE_RATE_KW     = INVERTER_KW     # configurable, default 10kW
+CHARGE_KWH         = CHARGE_RATE_KW * 0.5  # default 5.0 kWh/slot
 
 EXPORT_RATE_P_DEF  = 15.0    # Conservative Octopus Outgoing default (p/kWh) when live
                               # export prices unavailable; live prices preferred
@@ -76,6 +124,13 @@ LON = float(os.environ.get("LONGITUDE", "-1.4"))
 # ---------------------------------------------
 BASE_DIR            = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE          = os.path.join(BASE_DIR, "fleet_state.json")
+STATE_FILE_G99      = os.path.join(BASE_DIR, "fleet_state_g99.json")
+# ^ G99 (50A target) is a shadow simulation run alongside the real G98 (32A)
+# system purely for comparison. It MUST persist to its own file — previously
+# it was re-loaded from fleet_state.json (the G98/real state) every run and
+# never saved anywhere, so its SOC/profit silently reset to G98's numbers on
+# every single run instead of accumulating its own trajectory. Fixed 19 Aug
+# 2026 — this was corrupting the G98 vs G99 comparison tab.
 PRICES_FILE         = os.path.join(BASE_DIR, "prices.json")
 EXPORT_PRICES_FILE  = os.path.join(BASE_DIR, "export_prices.json")
 WEATHER_FILE        = os.path.join(BASE_DIR, "weather.json")
@@ -530,7 +585,12 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
         return {}
 
     discharge_per_slot = export_kwh_cap if export_kwh_cap is not None else EXPORT_KWH
-    charge_per_slot    = CHARGE_KWH           # inverter max: 5.25 kWh/slot (G98 & G99)
+    # Charge cap = the configurable import rate (node3_config, default 10kW/
+    # 5.0kWh-per-slot) — same physical inverter regardless of which export
+    # scenario (G98/G99) is being planned, since import isn't DNO-capped the
+    # way export is. See CHARGE_KWH / asymmetric-rates note near the top of
+    # this file for why this is intentional, not the earlier 5.25-vs-3.68 bug.
+    charge_per_slot    = CHARGE_KWH
     load_per_slot      = DAILY_LOAD_KWH / 48.0
 
     n           = len(price_slots)
@@ -721,6 +781,25 @@ def load_state():
     return _fresh_state()
 
 
+def load_state_g99():
+    """Load the G99 shadow-simulation state from its OWN file (see STATE_FILE_G99
+    comment). Falls back to a fresh state — never to the G98 state file."""
+    if os.path.exists(STATE_FILE_G99):
+        try:
+            with open(STATE_FILE_G99) as f:
+                data = json.load(f)
+            if data and "soc_kwh" in data:
+                return data
+        except Exception:
+            pass
+    return _fresh_state()
+
+
+def save_state_g99(state):
+    with open(STATE_FILE_G99, "w") as f:
+        json.dump(state, f, indent=2)
+
+
 def _fresh_state():
     return {
         'soc_kwh':          INITIAL_SOC_KWH,
@@ -740,6 +819,9 @@ def _fresh_state():
 
 
 def save_state(state):
+    # Always stamp current LP-optimiser availability so the dashboard/API can
+    # surface a visible warning instead of this ever failing silently again.
+    state['lp_available'] = SCIPY_AVAILABLE
     with open(STATE_FILE, "w") as f:
         json.dump(state, f, indent=2)
 
@@ -756,13 +838,27 @@ def simulate_slot(state, price_p, slot_dt, weather, buy_thr, sell_thr,
     No time-of-day restrictions. The plan (or threshold logic) decides
     charge/discharge based on price rank within the full window.
     """
-    charge_kwh_max  = CHARGE_RATE_KW * 0.5    # 5.25 kWh max charge/slot
     export_kwh_slot = export_kwh_cap if export_kwh_cap is not None else EXPORT_KWH
+    # Charge cap = configurable import rate (see plan_optimal_dispatch note above).
+    charge_kwh_max  = CHARGE_KWH
 
-    bat_kwh      = state.get("battery_kwh",    BATTERY_KWH)
+    # ALWAYS use the current config-driven module constants here, never a
+    # value frozen inside the persisted state file. fleet_state.json's
+    # 'battery_kwh' field gets stamped once (in _fresh_state(), the very
+    # first time the file is ever created) and was never re-stamped on
+    # later runs — so once set, it stayed frozen at whatever battery_kwh was
+    # configured back then, forever, no matter how many times /api/settings
+    # was changed afterward or simulate.py re-run. Every simulate.py
+    # invocation is a fresh subprocess that re-reads node3_config.json from
+    # scratch (BATTERY_KWH / MIN_SOC_KWH above), so using those directly is
+    # what actually makes settings changes reach the live dispatch physics
+    # instead of only the display layer. This was the real cause of "SOC
+    # doesn't match settings applied" — the SOC number itself was being
+    # computed against a stale, invisible battery/min-SOC cap.
+    bat_kwh      = BATTERY_KWH
     solar_kwp    = state.get("solar_kwp",      SOLAR_KWP)
     load_kwh_day = state.get("daily_load_kwh", DAILY_LOAD_KWH)
-    min_soc      = bat_kwh * (MIN_SOC_KWH / BATTERY_KWH)
+    min_soc      = MIN_SOC_KWH
 
     slot_load_kwh = load_kwh_day / 48.0
     solar_kwh     = get_solar_kwh_for_slot(weather, slot_dt, kwp=solar_kwp)
@@ -1091,9 +1187,23 @@ def run_single():
     state = load_state()
     if state is None:
         state = _fresh_state()
-    state_g99 = load_state()
+    state_g99 = load_state_g99()
     if state_g99 is None:
         state_g99 = _fresh_state()
+
+    # Re-stamp config-derived fields on every run so a persisted state file
+    # never goes stale relative to node3_config.json. These were previously
+    # only ever set once, in _fresh_state(), the very first time a state
+    # file was created — every run after that silently carried the OLD value
+    # forward via load_state(), even though simulate_slot() itself has been
+    # fixed to compute dispatch physics from the current BATTERY_KWH/
+    # MIN_SOC_KWH regardless. This closes the other half of the gap: the
+    # *reported* battery_kwh (echoed back through /api/fleet to the
+    # dashboard) now matches what was actually just used to compute SOC,
+    # instead of dashboard.html's `node.battery_kwh ?? CFG.BATTERY_KWH`
+    # fallback picking up a frozen old figure.
+    state['battery_kwh']     = BATTERY_KWH
+    state_g99['battery_kwh'] = BATTERY_KWH
 
     # ── STARTUP SEQUENCE ─────────────────────────────────────────────────────────
     # If battery SOC is below the reserve floor (default first-boot or after a deep
@@ -1181,6 +1291,7 @@ def run_single():
                        g99_action=state_g99['last_action'])
 
     save_state(state)
+    save_state_g99(state_g99)
     delta = state_g99['profit_gbp'] - state['profit_gbp']
     print('[DONE] G98: ' + state['last_action']
           + '  ' + str(round(state['last_price_p'], 2)) + 'p'

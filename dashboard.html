@@ -153,6 +153,15 @@
     }
     .chart-title span { color: var(--text); font-size: 13px; }
     canvas { width: 100% !important; }
+    /* Hard safety cap — Chart.js charts created while their tab-panel is
+       display:none (the HISTORICAL tab's charts, which auto-populate before
+       you ever click that tab) can compute a garbage aspect ratio at zero
+       width/height and set themselves an inline height of thousands of
+       pixels, blowing out the whole page and burying the tab bar miles up
+       the scroll. This clamps every canvas's rendered box regardless of
+       whatever inline height Chart.js sets — !important beats an inline
+       style attribute. */
+    canvas { max-height: 340px !important; }
 
 
     /* ══════════════════════════════════════════
@@ -418,6 +427,9 @@
     .stat-card.cyan  { border-color: rgba(57,197,207,0.4); }
     .stat-card.cyan .stat-value { color: var(--cyan); }
     .stat-value.cyan { color: var(--cyan); }
+    .stat-card.red   { border-color: rgba(248,81,73,0.4); }
+    .stat-card.red .stat-value { color: var(--red); }
+    .stat-value.red  { color: var(--red); }
     .stat-card.green-bright { border-color: rgba(63,185,80,0.6); background: rgba(63,185,80,0.06); }
     .stat-card.green-bright .stat-value { color: var(--green); font-size: 26px; }
     .stat-value.green-bright { color: var(--green); }
@@ -719,6 +731,34 @@
 
 <div class="wrapper">
 
+<!-- Stale-data watchdog — hidden unless the most recent recorded slot is old.
+     Added 19 Aug 2026 after the public site was found silently serving data
+     frozen since the .github/workflows cron job was deleted 10 May 2026. -->
+<div id="stale-data-banner" style="display:none;background:#3d1414;border:1px solid var(--red);color:#ffb3ab;padding:10px 16px;border-radius:6px;margin-bottom:10px;font-size:12px;font-weight:bold;letter-spacing:0.3px"></div>
+
+<!-- LP-optimiser watchdog — hidden unless scipy/numpy are missing on the server,
+     which silently downgrades dispatch to a crude greedy heuristic. Added 19 Aug
+     2026 after discovering run-portal-direct.command never installed scipy, so
+     the "LP-optimal dispatch" the README describes had never actually been
+     running — the battery was charging into an already-full pack and barely
+     ever selling, with zero visible indication anywhere on this page. -->
+<div id="lp-unavailable-banner" style="display:none;background:#3d1414;border:1px solid var(--red);color:#ffb3ab;padding:10px 16px;border-radius:6px;margin-bottom:10px;font-size:12px;font-weight:bold;letter-spacing:0.3px">
+  ⚠ LP OPTIMISER UNAVAILABLE — scipy/numpy not installed on the server. Dispatch has
+  fallen back to a crude greedy heuristic that is NOT price-optimal and will produce
+  poor or negative arbitrage results. Run: pip3 install -r requirements.txt, then restart.
+</div>
+
+<!-- Local-JS-fallback watchdog — the Flask server was unreachable, so this page
+     is running runSimulation()'s client-side percentile heuristic instead of
+     the real Python LP. Added 19 Aug 2026 so this is never mistaken for the
+     real figures — same underlying risk as the scipy-fallback bug, just
+     triggered by a network hiccup instead of a missing dependency. -->
+<div id="local-sim-banner" style="display:none;background:#3d1414;border:1px solid var(--red);color:#ffb3ab;padding:10px 16px;border-radius:6px;margin-bottom:10px;font-size:12px;font-weight:bold;letter-spacing:0.3px">
+  ⚠ SERVER UNREACHABLE — showing a LOCAL ESTIMATE computed in-browser (simple percentile
+  heuristic), NOT the real Python LP-optimal dispatch. Every figure on this page right
+  now is an approximation. Check that server.py is running, then refresh.
+</div>
+
   <!-- HEADER -->
   <div class="header">
     <div class="header-left">
@@ -730,9 +770,39 @@
       <a href="NODE3_Schematic.html" target="_blank" style="display:flex;align-items:center;gap:6px;background:rgba(88,166,255,0.10);border:1px solid rgba(88,166,255,0.35);border-radius:20px;padding:3px 10px;font-size:12px;color:var(--blue);text-decoration:none;letter-spacing:1px;" title="Full electrical schematic">⚡ SCHEMATIC</a>
     </div>
     <div class="header-right">
+      <button onclick="openSettings()" title="Battery capacity / import / export rate settings" style="background:rgba(88,166,255,0.10);border:1px solid rgba(88,166,255,0.35);border-radius:20px;padding:3px 12px;font-size:12px;color:var(--blue);letter-spacing:1px;cursor:pointer;margin-right:4px">⚙ SETTINGS</button>
       <div class="clock" id="clock">--:--:--</div>
       <div class="clock-sub" id="clock-date">--- -- ----</div>
       <div id="status-line">initialising…</div>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL — battery capacity / import / export rate, single source
+       of truth for simulate.py + every dispatch/backtest engine in server.py
+       (node3_config.json). Added 19 Aug 2026 per Matt's explicit request. -->
+  <div id="settings-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);align-items:center;justify-content:center">
+    <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:24px 28px;width:360px;max-width:90vw">
+      <div style="font-size:15px;font-weight:bold;letter-spacing:0.5px;margin-bottom:4px">⚙ SYSTEM SETTINGS</div>
+      <div style="font-size:11px;color:#8b949e;margin-bottom:18px">G98 (current live connection) operating limits. G99 comparison stays fixed at the real 50A DNO figure — it models a different grid connection, not a tunable setting.</div>
+
+      <label style="display:block;font-size:11px;color:#8b949e;margin-bottom:3px">Battery capacity (kWh)</label>
+      <input type="number" id="set-battery-kwh" step="0.1" min="0.1" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;margin-bottom:12px;font-size:13px">
+
+      <label style="display:block;font-size:11px;color:#8b949e;margin-bottom:3px">Import / charge rate (kW)</label>
+      <input type="number" id="set-import-kw" step="0.1" min="0.1" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;margin-bottom:12px;font-size:13px">
+
+      <label style="display:block;font-size:11px;color:#8b949e;margin-bottom:3px">Export / discharge rate (kW)</label>
+      <input type="number" id="set-export-kw" step="0.1" min="0.1" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;margin-bottom:12px;font-size:13px">
+
+      <label style="display:block;font-size:11px;color:#8b949e;margin-bottom:3px">Min SOC floor (%)</label>
+      <input type="number" id="set-min-soc-pct" step="1" min="0" max="90" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;margin-bottom:16px;font-size:13px">
+
+      <div id="settings-msg" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px"></div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="closeSettings()" style="background:transparent;border:1px solid #30363d;border-radius:6px;color:#8b949e;padding:7px 16px;font-size:12px;cursor:pointer">Cancel</button>
+        <button onclick="saveSettings()" style="background:var(--blue,#58a6ff);border:none;border-radius:6px;color:#0d1117;padding:7px 16px;font-size:12px;font-weight:bold;cursor:pointer">Save</button>
+      </div>
     </div>
   </div>
 
@@ -750,7 +820,9 @@
     <button class="tab-btn"        id="tbn-g98"         onclick="switchTab('g98')"         title="G98 current 32A cap scenario">G98</button>
     <button class="tab-btn"        id="tbn-g99"         onclick="switchTab('g99')"         title="G99 upgrade 50A scenario & upgrade value">G99</button>
     <button class="tab-btn"        id="tbn-schematic"   onclick="switchTab('schematic')"   title="Full electrical schematic">⚡ SCHEMATIC</button>
+    <button class="tab-btn"        id="tbn-hardware"    onclick="switchTab('hardware')"    title="Live pack telemetry &amp; FoxESS hardware bridge status">🔋 PACK STATUS</button>
     <button class="tab-btn"        id="tbn-homeowner"   onclick="switchTab('homeowner')"   title="Homeowner savings portal">🏠 HOMEOWNER</button>
+    <button class="tab-btn"        id="tbn-vpp"         onclick="switchTab('vpp')"         title="Virtual Power Plant — future revenue pathway &amp; enrolment status">🔌 VPP</button>
   </div>
 
   <!-- ══ TAB: LIVE ══════════════════════════════════════════════ -->
@@ -802,61 +874,10 @@
     </div>
   </div>
 
-  <!-- VLP / VIRTUAL POWER PLANT REVENUE PANEL -->
-  <div class="revenue-section balancing" style="margin-bottom:16px">
-    <div class="revenue-title" style="color:var(--purple);display:flex;align-items:center;justify-content:space-between">
-      <span>⚡ Virtual Power Plant (VPP) — Future Revenue Pathway</span>
-      <span id="vlp-status-badge" style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(188,140,255,0.15);color:var(--purple);font-weight:bold;letter-spacing:1px">PRE-REGISTRATION · PROJECTED ONLY</span>
-    </div>
-    <div style="background:rgba(188,140,255,0.06);border:1px solid rgba(188,140,255,0.2);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--muted)">
-      ⚠ These are <strong style="color:var(--amber)">market projections — not live income</strong>. Node-3 is not yet enrolled in a VPP/aggregator. Once enrolled (Octopus Kraken Flex or similar), real dispatch income will replace these estimates. The Agile arbitrage figures above are real.
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
-      <div style="text-align:center">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Year (G98 projection)</div>
-        <div style="font-size:17px;font-weight:bold;color:var(--purple)">~£700</div>
-        <div style="font-size:10px;color:var(--muted)">10.5kW × £70k/MW/yr (Modo Energy 2025)</div>
-      </div>
-      <div style="text-align:center">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Year (G99 projection)</div>
-        <div style="font-size:17px;font-weight:bold;color:var(--purple)">~£1,000</div>
-        <div style="font-size:10px;color:var(--muted)">50A upgrade → full inverter capacity dispatch</div>
-      </div>
-      <div style="text-align:center">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">G99 + Agile combined</div>
-        <div style="font-size:17px;font-weight:bold;color:var(--green)">~£1,350+</div>
-        <div style="font-size:10px;color:var(--muted)">VPP £1k + Agile arbitrage £350 est.</div>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:8px;align-items:center">
-      <span>Source: Modo Energy 2025 — GB BESS average £70k/MW/yr · Node-3 inverter 10.5kW</span>
-      <span style="color:var(--border)">|</span>
-      <span id="vlp-phase-text" style="color:var(--amber)">▶ G99 approved → Octopus Kraken Flex enrolment → dispatched by aggregator → VPP income live</span>
-    </div>
-    <!-- VLP Phase Progress -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px">
-      <div id="vlp-p1" style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:4px;padding:4px 6px;font-size:11px;text-align:center">
-        <div style="color:var(--muted);letter-spacing:.5px">PHASE 1</div>
-        <div style="color:var(--green);font-weight:bold">G99 APPLICATION</div>
-        <div style="color:var(--muted)">Submitted to SSEN ✓</div>
-      </div>
-      <div id="vlp-p2" style="background:rgba(139,148,158,0.08);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:11px;text-align:center">
-        <div style="color:var(--muted);letter-spacing:.5px">PHASE 2</div>
-        <div style="color:var(--muted);font-weight:bold">VPP ENROLMENT</div>
-        <div style="color:var(--muted)">Octopus Kraken Flex</div>
-      </div>
-      <div id="vlp-p3" style="background:rgba(139,148,158,0.08);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:11px;text-align:center">
-        <div style="color:var(--muted);letter-spacing:.5px">PHASE 3</div>
-        <div style="color:var(--muted);font-weight:bold">DISPATCH LIVE</div>
-        <div style="color:var(--muted)">Aggregator dispatches</div>
-      </div>
-      <div id="vlp-p4" style="background:rgba(139,148,158,0.08);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:11px;text-align:center">
-        <div style="color:var(--muted);letter-spacing:.5px">PHASE 4</div>
-        <div style="color:var(--muted);font-weight:bold">REAL INCOME</div>
-        <div style="color:var(--muted)">Live settlement data</div>
-      </div>
-    </div>
-  </div>
+  <!-- VLP / VIRTUAL POWER PLANT REVENUE PANEL moved to its own tab — see tab-vpp
+       below (Matt, 19 Aug: "move all the VPP stuff to its own tab" — it was
+       cluttering the LIVE tab and made the real Agile arbitrage numbers above
+       it look like they belonged to the same (unrealised) revenue stream). -->
 
   <!-- TOP STATS -->
   <div class="stats-row">
@@ -924,8 +945,8 @@
   <!-- PROJECTIONS BAR -->
   <div class="proj-bar" id="proj-bar">
     <div class="proj-cell" onclick="scrollToHistorical()"
-         data-tip="Today's estimated arbitrage income extrapolated from the live simulation rate across all 48 half-hour slots.">
-      <div class="proj-lbl">TODAY (EST)</div>
+         data-tip="7-day rolling average daily profit — the basis used for the week/month/annual projections to the right. For today's ACTUAL result, see the ARBITRAGE INCOME card above.">
+      <div class="proj-lbl">TODAY — PROJECTED (7-DAY AVG)</div>
       <div class="proj-main" id="proj-daily">--</div>
       <div class="proj-range"><span class="r-lo" id="proj-daily-lo">--</span> — <span class="r-hi" id="proj-daily-hi">--</span></div>
     </div>
@@ -1026,6 +1047,23 @@
 
   <!-- ══ TAB: HISTORICAL ════════════════════════════════════════ -->
   <div class="tab-panel" id="tab-historical">
+
+  <!-- ══ ROLLING 12 MONTHS — one number, one chart, nothing else.
+       Added 19 Aug 2026: this is the plain trailing-12-months total Matt
+       asked for, sitting above the denser G98/G99/Greedy comparison tooling
+       below so it doesn't get lost in it. Loads automatically — no button. -->
+  <div class="chart-card" id="rolling12-card" style="margin-bottom:14px">
+    <div class="chart-title" style="flex-direction:column;align-items:flex-start;gap:4px">
+      ROLLING 12 MONTHS
+      <span style="color:var(--muted);font-size:10px;font-weight:normal" id="rolling12-range">Loading…</span>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:16px;margin:10px 0 4px">
+      <div style="font-size:36px;font-weight:800" id="rolling12-total">—</div>
+      <div style="font-size:12px;color:var(--muted)" id="rolling12-updated"></div>
+    </div>
+    <canvas id="rolling12-chart" height="90"></canvas>
+  </div>
+
   <div class="section-divider"></div>
 
   <div class="hist-header" id="hist-section">
@@ -1186,7 +1224,7 @@
     <div class="chart-card" style="margin-bottom:10px">
       <div class="chart-title" style="flex-direction:column;align-items:flex-start;gap:4px">
         LP BACKTEST — G98 vs G99 vs GREEDY (12 MONTHS)
-        <span style="color:var(--muted);font-size:10px;font-weight:normal">Asymmetric rates: charge 5.25 kWh/slot (inverter max) · G98 export 3.68 kWh/slot · G99 export 5.75 kWh/slot · LP = scipy HiGHS globally optimal</span>
+        <span style="color:var(--muted);font-size:10px;font-weight:normal" id="lp-bt-rates-line">Rates: configurable — see ⚙ SETTINGS · LP = scipy HiGHS globally optimal</span>
       </div>
     </div>
     <button class="hist-btn" id="lp-bt-btn" onclick="loadLpBacktest()">🔬 LOAD LP BACKTEST (G98 + G99 vs GREEDY)</button>
@@ -1199,13 +1237,13 @@
           <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">G98 LP (ACTUAL)</div>
           <div style="font-size:26px;font-weight:800;color:var(--green)" id="lp-bt-g98">—</div>
           <div style="font-size:11px;color:var(--muted)">12-month total · LP optimal</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:4px">charge 5.25 · export 3.68 kWh/slot</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px" id="lp-bt-g98-rates">charge — · export — kWh/slot</div>
         </div>
         <div style="background:rgba(163,113,247,0.08);border:2px solid rgba(163,113,247,0.5);border-radius:8px;padding:14px;text-align:center">
           <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">G99 LP (PROJECTED)</div>
           <div style="font-size:26px;font-weight:800;color:var(--purple)" id="lp-bt-g99">—</div>
           <div style="font-size:11px;color:var(--muted)">12-month projected · pending SSEN OA</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:4px">charge 5.25 · export 5.75 kWh/slot</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px" id="lp-bt-g99-rates">charge — · export — kWh/slot</div>
         </div>
         <div style="background:rgba(255,193,7,0.08);border:2px solid rgba(255,193,7,0.3);border-radius:8px;padding:14px;text-align:center">
           <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">G99 UPLIFT vs G98</div>
@@ -1333,6 +1371,72 @@
     </div>
   </div><!-- /tab-schematic -->
 
+  <!-- ══ TAB: PACK STATUS ══════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-hardware">
+
+    <div class="chart-card" style="margin-bottom:16px">
+      <div class="chart-title" style="margin-bottom:10px">LIVE PACK TELEMETRY</div>
+      <div class="homeowner-savings-grid">
+        <div class="stat-card" id="hw-source-card">
+          <div class="stat-label">Telemetry Source</div>
+          <div class="stat-value" id="hw-src-val">—</div>
+          <div class="stat-sub" id="hw-src-sub">Waiting for first reading</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-label">Pack SOC (real)</div>
+          <div class="stat-value blue" id="hw-real-soc">—</div>
+          <div class="stat-sub" id="hw-soc-updated">no data yet</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-label">Pack Voltage</div>
+          <div class="stat-value amber" id="hw-voltage">—</div>
+          <div class="stat-sub">Nominal 360V DC</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-label">Pack Current</div>
+          <div class="stat-value purple" id="hw-current">—</div>
+          <div class="stat-sub">+ charging · − discharging</div>
+        </div>
+        <div class="stat-card" id="hw-temp-card">
+          <div class="stat-label">Pack Temperature</div>
+          <div class="stat-value" id="hw-temp">—</div>
+          <div class="stat-sub">Alarm threshold 45°C</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">State of Health</div>
+          <div class="stat-value green" id="hw-soh">—</div>
+          <div class="stat-sub">Reported by BMS via CAN</div>
+        </div>
+      </div>
+      <div class="stat-sub" style="margin-top:10px;color:var(--muted)">
+        Fed by the MQTT listener in server.py, subscribed to the Battery-Emulator (DALA/LilyGo) telemetry topic. Shows "SIMULATED" until the LilyGo is wired and publishing.
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title" style="margin-bottom:10px">HARDWARE BRIDGE — FoxESS CONTROL</div>
+      <div class="homeowner-savings-grid">
+        <div class="stat-card cyan">
+          <div class="stat-label">Operational Mode</div>
+          <div class="stat-value cyan" id="hw-mode" style="font-size:20px">—</div>
+          <div class="stat-sub">pre_commissioning / self_consumption / full_export</div>
+        </div>
+        <div class="stat-card" id="hw-path-card">
+          <div class="stat-label">Control Path</div>
+          <div class="stat-value" id="hw-path" style="font-size:20px">—</div>
+          <div class="stat-sub">Modbus RTU → Modbus TCP → FoxESS API → MQTT</div>
+        </div>
+        <div class="stat-card" id="hw-last-card">
+          <div class="stat-label">Last Command</div>
+          <div class="stat-value" id="hw-last-action" style="font-size:20px">—</div>
+          <div class="stat-sub" id="hw-last-cmd-time">—</div>
+        </div>
+      </div>
+      <div class="stat-sub" style="margin-top:12px;color:var(--muted)" id="hw-bridge-error"></div>
+    </div>
+
+  </div><!-- /tab-hardware -->
+
   <!-- ══ TAB: HOMEOWNER ════════════════════════════════════════ -->
   <div class="tab-panel" id="tab-homeowner">
 
@@ -1422,6 +1526,67 @@
     </div>
 
   </div><!-- /tab-homeowner -->
+
+  <!-- ══ TAB: VPP ══════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-vpp">
+
+  <!-- VLP / VIRTUAL POWER PLANT REVENUE PANEL -->
+  <div class="revenue-section balancing" style="margin-bottom:16px">
+    <div class="revenue-title" style="color:var(--purple);display:flex;align-items:center;justify-content:space-between">
+      <span>⚡ Virtual Power Plant (VPP) — Future Revenue Pathway</span>
+      <span id="vlp-status-badge" style="font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(188,140,255,0.15);color:var(--purple);font-weight:bold;letter-spacing:1px">PRE-REGISTRATION · PROJECTED ONLY</span>
+    </div>
+    <div style="background:rgba(188,140,255,0.06);border:1px solid rgba(188,140,255,0.2);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--muted)">
+      ⚠ These are <strong style="color:var(--amber)">market projections — not live income</strong>. Node-3 is not yet enrolled in a VPP/aggregator. Once enrolled (Octopus Kraken Flex or similar), real dispatch income will replace these estimates. The Agile arbitrage figures on the LIVE tab are real.
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Year (G98 projection)</div>
+        <div style="font-size:17px;font-weight:bold;color:var(--purple)">~£700</div>
+        <div style="font-size:10px;color:var(--muted)">10.5kW × £70k/MW/yr (Modo Energy 2025)</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Year (G99 projection)</div>
+        <div style="font-size:17px;font-weight:bold;color:var(--purple)">~£1,000</div>
+        <div style="font-size:10px;color:var(--muted)">50A upgrade → full inverter capacity dispatch</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">G99 + Agile combined</div>
+        <div style="font-size:17px;font-weight:bold;color:var(--green)">~£1,350+</div>
+        <div style="font-size:10px;color:var(--muted)">VPP £1k + Agile arbitrage £350 est.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:8px;align-items:center">
+      <span>Source: Modo Energy 2025 — GB BESS average £70k/MW/yr · Node-3 inverter 10.5kW</span>
+      <span style="color:var(--border)">|</span>
+      <span id="vlp-phase-text" style="color:var(--amber)">▶ G99 approved → Octopus Kraken Flex enrolment → dispatched by aggregator → VPP income live</span>
+    </div>
+    <!-- VLP Phase Progress -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px">
+      <div id="vlp-p1" style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:4px;padding:4px 6px;font-size:11px;text-align:center">
+        <div style="color:var(--muted);letter-spacing:.5px">PHASE 1</div>
+        <div style="color:var(--green);font-weight:bold">G99 APPLICATION</div>
+        <div style="color:var(--muted)">Submitted to SSEN ✓</div>
+      </div>
+      <div id="vlp-p2" style="background:rgba(139,148,158,0.08);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:11px;text-align:center">
+        <div style="color:var(--muted);letter-spacing:.5px">PHASE 2</div>
+        <div style="color:var(--muted);font-weight:bold">VPP ENROLMENT</div>
+        <div style="color:var(--muted)">Octopus Kraken Flex</div>
+      </div>
+      <div id="vlp-p3" style="background:rgba(139,148,158,0.08);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:11px;text-align:center">
+        <div style="color:var(--muted);letter-spacing:.5px">PHASE 3</div>
+        <div style="color:var(--muted);font-weight:bold">DISPATCH LIVE</div>
+        <div style="color:var(--muted)">Aggregator dispatches</div>
+      </div>
+      <div id="vlp-p4" style="background:rgba(139,148,158,0.08);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:11px;text-align:center">
+        <div style="color:var(--muted);letter-spacing:.5px">PHASE 4</div>
+        <div style="color:var(--muted);font-weight:bold">REAL INCOME</div>
+        <div style="color:var(--muted)">Live settlement data</div>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /tab-vpp -->
 
   <!-- T-09: Demo data watermark -->
   <div class="demo-watermark" id="demo-watermark">⚠ DEMO DATA</div>
@@ -1526,6 +1691,7 @@ let serverBase = '';
 // STATE
 // ══════════════════════════════════════════════════════════════
 let fleet = [];
+let hwState = {};   // raw hardware telemetry fields from /api/fleet (soc_source, batt_voltage_v, etc.)
 let priceHistory = [];
 let exportPriceHistory = [];
 let historyData  = [];
@@ -2161,9 +2327,9 @@ async function tryServerMode() {
 
 async function loadFromServer() {
   const [nodeResp, priceResp, histResp] = await Promise.all([
-    fetch('/api/fleet'),
-    fetch('/api/prices'),
-    fetch('/api/history'),
+    fetch('/api/fleet',   { signal: AbortSignal.timeout(10000) }),
+    fetch('/api/prices',  { signal: AbortSignal.timeout(10000) }),
+    fetch('/api/history', { signal: AbortSignal.timeout(10000) }),
   ]);
   const serverNode   = await nodeResp.json();
   const serverPrices = await priceResp.json();
@@ -2183,6 +2349,16 @@ async function loadFromServer() {
     solarKwp:      node.solar_kwp         ?? CFG.SOLAR_KWP,
     dailyLoad:     node.daily_load_kwh    ?? CFG.DAILY_HOME_KWH,
   }];
+  hwState = {
+    socSource:  node.soc_source     ?? null,   // "hardware" once the MQTT SOC feed is live, else absent/simulated
+    socPct:     node.soc_pct        ?? null,
+    socUpdated: node.soc_updated    ?? null,
+    voltageV:   node.batt_voltage_v ?? null,
+    currentA:   node.batt_current_a ?? null,
+    tempC:      node.batt_temp_c    ?? null,
+    sohPct:     node.batt_soh_pct   ?? null,
+    lpAvailable: node.lp_available  ?? null,   // false = scipy/numpy missing, dispatch degraded to greedy fallback
+  };
   buyThreshold  = node.buy_threshold_p  || 0;
   sellThreshold = node.sell_threshold_p || 0;
   slotsCount    = node.slots_simulated  || 0;
@@ -2285,41 +2461,58 @@ function renderSchedule(planData) {
   // P&L breakdown: show hosting cost split if server provided it
   const hostingLine = (hostingCost != null && houseLoadKwh != null)
     ? `<span style="color:var(--muted)">·</span>
-       <span style="font-size:11px;color:var(--muted)" title="House supply: ${houseLoadKwh.toFixed(1)}kWh free allowance (12kWh/day). Excess billed to homeowner at cost.">
+       <span style="font-size:11px;color:var(--muted)" title="House supply: ${houseLoadKwh.toFixed(1)}kWh drawn, first 10kWh/day free to homeowner. Excess above that billed back to homeowner at avg buy price +10%.">
          🏠 hosting £${hostingCost.toFixed(3)}
        </span>
        <span style="color:var(--muted)">·</span>
        <span style="font-size:11px;color:${arbitrageNet>=0?'#3fb950':'#f85149'};font-weight:700"
-             title="Pure arbitrage profit: export revenue minus charge cost for exports only. Hosting cost (free 12kWh/day) is separated out.">
+             title="Pure arbitrage profit: export revenue minus charge cost for exports only. Hosting cost (free 10kWh/day to homeowner, excess billed at buy price +10%) is separated out.">
          arb: ${arbitrageNet>=0?'+':''}£${arbitrageNet.toFixed(3)}
        </span>`
     : '';
 
   // Build annual projection block
+  // IMPORTANT (Matt, 19 Aug): this is a naive single-window extrapolation —
+  // net profit from just THIS forward window (next 24-48h) scaled up as if
+  // every day of the year had this exact same price spread. It is NOT a
+  // forecast and has no relationship to the real 12-month backtest figure
+  // (see the ANNUAL cell in the projections bar / histResultsCache-based
+  // number, which uses a real year of historical Agile prices). This block
+  // will swing wildly day to day depending on whether the next window
+  // happens to catch a wide or narrow spread. Labelled and coloured as a
+  // one-off illustrative snapshot, not a trustworthy annual number.
   const annualBlock = (annualG98 != null) ? `
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;padding:8px 10px;
-                background:rgba(0,0,0,0.2);border-radius:6px;border:1px solid var(--border)">
-      <div style="display:flex;flex-direction:column;align-items:center;min-width:80px">
-        <span style="font-size:9px;color:var(--muted);letter-spacing:.8px">G98 ANNUAL (LP)</span>
-        <span style="font-size:15px;font-weight:700;color:#3fb950">~£${Math.round(annualG98)}/yr</span>
-        <span style="font-size:9px;color:var(--muted)">charge 5.25 · export 3.68 kWh</span>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;padding:8px 10px;
+                background:rgba(0,0,0,0.2);border-radius:6px;border:1px dashed var(--border)">
+      <div style="font-size:10px;color:var(--amber)">
+        ⚠ ONE-OFF SNAPSHOT — NOT A FORECAST. Shows what this specific ${slots.length}-slot window
+        would net if (hypothetically) every day of the year matched it exactly. Real spreads vary
+        enormously day to day — see the ANNUAL figure in the projections bar above for the actual
+        12-month-backtest-based estimate.
       </div>
-      ${annualG99 != null ? `
-      <div style="width:1px;background:var(--border);margin:0 4px"></div>
-      <div style="display:flex;flex-direction:column;align-items:center;min-width:80px">
-        <span style="font-size:9px;color:var(--muted);letter-spacing:.8px">G99 ANNUAL (LP)</span>
-        <span style="font-size:15px;font-weight:700;color:var(--purple)">~£${Math.round(annualG99)}/yr</span>
-        <span style="font-size:9px;color:var(--muted)">charge 5.25 · export 5.75 kWh</span>
-      </div>
-      <div style="width:1px;background:var(--border);margin:0 4px"></div>
-      <div style="display:flex;flex-direction:column;align-items:center;min-width:70px">
-        <span style="font-size:9px;color:var(--muted);letter-spacing:.8px">G99 UPLIFT</span>
-        <span style="font-size:15px;font-weight:700;color:var(--amber)">+£${Math.round(annualDelta)}/yr</span>
-        <span style="font-size:9px;color:var(--muted)">vs G98 — pending SSEN OA</span>
-      </div>` : ''}
-      <div style="flex:1"></div>
-      <div style="font-size:10px;color:var(--muted);align-self:flex-end;text-align:right">
-        Extrapolated from ${slots.length}-slot window · LP-optimised
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;flex-direction:column;align-items:center;min-width:80px">
+          <span style="font-size:9px;color:var(--muted);letter-spacing:.8px">G98 · IF EVERY DAY = THIS WINDOW</span>
+          <span style="font-size:15px;font-weight:700;color:var(--muted)">~£${Math.round(annualG98)}</span>
+          <span style="font-size:9px;color:var(--muted)">charge ${CFG.CHARGE_KWH.toFixed(2)} · export ${CFG.EXPORT_KWH.toFixed(2)} kWh</span>
+        </div>
+        ${annualG99 != null ? `
+        <div style="width:1px;background:var(--border);margin:0 4px"></div>
+        <div style="display:flex;flex-direction:column;align-items:center;min-width:80px">
+          <span style="font-size:9px;color:var(--muted);letter-spacing:.8px">G99 · IF EVERY DAY = THIS WINDOW</span>
+          <span style="font-size:15px;font-weight:700;color:var(--muted)">~£${Math.round(annualG99)}</span>
+          <span style="font-size:9px;color:var(--muted)">charge ${CFG.CHARGE_KWH.toFixed(2)} · export ${CFG.EXPORT_KWH_G99.toFixed(2)} kWh</span>
+        </div>
+        <div style="width:1px;background:var(--border);margin:0 4px"></div>
+        <div style="display:flex;flex-direction:column;align-items:center;min-width:70px">
+          <span style="font-size:9px;color:var(--muted);letter-spacing:.8px">G99 UPLIFT (same snapshot)</span>
+          <span style="font-size:15px;font-weight:700;color:var(--muted)">+£${Math.round(annualDelta)}</span>
+          <span style="font-size:9px;color:var(--muted)">vs G98 — pending SSEN OA</span>
+        </div>` : ''}
+        <div style="flex:1"></div>
+        <div style="font-size:10px;color:var(--muted);align-self:flex-end;text-align:right">
+          Extrapolated from ${slots.length}-slot window only · LP-optimised
+        </div>
       </div>
     </div>` : '';
 
@@ -2522,7 +2715,11 @@ function calculateProjections() {
   if (crossEhi) crossEhi.textContent = annualLo > 1 ? (INSTALL_COST / annualLo).toFixed(1) + ' yrs (worst)' : '?';
 
   // Ensure period labels are correct
-  const lblMap = {daily:'TODAY — 48 SLOTS', weekly:'THIS WEEK', monthly:'THIS MONTH', annual:'ANNUAL'};
+  // NOTE: this cell's value is dailyBase = rolling7DayAvg(), NOT today's actual 48-slot
+  // total (that's the separate "ARBITRAGE INCOME — 24HRS" card above, fed by today24hr).
+  // Label must say so explicitly — "TODAY — 48 SLOTS" previously implied it WAS today's
+  // real figure, which produced two different numbers both claiming to be "today".
+  const lblMap = {daily:'TODAY — PROJECTED (7-DAY AVG)', weekly:'THIS WEEK', monthly:'THIS MONTH', annual:'ANNUAL'};
   Object.entries(lblMap).forEach(([id, txt]) => {
     const lel = document.querySelector(`[id="proj-${id}"]`)?.closest('.proj-cell')?.querySelector('.proj-lbl');
     if (lel) lel.textContent = txt;
@@ -2774,8 +2971,19 @@ function renderPriceChart() {
 // ══════════════════════════════════════════════════════════════
 let countdown = CFG.REFRESH_MS / 1000;
 function updateStatus() {
-  const mode = USE_SERVER ? 'SERVER' : (dataMode === 'DEMO' ? 'DEMO' : 'LIVE API');
-  document.getElementById('data-mode').textContent = mode;
+  const mode = USE_SERVER ? 'SERVER' : (dataMode === 'DEMO' ? 'DEMO' : '⚠ LOCAL ESTIMATE');
+  const modeEl = document.getElementById('data-mode');
+  modeEl.textContent = mode;
+  // Server unreachable -> we're running runSimulation()'s local JS percentile
+  // heuristic instead of the real Python LP. Same class of bug as the
+  // scipy-fallback one already found — make it visually unmistakable rather
+  // than a small corner label, since these numbers feed the same headline
+  // stat cards as the real server-driven figures.
+  modeEl.style.color = (!USE_SERVER && dataMode !== 'DEMO') ? 'var(--red)' : '';
+  const localSimBanner = document.getElementById('local-sim-banner');
+  if (localSimBanner) {
+    localSimBanner.style.display = (!USE_SERVER && dataMode !== 'DEMO') ? 'block' : 'none';
+  }
   document.getElementById('status-line').textContent =
     `last update: ${new Date().toLocaleTimeString('en-GB')} · next in ${countdown}s`;
 }
@@ -2792,6 +3000,17 @@ async function refresh() {
   setLoading('FETCHING LIVE PRICES…');
 
   try {
+    if (!USE_SERVER) {
+      // tryServerMode() was previously only ever called once, at page init.
+      // If /api/status didn't report fleet_ready=true in that exact first
+      // instant — e.g. right after a container restart, before the backend
+      // has finished its own startup — USE_SERVER got stuck false for the
+      // rest of the page's life, even once the server became healthy
+      // moments later, permanently stranding the page in the slow/fragile
+      // direct-Octopus/Open-Meteo browser fallback instead of ever
+      // switching back. Re-check every cycle so it self-heals.
+      try { await tryServerMode(); } catch {}
+    }
     if (USE_SERVER) {
       await loadFromServer();
       // Get current price from server prices
@@ -2893,7 +3112,7 @@ async function refresh() {
 
     // FORWARD SCHEDULE — fetch Python-computed plan (single source of truth)
     try {
-      const planResp = await fetch('/api/plan');
+      const planResp = await fetch('/api/plan', { signal: AbortSignal.timeout(10000) });
       if (planResp.ok) {
         const planData = await planResp.json();
         renderSchedule(planData);
@@ -2905,12 +3124,164 @@ async function refresh() {
     countdown = CFG.REFRESH_MS / 1000;
     updateStatus();
     updateSecondaryTabs();
+    checkDataFreshness();
+    checkLpAvailability();
     hideLoading();
 
   } catch (err) {
     console.error('Refresh error:', err);
     document.getElementById('status-line').textContent = 'ERROR: ' + err.message;
     hideLoading();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// STALE-DATA WATCHDOG
+// Compares the most recent recorded slot against wall-clock time and
+// warns loudly if the two have drifted apart — e.g. the GitHub Actions
+// cron that's supposed to refresh history.csv every 30 min has died,
+// or the Pi's been off, and the page is quietly showing old numbers
+// as if they were today's.
+// ══════════════════════════════════════════════════════════════
+function checkDataFreshness() {
+  const banner = document.getElementById('stale-data-banner');
+  if (!banner) return;
+  const lastEntry = historyData.length ? historyData[historyData.length - 1] : null;
+  const lastTs = lastEntry && lastEntry.time instanceof Date ? lastEntry.time : null;
+  if (!lastTs || isNaN(lastTs.getTime())) { banner.style.display = 'none'; return; }
+
+  const STALE_THRESHOLD_MS = 3 * 3600 * 1000; // 3hrs — generous vs the 30-min slot cycle
+  const ageMs = Date.now() - lastTs.getTime();
+  if (ageMs > STALE_THRESHOLD_MS) {
+    const days = Math.floor(ageMs / 86400000);
+    const hrs  = Math.floor((ageMs % 86400000) / 3600000);
+    const ageStr = days > 0 ? `${days}d ${hrs}h` : `${hrs}h`;
+    banner.textContent = `⚠ DATA IS STALE — most recent recorded slot is ${ageStr} old `
+      + `(${lastTs.toLocaleString('en-GB')}). Every figure on this page is from that point, `
+      + `not live. Check the scheduler / GitHub Actions refresh job.`;
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// LP-OPTIMISER WATCHDOG
+// simulate.py stamps lp_available:false into fleet_state.json whenever
+// scipy/numpy fail to import, which silently downgrades dispatch to a
+// crude greedy fallback. Surface that loudly instead of letting it hide.
+// ══════════════════════════════════════════════════════════════
+function checkLpAvailability() {
+  const banner = document.getElementById('lp-unavailable-banner');
+  if (!banner) return;
+  banner.style.display = (hwState.lpAvailable === false) ? 'block' : 'none';
+}
+
+// ══════════════════════════════════════════════════════════════
+// SETTINGS PANEL — battery capacity / import / export rate
+// Single source of truth: node3_config.json via /api/settings.
+// ══════════════════════════════════════════════════════════════
+// Pulls the current operator settings into CFG so every place that still
+// reads CFG.CHARGE_KWH/CFG.EXPORT_KWH/CFG.BATTERY_KWH/CFG.MIN_SOC_KWH (the
+// local JS fallback sim, the dispatch-plan summary stats) reflects reality
+// instead of the old hardcoded 72/5.25/3.68 defaults. Called on startup and
+// after every successful Settings save — best-effort, CFG keeps its
+// hardcoded defaults if this fails (e.g. server unreachable).
+async function syncCfgFromSettings() {
+  try {
+    // Every other fetch in this file has an AbortSignal timeout guard — this
+    // one didn't, and init() awaits it directly before ever calling refresh().
+    // If /api/settings ever hangs on the backend (subprocess-heavy backfill
+    // contending for CPU, a stuck request, anything), this fetch would sit
+    // pending forever with no error — which is exactly what left the page
+    // stuck on the raw default "CONNECTING TO LIVE DATA…" text with zero
+    // console errors. Bounded now so the page always continues either way.
+    const res = await fetch('/api/settings', { signal: AbortSignal.timeout(6000) });
+    if (!res.ok) return;
+    const cfg = await res.json();
+    CFG.BATTERY_KWH = cfg.battery_kwh;
+    CFG.MIN_SOC_KWH = cfg.battery_kwh * (cfg.min_soc_pct / 100);
+    CFG.CHARGE_KWH  = cfg.import_kw * 0.5;
+    CFG.EXPORT_KWH  = cfg.export_kw * 0.5;
+  } catch (e) {
+    console.warn('[NODE-3] Could not sync settings into CFG:', e.message);
+  }
+}
+
+async function openSettings() {
+  const modal = document.getElementById('settings-modal');
+  const msg   = document.getElementById('settings-msg');
+  msg.textContent = '';
+  modal.style.display = 'flex';
+  try {
+    const res = await fetch('/api/settings', { signal: AbortSignal.timeout(6000) });
+    const cfg = await res.json();
+    document.getElementById('set-battery-kwh').value  = cfg.battery_kwh;
+    document.getElementById('set-import-kw').value    = cfg.import_kw;
+    document.getElementById('set-export-kw').value    = cfg.export_kw;
+    document.getElementById('set-min-soc-pct').value  = cfg.min_soc_pct;
+  } catch (e) {
+    msg.textContent = 'Could not load current settings: ' + e.message;
+  }
+}
+
+function closeSettings() {
+  document.getElementById('settings-modal').style.display = 'none';
+}
+
+async function saveSettings() {
+  const msg = document.getElementById('settings-msg');
+  msg.style.color = 'var(--red)';
+  const body = {
+    battery_kwh:  parseFloat(document.getElementById('set-battery-kwh').value),
+    import_kw:    parseFloat(document.getElementById('set-import-kw').value),
+    export_kw:    parseFloat(document.getElementById('set-export-kw').value),
+    min_soc_pct:  parseFloat(document.getElementById('set-min-soc-pct').value),
+  };
+  for (const [k, v] of Object.entries(body)) {
+    if (!isFinite(v) || v <= 0) { msg.textContent = `${k} must be a positive number.`; return; }
+  }
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) { msg.textContent = data.error || 'Save failed.'; return; }
+    msg.style.color = 'var(--green,#3fb950)';
+    msg.textContent = 'Saved. Takes effect immediately for backtests and hardware '
+      + 'export commands. Refreshing live dispatch now…';
+    await syncCfgFromSettings();
+
+    // The live dispatch loop (server.py's background scheduler) runs
+    // simulate.py as a fresh subprocess, which re-reads node3_config.json
+    // from scratch every time — so it WOULD pick up new settings on its own,
+    // but only at the next 30-minute slot boundary. Until then the displayed
+    // SOC/plan still reflects whatever the previous run computed under the
+    // OLD settings, which reads as "SOC doesn't match settings applied."
+    // Force an immediate single-slot run now instead of making Matt wait.
+    try {
+      const trigResp = await fetch('/api/trigger', {
+        method: 'POST',
+        signal: AbortSignal.timeout(30000),
+      });
+      if (trigResp.ok) {
+        msg.textContent = 'Saved — live dispatch refreshed with new settings.';
+      } else {
+        msg.textContent = 'Saved, but live refresh failed — it will pick up '
+          + 'the new settings at the next 30-min slot boundary regardless.';
+      }
+    } catch (e) {
+      console.warn('[NODE-3] Post-settings trigger failed:', e);
+      msg.textContent = 'Saved — live dispatch will refresh at the next '
+        + '30-min slot boundary (immediate refresh request failed: ' + e.message + ').';
+    }
+
+    setTimeout(closeSettings, 1800);
+    refresh();
+  } catch (e) {
+    msg.textContent = 'Save failed: ' + e.message;
   }
 }
 
@@ -2970,6 +3341,13 @@ async function loadLpBacktest(force) {
     const g99p = g98 > 0 ? ((g99/g98 - 1)*100).toFixed(1) : '?';
     const lpUp = d.uplift_gbp         || 0;
     const lpPc = d.uplift_pct         || 0;
+
+    const rl98 = document.getElementById('lp-bt-g98-rates');
+    const rl99 = document.getElementById('lp-bt-g99-rates');
+    if (rl98) rl98.textContent = `charge ${CFG.CHARGE_KWH.toFixed(2)} · export ${CFG.EXPORT_KWH.toFixed(2)} kWh/slot`;
+    if (rl99) rl99.textContent = `charge ${CFG.CHARGE_KWH.toFixed(2)} · export ${CFG.EXPORT_KWH_G99.toFixed(2)} kWh/slot`;
+    const rlLine = document.getElementById('lp-bt-rates-line');
+    if (rlLine) rlLine.textContent = (d.rates ? d.rates + ' · ' : '') + 'LP = scipy HiGHS globally optimal';
 
     document.getElementById('lp-bt-g98').textContent      = '£' + g98.toFixed(2) + '/yr';
     document.getElementById('lp-bt-g99').textContent      = '£' + g99.toFixed(2) + '/yr';
@@ -3123,6 +3501,72 @@ function populateRevenueBreakdown(res) {
   document.getElementById('rev-home-year').textContent = '£' + homeownerYearSave.toFixed(2);
 }
 
+// ══════════════════════════════════════════════════════════════
+// ROLLING 12 MONTHS — plain trailing-12-months total + monthly bars.
+// Deliberately separate from the G98/G99/Greedy LP comparison tooling
+// below: one number, one chart, no jargon, loads automatically.
+// ══════════════════════════════════════════════════════════════
+let rolling12Chart = null;
+function renderRolling12Card(res) {
+  const totalEl   = document.getElementById('rolling12-total');
+  const rangeEl   = document.getElementById('rolling12-range');
+  const updatedEl = document.getElementById('rolling12-updated');
+  const canvasEl  = document.getElementById('rolling12-chart');
+  if (!totalEl || !canvasEl) return;
+
+  const monthly = res.monthly || {};
+  const months  = Object.keys(monthly).sort();
+  if (!months.length) return;
+
+  const total = res.total ?? 0;
+  totalEl.textContent = (total >= 0 ? '£' : '-£') + Math.abs(total).toFixed(2);
+  totalEl.style.color = total >= 0 ? 'var(--green)' : 'var(--red)';
+
+  const monthLabel = (key) => {
+    const [y, mo] = key.split('-');
+    return new Date(+y, +mo - 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+  };
+  rangeEl.textContent = `${monthLabel(months[0])} → ${monthLabel(months[months.length - 1])}`
+    + ` · real Octopus Agile prices · recalculates automatically, rolls forward each day`;
+
+  // res._generated_at is set server-side (server.py /api/backtest) whether this
+  // came from a fresh run or the 24h cache — so we can always say exactly how
+  // old these numbers are instead of implying they're live right now.
+  if (updatedEl) {
+    updatedEl.textContent = res._generated_at ? 'generated ' + timeAgo(res._generated_at) : '';
+  }
+
+  const chartLabels = months.map(m => {
+    const [y, mo] = m.split('-');
+    return new Date(+y, +mo - 1).toLocaleDateString('en-GB', { month: 'short' });
+  });
+  const chartValues = months.map(m => +((monthly[m].profit || 0).toFixed(2)));
+
+  const ctx = canvasEl.getContext('2d');
+  if (rolling12Chart) rolling12Chart.destroy();
+  rolling12Chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: chartLabels,
+      datasets: [{
+        label: 'Monthly profit (£)',
+        data: chartValues,
+        backgroundColor: chartValues.map(v => v >= 0 ? 'rgba(63,185,80,0.75)' : 'rgba(248,81,73,0.75)'),
+        borderRadius: 3,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#8b949e' } },
+        y: { grid: { color: '#30363d' }, ticks: { color: '#8b949e', callback: v => '£' + v } },
+      },
+    },
+  });
+}
+
 function renderHistoricalResults(res) {
   const {
     total, monthly, totalSlots, buyThr, sellThr,
@@ -3134,6 +3578,8 @@ function renderHistoricalResults(res) {
     avgExportRateP = CFG.EXPORT_RATE_P_DEFAULT,
     hasExportData = false,
   } = res;
+
+  renderRolling12Card(res);
 
   // Populate revenue breakdown
   populateRevenueBreakdown(res);
@@ -3341,6 +3787,7 @@ function renderHistoricalResults(res) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
         x: { ticks: { color: '#8b949e', font: { size: 12 } }, grid: { display: false } },
@@ -3385,6 +3832,7 @@ function renderHistoricalResults(res) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: true, labels: { color: '#8b949e', font: { size: 12 }, boxWidth: 12 } } },
       scales: {
         x: { ticks: { color: '#8b949e', font: { size: 9 } }, grid: { display: false } },
@@ -3498,7 +3946,9 @@ const TAB_COLORS = {
   g98:        'active',
   g99:        'active-purple',
   schematic:  'active-blue',
+  hardware:   'active-cyan',
   homeowner:  'active-cyan',
+  vpp:        'active-purple',
 };
 
 let g98Chart = null;
@@ -3528,6 +3978,20 @@ function switchTab(name) {
   // Render G98/G99 tab content when switching to it
   if (name === 'g98') renderG98Tab();
   if (name === 'g99') renderG99Tab();
+  if (name === 'hardware') renderHardwareTab();
+
+  // HISTORICAL tab's charts (rolling12Chart, histMonthlyChart, histSpreadChart)
+  // get created once, automatically, 2s after page load — while this tab-panel
+  // is still `display:none` (it's not the default active tab). Chart.js measures
+  // a hidden container as zero-size at creation time and can bake a garbage
+  // aspect ratio into the chart right then — a plain .resize() later just
+  // reapplies that same broken ratio against the new width, so it doesn't
+  // reliably fix it. Fully destroy + rebuild from the cached results instead,
+  // now that the panel is actually visible (display:block, real width) — same
+  // function the initial load already uses, so it's guaranteed consistent.
+  if (name === 'historical' && histResultsCache) {
+    renderHistoricalResults(histResultsCache);
+  }
 
   // Restore homeowner portal state
   if (name === 'homeowner') restoreHomeownerState();
@@ -3792,6 +4256,92 @@ function populateHomeownerPortal() {
   savingEl.style.color = curDiff >= 0 ? 'var(--green)' : 'var(--red)';
 }
 
+// ══════════════════════════════════════════════════════════════
+// PACK STATUS TAB (live hardware telemetry + FoxESS bridge)
+// ══════════════════════════════════════════════════════════════
+function timeAgo(iso) {
+  if (!iso) return '—';
+  const then = new Date(iso).getTime();
+  if (isNaN(then)) return '—';
+  const secs = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (secs < 60) return secs + 's ago';
+  if (secs < 3600) return Math.floor(secs / 60) + 'm ago';
+  if (secs < 86400) return Math.floor(secs / 3600) + 'h ago';
+  return Math.floor(secs / 86400) + 'd ago';
+}
+
+function renderHardwareTab() {
+  // Pack telemetry — from hwState, populated in loadFromServer() each refresh cycle.
+  // soc_source only reads "hardware" once server.py's MQTT listener has received a
+  // real Battery-Emulator message; until then this correctly shows SIMULATED.
+  const isReal  = hwState.socSource === 'hardware';
+  const srcVal  = document.getElementById('hw-src-val');
+  const srcSub  = document.getElementById('hw-src-sub');
+  const srcCard = document.getElementById('hw-source-card');
+  if (srcVal)  { srcVal.textContent = isReal ? 'HARDWARE' : 'SIMULATED'; srcVal.className = 'stat-value ' + (isReal ? 'green' : 'amber'); }
+  if (srcCard) srcCard.className = 'stat-card ' + (isReal ? 'green' : 'amber');
+  if (srcSub)  srcSub.textContent = isReal
+    ? 'Live MQTT feed from Battery-Emulator'
+    : 'No MQTT data received yet — showing simulated SOC';
+
+  const socEl = document.getElementById('hw-real-soc');
+  if (socEl) socEl.textContent = hwState.socPct != null ? Number(hwState.socPct).toFixed(1) + '%' : '—';
+  const socUpdEl = document.getElementById('hw-soc-updated');
+  if (socUpdEl) socUpdEl.textContent = hwState.socUpdated ? 'updated ' + timeAgo(hwState.socUpdated) : 'no data yet';
+
+  const vEl = document.getElementById('hw-voltage');
+  if (vEl) vEl.textContent = hwState.voltageV != null ? Number(hwState.voltageV).toFixed(1) + 'V' : '—';
+
+  const iEl = document.getElementById('hw-current');
+  if (iEl) iEl.textContent = hwState.currentA != null ? Number(hwState.currentA).toFixed(1) + 'A' : '—';
+
+  const tEl   = document.getElementById('hw-temp');
+  const tCard = document.getElementById('hw-temp-card');
+  if (tEl) {
+    tEl.textContent = hwState.tempC != null ? Number(hwState.tempC).toFixed(1) + '°C' : '—';
+    const hot = hwState.tempC != null && Number(hwState.tempC) >= 45;
+    tEl.className = 'stat-value ' + (hot ? 'red' : '');
+    if (tCard) tCard.className = 'stat-card ' + (hot ? 'red' : '');
+  }
+
+  const sohEl = document.getElementById('hw-soh');
+  if (sohEl) sohEl.textContent = hwState.sohPct != null ? Number(hwState.sohPct).toFixed(1) + '%' : '—';
+
+  // Hardware bridge status — this endpoint spawns a subprocess server-side, so only
+  // poll it while the Pack Status tab is actually open (called from switchTab and
+  // updateSecondaryTabs, not from the main 30s refresh loop).
+  fetch('/api/hardware-status', { signal: AbortSignal.timeout(8000) })
+    .then(r => r.json())
+    .then(data => {
+      const modeEl   = document.getElementById('hw-mode');
+      const pathEl   = document.getElementById('hw-path');
+      const pathCard = document.getElementById('hw-path-card');
+      const actEl    = document.getElementById('hw-last-action');
+      const timeEl   = document.getElementById('hw-last-cmd-time');
+      const errEl    = document.getElementById('hw-bridge-error');
+      // Field names match hardware_bridge.py's get_status() exactly — see
+      // NODE3 memory notes: operational_mode, last_command(_ts/_path), control_paths{}.
+      if (data.error) { if (errEl) errEl.textContent = '⚠ ' + data.error; return; }
+      if (errEl) errEl.textContent = data.last_error ? '⚠ last bridge error: ' + data.last_error : '';
+      if (modeEl) modeEl.textContent = (data.operational_mode || 'UNSET').toString().toUpperCase()
+        + (data.hardware_enabled ? '' : ' (sim only)');
+
+      const cp = data.control_paths || {};
+      const configured = Object.entries(cp).filter(([,v]) => v).map(([k]) => k.replace('_',' ').toUpperCase());
+      if (pathEl)   pathEl.textContent = data.last_command_path
+        ? data.last_command_path.replace('_',' ').toUpperCase()
+        : (configured.length ? 'READY (' + configured[0] + ')' : 'NONE CONFIGURED');
+      if (pathCard) pathCard.className = 'stat-card ' + (configured.length ? 'green' : 'amber');
+
+      if (actEl)  actEl.textContent = (data.last_command || 'no command yet').toString().toUpperCase();
+      if (timeEl) timeEl.textContent = data.last_command_ts ? 'as of ' + timeAgo(data.last_command_ts) : '—';
+    })
+    .catch(e => {
+      const errEl = document.getElementById('hw-bridge-error');
+      if (errEl) errEl.textContent = '⚠ Could not reach /api/hardware-status: ' + e.message;
+    });
+}
+
 // Called after each full refresh cycle — updates whichever secondary tab is active
 function updateSecondaryTabs() {
   try {
@@ -3799,6 +4349,7 @@ function updateSecondaryTabs() {
     if (!activeTab) return;
     if (activeTab.id === 'tab-g98') renderG98Tab();
     if (activeTab.id === 'tab-g99') renderG99Tab();
+    if (activeTab.id === 'tab-hardware') renderHardwareTab();
     // Update homeowner portal if it's visible
     const portal = document.getElementById('homeowner-portal');
     if (activeTab.id === 'tab-homeowner' && portal && portal.style.display !== 'none') {
@@ -3830,7 +4381,26 @@ function msToNextSlot() {
     console.log('[NODE-3] Direct API mode');
   }
 
+  await syncCfgFromSettings();
+
+  // WATCHDOG — this page has repeatedly wedged on the loading overlay with
+  // zero console errors, because SOME fetch somewhere along the init chain
+  // hangs (pending forever) rather than erroring, and a pending promise
+  // trips no catch block. Individual fetches are getting AbortSignal
+  // timeouts added as they're found, but rather than keep whack-a-moling
+  // this one at a time, force the overlay down no matter what after 20s —
+  // worst case you see stale/partial data with an error noted, not an
+  // infinite spinner.
+  let firstLoadSettled = false;
+  setTimeout(() => {
+    if (!firstLoadSettled) {
+      console.error('[NODE-3] Startup watchdog fired — forcing loading overlay down after 20s.');
+      document.getElementById('status-line').textContent = 'ERROR: startup timed out — a request hung. Check console/network tab.';
+      hideLoading();
+    }
+  }, 20000);
   await refresh();
+  firstLoadSettled = true;
   setInterval(refresh, CFG.REFRESH_MS);
 
   // Load historical data immediately on startup (2s delay for live data to settle)

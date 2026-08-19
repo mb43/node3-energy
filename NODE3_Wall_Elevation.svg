@@ -1,0 +1,227 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1100" font-family="Inter, Arial, sans-serif" font-size="12">
+  <style>
+    .wall { fill: #f0e8d8; stroke: #8b6e4e; stroke-width: 2; }
+    .floor { fill: #d0c4a8; stroke: #6b5536; stroke-width: 2; }
+    .pack { fill: #fff3d6; stroke: #b08800; stroke-width: 2.5; }
+    .pack-sdp { fill: #ffd700; stroke: #806000; stroke-width: 1.5; }
+    .pack-hv { fill: #ffe5b3; stroke: #996600; stroke-width: 1.5; }
+    .pack-yazaki { fill: #d4e7ff; stroke: #003366; stroke-width: 1.5; }
+    .pbox { fill: #ffe0e0; stroke: #aa0000; stroke-width: 2; }
+    .hvbox { fill: #ffd5d5; stroke: #800000; stroke-width: 2; }
+    .lvbox { fill: #e0f0ff; stroke: #0044aa; stroke-width: 2; }
+    .piwan { fill: #e6ffe6; stroke: #006600; stroke-width: 2; }
+    .inverter { fill: #f0f0f0; stroke: #000; stroke-width: 2; }
+    .estop { fill: #ff0000; stroke: #800000; stroke-width: 2; }
+    .hv { stroke: #cc0000; stroke-width: 3; fill: none; }
+    .lv { stroke: #0066cc; stroke-width: 1.8; fill: none; }
+    .can { stroke: #009933; stroke-width: 1.8; fill: none; }
+    .dim { stroke: #006; stroke-width: 0.6; fill: none; }
+    .dim-text { font-size: 10px; fill: #006; }
+    .ttl { font-size: 14px; font-weight: 700; fill: #000; }
+    .lbl { font-size: 11px; fill: #222; font-weight: 600; }
+    .small { font-size: 9.5px; fill: #444; }
+    .key { font-size: 10px; font-weight: 700; }
+  </style>
+
+  <!-- Title -->
+  <text x="750" y="28" text-anchor="middle" class="ttl">NODE-3 Wall Elevation — 3× Nissan e-NV200 vertical · ~3.6 m wall run · all boxes wall-mounted</text>
+  <text x="750" y="46" text-anchor="middle" class="small">View: looking at wall from the room. Each pack ~1547 mm tall × ~1188 mm wide × 264 mm proud of wall.</text>
+
+  <!-- Wall + Floor -->
+  <rect x="40" y="80" width="1420" height="900" class="wall"/>
+  <rect x="40" y="980" width="1420" height="60" class="floor"/>
+  <text x="55" y="105" class="small">Wall (masonry/block, structurally rated for ~850 kg)</text>
+  <text x="55" y="1015" class="small">Floor</text>
+
+  <!-- Scale reference: ~7.5 px per 10 mm horizontally (so 1188 mm = ~890 px) and similar vertically -->
+  <!-- Floor line is at y=980, packs start at y=240 (top of pack), pack height ~600 px = 1547 mm scaled -->
+  <!-- 1 px ≈ 1.7 mm horizontally; 1 px ≈ 1.85 mm vertically -->
+
+  <!-- ============ Packs (3 standing vertically) ============ -->
+  <!-- Pack 1 -->
+  <g>
+    <rect x="100" y="280" width="380" height="650" class="pack"/>
+    <text x="290" y="305" text-anchor="middle" class="ttl">PACK 1</text>
+    <text x="290" y="322" text-anchor="middle" class="lbl">Nissan e-NV200 24 kWh</text>
+    <text x="290" y="338" text-anchor="middle" class="small">1547 mm tall × 1188 mm wide × 264 mm deep</text>
+    <text x="290" y="354" text-anchor="middle" class="small">~277 kg</text>
+
+    <!-- Connectors at top — SDP / HV / Yazaki cluster -->
+    <rect x="140" y="385" width="70" height="40" class="pack-sdp"/>
+    <text x="175" y="405" text-anchor="middle" class="small" font-weight="700">SDP</text>
+    <text x="175" y="418" text-anchor="middle" class="small">(green flag)</text>
+
+    <rect x="220" y="385" width="70" height="40" class="pack-hv"/>
+    <text x="255" y="402" text-anchor="middle" class="small" font-weight="700">HV out</text>
+    <text x="255" y="416" text-anchor="middle" class="small">(Sumitomo)</text>
+
+    <rect x="300" y="385" width="70" height="40" class="pack-yazaki"/>
+    <text x="335" y="402" text-anchor="middle" class="small" font-weight="700">Yazaki</text>
+    <text x="335" y="416" text-anchor="middle" class="small">36-pin BMS</text>
+  </g>
+
+  <!-- Pack 2 -->
+  <g>
+    <rect x="510" y="280" width="380" height="650" class="pack"/>
+    <text x="700" y="305" text-anchor="middle" class="ttl">PACK 2</text>
+    <text x="700" y="322" text-anchor="middle" class="lbl">Nissan e-NV200 24 kWh</text>
+    <text x="700" y="338" text-anchor="middle" class="small">1547 mm tall × 1188 mm wide × 264 mm deep</text>
+    <text x="700" y="354" text-anchor="middle" class="small">~277 kg</text>
+
+    <rect x="550" y="385" width="70" height="40" class="pack-sdp"/>
+    <text x="585" y="405" text-anchor="middle" class="small" font-weight="700">SDP</text>
+    <text x="585" y="418" text-anchor="middle" class="small">(green flag)</text>
+
+    <rect x="630" y="385" width="70" height="40" class="pack-hv"/>
+    <text x="665" y="402" text-anchor="middle" class="small" font-weight="700">HV out</text>
+    <text x="665" y="416" text-anchor="middle" class="small">(Sumitomo)</text>
+
+    <rect x="710" y="385" width="70" height="40" class="pack-yazaki"/>
+    <text x="745" y="402" text-anchor="middle" class="small" font-weight="700">Yazaki</text>
+    <text x="745" y="416" text-anchor="middle" class="small">36-pin BMS</text>
+  </g>
+
+  <!-- Pack 3 -->
+  <g>
+    <rect x="920" y="280" width="380" height="650" class="pack"/>
+    <text x="1110" y="305" text-anchor="middle" class="ttl">PACK 3</text>
+    <text x="1110" y="322" text-anchor="middle" class="lbl">Nissan e-NV200 24 kWh</text>
+    <text x="1110" y="338" text-anchor="middle" class="small">1547 mm tall × 1188 mm wide × 264 mm deep</text>
+    <text x="1110" y="354" text-anchor="middle" class="small">~277 kg</text>
+
+    <rect x="960" y="385" width="70" height="40" class="pack-sdp"/>
+    <text x="995" y="405" text-anchor="middle" class="small" font-weight="700">SDP</text>
+    <text x="995" y="418" text-anchor="middle" class="small">(green flag)</text>
+
+    <rect x="1040" y="385" width="70" height="40" class="pack-hv"/>
+    <text x="1075" y="402" text-anchor="middle" class="small" font-weight="700">HV out</text>
+    <text x="1075" y="416" text-anchor="middle" class="small">(Sumitomo)</text>
+
+    <rect x="1120" y="385" width="70" height="40" class="pack-yazaki"/>
+    <text x="1155" y="402" text-anchor="middle" class="small" font-weight="700">Yazaki</text>
+    <text x="1155" y="416" text-anchor="middle" class="small">36-pin BMS</text>
+  </g>
+
+  <!-- ============ Per-pack breaker boxes (above each pack) ============ -->
+  <g>
+    <rect x="190" y="170" width="200" height="90" class="pbox"/>
+    <text x="290" y="190" text-anchor="middle" class="lbl">P1 BREAKER BOX</text>
+    <text x="290" y="206" text-anchor="middle" class="small">~150×150×80 steel IP65</text>
+    <text x="290" y="220" text-anchor="middle" class="small">1× TOMZN DC 2P 32A</text>
+    <text x="290" y="234" text-anchor="middle" class="small">in: Sumitomo · out: 35 mm²</text>
+    <text x="290" y="248" text-anchor="middle" class="small">PE bonded</text>
+
+    <rect x="600" y="170" width="200" height="90" class="pbox"/>
+    <text x="700" y="190" text-anchor="middle" class="lbl">P2 BREAKER BOX</text>
+    <text x="700" y="206" text-anchor="middle" class="small">~150×150×80 steel IP65</text>
+    <text x="700" y="220" text-anchor="middle" class="small">1× TOMZN DC 2P 32A</text>
+    <text x="700" y="234" text-anchor="middle" class="small">in: Sumitomo · out: 35 mm²</text>
+    <text x="700" y="248" text-anchor="middle" class="small">PE bonded</text>
+
+    <rect x="1010" y="170" width="200" height="90" class="pbox"/>
+    <text x="1110" y="190" text-anchor="middle" class="lbl">P3 BREAKER BOX</text>
+    <text x="1110" y="206" text-anchor="middle" class="small">~150×150×80 steel IP65</text>
+    <text x="1110" y="220" text-anchor="middle" class="small">1× TOMZN DC 2P 32A</text>
+    <text x="1110" y="234" text-anchor="middle" class="small">in: Sumitomo · out: 35 mm²</text>
+    <text x="1110" y="248" text-anchor="middle" class="small">PE bonded</text>
+  </g>
+
+  <!-- HV cable from pack HV out → breaker box (short ~30 cm) -->
+  <line x1="255" y1="385" x2="255" y2="260" class="hv"/>
+  <line x1="665" y1="385" x2="665" y2="260" class="hv"/>
+  <line x1="1075" y1="385" x2="1075" y2="260" class="hv"/>
+  <text x="263" y="320" class="small" fill="#cc0000">~30 cm</text>
+  <text x="673" y="320" class="small" fill="#cc0000">~30 cm</text>
+  <text x="1083" y="320" class="small" fill="#cc0000">~30 cm</text>
+
+  <!-- ============ Central HV busbar box (above between Pack 1 & Pack 2) ============ -->
+  <rect x="400" y="80" width="350" height="80" class="hvbox"/>
+  <text x="575" y="100" text-anchor="middle" class="lbl">CENTRAL HV BUSBAR BOX</text>
+  <text x="575" y="116" text-anchor="middle" class="small">Steel IP65 ~250×200×150 — +/− Cu busbars + Master TOMZN + PE bar</text>
+  <text x="575" y="130" text-anchor="middle" class="small">Goes to inverter via single 35 mm² run</text>
+  <text x="575" y="146" text-anchor="middle" class="small">Centred above Pack 1 ↔ Pack 2 boundary (equidistant cable runs)</text>
+
+  <!-- HV runs from each pack breaker box to busbar box -->
+  <path d="M 290 170 Q 290 165 400 130" class="hv"/>
+  <path d="M 700 170 Q 700 140 740 140" class="hv"/>
+  <path d="M 1110 170 Q 1110 130 750 130" class="hv"/>
+  <text x="340" y="158" class="small" fill="#cc0000">~1 m</text>
+  <text x="730" y="172" class="small" fill="#cc0000">~0.5 m</text>
+  <text x="900" y="125" class="small" fill="#cc0000">~1.5 m</text>
+
+  <!-- ============ LV / Control box (above Pack 3) ============ -->
+  <rect x="800" y="80" width="300" height="80" class="lvbox"/>
+  <text x="950" y="100" text-anchor="middle" class="lbl">LV / CONTROL BOX</text>
+  <text x="950" y="116" text-anchor="middle" class="small">Plastic IP54/65 ~300×200×150 — DR-60-12 PSU,</text>
+  <text x="950" y="130" text-anchor="middle" class="small">LilyGo T-2CAN, SSR-04, Waveshare CAN HAT,</text>
+  <text x="950" y="146" text-anchor="middle" class="small">terminal blocks, DROK 12→5V, E-stop on lid</text>
+
+  <!-- E-stop indicator -->
+  <circle cx="1075" cy="120" r="11" class="estop"/>
+  <text x="1075" y="124" text-anchor="middle" font-size="7" fill="white" font-weight="700">E-STOP</text>
+
+  <!-- Yazaki harness LV runs from each pack Yazaki → daisy node → control box -->
+  <path d="M 335 385 Q 335 330 800 130" class="lv"/>
+  <path d="M 745 385 Q 745 220 820 160" class="lv"/>
+  <path d="M 1155 385 Q 1155 220 870 160" class="lv"/>
+  <text x="500" y="270" class="small" fill="#0066cc">Yazaki harnesses → daisy junction → LV box (5-cond. CY multicore)</text>
+
+  <!-- ============ Pi / WAN box ============ -->
+  <rect x="1180" y="170" width="260" height="120" class="piwan"/>
+  <text x="1310" y="190" text-anchor="middle" class="lbl">Pi + WAN BOX</text>
+  <text x="1310" y="206" text-anchor="middle" class="small">(your existing plastic clip-lid box)</text>
+  <text x="1310" y="222" text-anchor="middle" class="small">Raspberry Pi 4 + ZTE 4G router</text>
+  <text x="1310" y="238" text-anchor="middle" class="small">Wherever 4G signal is best</text>
+  <text x="1310" y="254" text-anchor="middle" class="small">12 V fed from LV control box</text>
+  <text x="1310" y="272" text-anchor="middle" class="small">LAN ↔ Pi for telemetry/NODE3 portal</text>
+
+  <!-- Link from LV box to Pi/WAN box -->
+  <path d="M 1100 120 L 1180 200" class="lv"/>
+
+  <!-- ============ Inverter (right side floor area) ============ -->
+  <rect x="1300" y="640" width="140" height="220" class="inverter"/>
+  <text x="1370" y="665" text-anchor="middle" class="lbl">FoxESS KH10.5</text>
+  <text x="1370" y="682" text-anchor="middle" class="small">HV Hybrid Inverter</text>
+  <text x="1370" y="698" text-anchor="middle" class="small">Floor / wall mount</text>
+  <text x="1370" y="714" text-anchor="middle" class="small">Per FoxESS install spec</text>
+  <text x="1370" y="850" text-anchor="middle" class="small">To CU + grid (G99)</text>
+
+  <!-- HV from busbar to inverter -->
+  <path d="M 750 120 Q 1380 120 1380 640" class="hv"/>
+  <text x="1100" y="135" class="small" fill="#cc0000">35 mm² to inverter (length per site)</text>
+
+  <!-- CAN from LV box (Waveshare) to inverter -->
+  <path d="M 1100 145 Q 1340 145 1340 640" class="can"/>
+  <text x="1185" y="160" class="small" fill="#009933">Isolated CAN → FoxESS</text>
+
+  <!-- ============ Behind-pack clearance call-out ============ -->
+  <g>
+    <line x1="40" y1="280" x2="100" y2="280" class="dim"/>
+    <line x1="40" y1="930" x2="100" y2="930" class="dim"/>
+    <text x="60" y="610" class="dim-text" transform="rotate(-90, 60, 610)">≥100 mm clearance to wall (airflow)</text>
+  </g>
+
+  <!-- Pack-to-pack gap call-out -->
+  <text x="495" y="615" text-anchor="middle" class="dim-text">~50–100 mm gap (airflow)</text>
+  <text x="905" y="615" text-anchor="middle" class="dim-text">~50–100 mm gap (airflow)</text>
+
+  <!-- Dimensions -->
+  <line x1="100" y1="1050" x2="1300" y2="1050" class="dim"/>
+  <text x="700" y="1075" text-anchor="middle" class="dim-text" font-weight="700">~3.6 m wall run (3 × 1188 mm + 2 × ~50 mm gaps)</text>
+
+  <line x1="60" y1="280" x2="60" y2="930" class="dim"/>
+  <text x="40" y="610" class="dim-text" transform="rotate(-90, 40, 610)">1547 mm pack height</text>
+
+  <line x1="60" y1="950" x2="60" y2="980" class="dim"/>
+  <text x="30" y="970" class="dim-text" transform="rotate(-90, 30, 970)">100+ mm off floor (don't sit on floor)</text>
+
+  <!-- Legend -->
+  <g transform="translate(60, 1075)">
+    <line x1="0" y1="0" x2="25" y2="0" class="hv"/>
+    <text x="30" y="4" class="key" fill="#cc0000">HV DC</text>
+    <line x1="90" y1="0" x2="115" y2="0" class="lv"/>
+    <text x="120" y="4" class="key" fill="#0066cc">LV 12 V (multicore)</text>
+    <line x1="260" y1="0" x2="285" y2="0" class="can"/>
+    <text x="290" y="4" class="key" fill="#009933">CAN (isolated)</text>
+  </g>
+</svg>

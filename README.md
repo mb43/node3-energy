@@ -2,8 +2,9 @@
 
 Public-facing landing page and real-time battery arbitrage operator portal for Dovecote Systems.
 
-**Live website:** [doesnthavetocosttheearth.com](https://doesnthavetocosttheearth.com/)
-**Live operator portal:** [doesnthavetocosttheearth.com/dashboard.html](https://doesnthavetocosttheearth.com/dashboard.html) (GitHub Pages) or [portal.doesnthavetocosttheearth.com](https://portal.doesnthavetocosttheearth.com/) (Pi API reverse proxy)
+**Live operator portal:** [dovecoteltd.co.uk:8585](http://dovecoteltd.co.uk:8585) — currently connects through to Matt's Mac.
+
+> ⚠️ **doesnthavetocosttheearth.com is DEFUNCT** (superseded 19 Aug 2026 by dovecoteltd.co.uk). Do not treat it as live: the GitHub Actions cron that was supposed to refresh `history.csv`/`prices.json` every 30 min (`.github/workflows/simulate.yml`) was deleted 10 May 2026 and never restored, so that GitHub Pages site has been silently serving numbers frozen at the initial commit ever since — it will show stale figures labelled as if they were today's. `portal.doesnthavetocosttheearth.com` (the old Pi reverse-proxy subdomain) no longer resolves at all. If this project is later revived on that domain, either restore the cron job or clearly mark the site as non-live before trusting anything it shows.
 
 ---
 
@@ -44,7 +45,9 @@ The battery also serves the home's 12 kWh/day consumption from those same charge
 
 ## Wiring Schematic
 
-The full wiring schematic and build checklist can be found in **[NODE3_Wiring_Schematic.md](NODE3_Wiring_Schematic.md)**.
+Interactive schematic (full HV+LV system, LV-only control wiring, and pin-by-pin connection tables): **[NODE3_Schematic.html](NODE3_Schematic.html)**.
+
+Full build checklist, BOM, and 14-step commissioning sequence: **[NODE3_DEFINITIVE.md](NODE3_DEFINITIVE.md)** (single source of truth — supersedes NODE3_Wiring_Schematic.md, which is superseded/archived in `_to_delete/`).
 
 ## Quick start
 
@@ -73,7 +76,10 @@ A=Eastern · B=East Midlands · C=London · D=N Wales/Merseyside · E=Midlands �
 ## Architecture
 
 ```
-index.html           Public-facing landing page for Dovecote Systems (doesnthavetocosttheearth.com).
+index.html           Public-facing landing page for Dovecote Systems. Nav link and Web: address now
+                      point to dovecoteltd.co.uk (updated 19 Aug 2026). Contact email left as
+                      info@doesnthavetocosttheearth.com — confirm that mailbox still exists before
+                      changing it to a dovecoteltd.co.uk address.
 style.css            Unified CSS design system (dark mode, glassmorphism, responsive utilities).
 dashboard.html       Self-contained operator portal. Displays live telemetry from server,
                      historical backtest graphs, and rolling 48-slot dispatch schedules.

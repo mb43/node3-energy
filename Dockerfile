@@ -9,6 +9,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application files
 COPY server.py .
 COPY simulate.py .
+COPY node3_config.py .
+COPY hardware_bridge.py .
 COPY dashboard.html .
 COPY index.html .
 
