@@ -1,6 +1,6 @@
 # Node-3 VLP / G99 / ElectronConnect Project Tracker
-**Version:** 2.0  
-**Updated:** 31 May 2026  
+**Version:** 3.0  
+**Updated:** 26 August 2026 (weekly review run)  
 **Property:** 179 King Georges Avenue, Southampton SO15 4LD  
 **MPAN:** 2000022678841  
 **Entity:** Dovecote Systems Ltd (Co. No. 17160178)  
@@ -8,15 +8,17 @@
 
 ---
 
-## 🔴 IMMEDIATE ACTIONS REQUIRED
+## 🔴 IMMEDIATE ACTIONS (check these NOW)
 
 | # | Action | Owner | Deadline | Notes |
 |---|--------|-------|----------|-------|
-| 1 | ~~Accept G99 offer FJJ907/1~~ | Matt | ✅ **DONE 2 Jun 2026** | Acceptance + 10.5kW load increase request sent to Andrea Keith. |
-| 2 | ~~Send VPP/VLP chase emails~~ | Matt | ✅ **DONE 2 Jun 2026** | Octopus, Elexon (CS0019840), Flexitricity all sent |
-| 3 | **Submit Service Agreement on ElectronConnect (mini-competition)** | Matt | **8–22 June 2026** | Window opens 8 June 11am. Log into electronconnect.net. Accept T&Cs — no consultant needed, it's a form. |
-| 4 | **Provide updated SLD to SSEN** | Matt | Before commissioning | Current SLD: DSL-SLD-001 Rev B. Required before energisation. |
-| 5 | **Chase Octopus VPP** | Matt | Soon | power@octopus.energy — sent 20 Apr, no reply. Key aggregator candidate for long-term BM/VLP revenue. |
+| 1 | ~~Check email for SSEN reply re FJJ907/1 expiry~~ | Matt | ✅ **RESOLVED 26 Aug** | Robert Smith (SSEN) replied 09:38 26 Aug: **"FJJ907 has already been accepted so has secured the export."** No further action needed — 27 Aug expiry does not apply. |
+| 2 | **ElectronConnect mini-competition** | Matt | **21 Sep 11am – 5 Oct 5pm 2026** | SSEN confirmed process by email 24 Aug: Electron will notify on 21 Sep when window opens; download, complete and upload the "mini-competition response form" before 5pm 5 Oct; contract issued for signature after due diligence. Questions → flexibilityprocurement@sse.com. Platform issues → support@electron.net. PQQ already approved — no re-registration needed. |
+| 3 | **Reply to Flexitricity (Jamie Hillis)** | Matt | Soon | Jamie Hillis replied 8 Jun asking about the BESS (repurposed EV packs). No reply sent yet. Key aggregator. |
+| 4 | **Reply to Octopus VPP** | Matt | Soon | Octopus replied 24 Jun with VPP enrolment process info. No reply sent yet. |
+| 5 | **Provide updated SLD to SSEN** | Matt | Before commissioning | Required before energisation. Current SLD: DSL-SLD-001 Rev B. |
+| 6 | **Book electrician** | Matt | When HV ready | Inverter wiring and commissioning. Matt has electrician ready once paid. |
+| 7 | **Arrange public liability insurance** | Matt | Before OA executed | Min £2M cover required. |
 
 ---
 
@@ -25,51 +27,53 @@
 | Field | Value |
 |-------|-------|
 | DNO | SSEN (Southern Electric Power Distribution plc) |
-| Agent | NorthMicroGen (notifications.northmicrogen@mailln.custhelp.com) |
-| Our Ref (SSEN) | FJJ907/1 |
-| Our Ref (NorthMicroGen) | 260420-000198 |
+| Agent | NorthMicroGen |
+| Our Ref (SSEN) | **FJJ907/1** |
+| Our Ref (NorthMicroGen) | **260420-000198** |
 | Application date | 20 April 2026 |
+| Accepted | 2 June 2026 |
 | Contact designer | Andrea Keith — andrea.keith@sse.com — 01738 342440 |
+| Robert Smith (10.5kW) | Robert.Smith5@sse.com |
 
 ### Application Timeline
 
 | Date | Event | Status |
 |------|-------|--------|
-| 20 Apr 2026 | G99 Fast-Track Notification submitted to notifications.southmicrogen@sse.com | ✅ Done |
-| 20 Apr 2026 | Auto-reply received from northmicrogen — ref 260420-000198 confirmed | ✅ Done |
-| 29 Apr 2026 | NorthMicroGen sent first "more info" request (G99 A1-1 form + site plan) | ✅ Received |
-| 14 May 2026 | NorthMicroGen sent second "more info" request (same items, chasing) | ✅ Received |
-| 16 May 2026 | Matt replied with full 7-attachment package | ✅ Done |
-| 29 May 2026 | **SSEN issued Quotation FJJ907/1** — offer for 5.5kW export at £0 | ✅ Received |
-| 2 Jun 2026 | **Acceptance email sent to Andrea Keith** + 10.5kW load increase quote requested | ✅ Done |
-| 27 Aug 2026 | Offer expiry (90 days from 29 May) | ✅ Accepted — no longer at risk |
+| 20 Apr 2026 | G99 Fast-Track submitted to notifications.southmicrogen@sse.com | ✅ Done |
+| 20 Apr 2026 | Auto-reply ref 260420-000198 confirmed | ✅ Done |
+| 29 Apr 2026 | First more-info request (G99 A1-1 + site plan) | ✅ Received |
+| 14 May 2026 | Second more-info request (chasing) | ✅ Received |
+| 16 May 2026 | Full 7-attachment reply sent | ✅ Done |
+| 29 May 2026 | **SSEN issued Quotation FJJ907/1** — 5.5kW export, £0 | ✅ Received |
+| 2 Jun 2026 | **Acceptance sent to Andrea Keith** + 10.5kW load increase request | ✅ Done |
+| 13 Aug 2026 | Automated "quotation about to expire" notice received | ⚠️ Status ambiguous |
+| 19 Aug 2026 | New service request opened for 10.5kW upgrade — ref 260819-001104, quote ref **FKA552**. Called Stuart Hadley. Full technical pack sent same day. | ✅ Done |
+| 20 Aug 2026 | SSEN (Robert Smith) issued FKA552 quotation — two options (see below) | ✅ Received |
+| 21 Aug 2026 | Asked Sonny (Solent Renewables) for ICP route/cost view | ⏳ No reply received |
+| 26 Aug 2026 | **Declined FKA552** — email sent to Robert Smith, cc Andrea Keith. Confirmed proceeding with FJJ907/1. Asked SSEN to confirm FJJ907/1 status is not affected by the 27 Aug stated expiry. | ✅ Done |
+| 26 Aug 2026 | **Robert Smith (SSEN) confirmed FJJ907 already accepted and export secured** — no action needed re: 27 Aug expiry notice | ✅ **RESOLVED** |
+| 27 Aug 2026 | STATED offer expiry (FJJ907/1) | ✅ **Does not apply — offer confirmed secure by SSEN** |
 
-### Documents Submitted (16 May 2026 response)
-1. `G99_MoreInfo_Response.pdf` — Covering letter confirming site details
-2. `NODE3_SitePlan_G99.pdf` — Annotated site plan (DSL-SP-001 Rev B)
-3. `G99_A1-1_Form_Filled.pdf` — ENA Form A1-1 (G99 Issue 2 Amendment 9), signed 18 May 2026
-4. `G99_SatelliteMap_179KGA.png` — Annotated ESRI satellite with boundary + meter
-5. `NODE3_G99_SLD_DSL-SLD-001_RevB.pdf` — G99 single-line diagram
-6. `KH105-G99_Amd-9_A23-test-report-20230424.pdf` — FoxESS type-test certificate
-7. `FoxESS_KH10.5_HV_Datasheet_V2.0.pdf` — BESS datasheet
-
-### Offer Details (FJJ907/1 — 29 May 2026)
+### Offer: FJJ907/1 (Active — accepted 2 Jun 2026)
 
 | Item | Value |
 |------|-------|
-| Installed capacity offered | 10.5kW |
-| **Export capacity offered** | **5.5kW** (limited — no reinforcement needed at this level) |
-| Originally requested | 10.5kW installed / 10.5kW export |
-| **Total charge** | **£0.00** |
-| Reason for 5.5kW limit | 10.5kW export would require chargeable network reinforcement |
-| Path to 10.5kW | Request "formal load increase" — SSEN will confirm costs |
-| Offer valid until | ~27 August 2026 (90 days from 29 May) |
-| Acceptance method | SSEN online portal + provide updated SLD prior to commissioning |
-| Network study result | No reinforcement needed for 5.5kW export |
-| Typical completion | 6 months after acceptance |
+| Export capacity | **5.5kW** |
+| Total charge | **£0.00** |
+| Installed capacity | 10.5kW |
+| Typical completion | 6 months from acceptance |
+| Status | **Accepted and confirmed secure** by SSEN (Robert Smith, 26 Aug 2026) — 27 Aug expiry notice does not apply |
 
-### Recommended Strategy
-**Accept the 5.5kW offer immediately** (free, unblocks commissioning, unblocks ElectronConnect OA) **AND** simultaneously request a formal quote for 10.5kW export. If 10.5kW reinforcement cost is reasonable (e.g. <£5k), upgrade later. 5.5kW is still commercially viable for VLP/BM participation.
+### Offer: FKA552 (Declined — 26 Aug 2026)
+
+| Item | Value |
+|------|-------|
+| Upgrade from → to | 5.5kW → 10.5kW export |
+| Option A (all works) | £15,547.56 |
+| Option B (non-contestable only) | £962.64 to SSEN + ~£14,584.92 contestable (ICP) |
+| Works required | 3-phase upgrade: single→three-phase, new joint bay, trenching |
+| Decision | **DECLINED** — cost not justified at this stage |
+| Offer valid until | ~18 Nov 2026 (90 days from 20 Aug) — door open to revisit |
 
 ---
 
@@ -84,63 +88,84 @@
 | Connection | 0.23kV (single-phase 230V) |
 | Capacity | 0.0105 MW (10.5kW) |
 | Connection status | Awaiting Energisation |
+| Contacts | Ronke Ajadi — Ronke.Ajadi@sse.com |
 
 ### Status Log
 
 | Date | Event | Status |
 |------|-------|--------|
-| 20 Apr 2026 | ElectronConnect account created for Dovecote Systems Ltd | ✅ Done |
-| 20 Apr 2026 | PQQ submitted (blank workaround per Ronke Ajadi guidance) | ✅ Done |
-| 20 Apr 2026 | PQQ **Approved** (Ronke processed same morning) | ✅ Done |
-| 20 Apr 2026 | Completed PQQ emailed to Ronke.Ajadi@sse.com | ✅ Done |
-| 20 Apr 2026 | Node-3 asset corrected and saved (22kV→0.23kV, 4MW→0.0105MW) | ✅ Done |
-| 20 Apr–5 May 2026 | OA procurement window open | ❌ **MISSED** — asset not eligible (G99 not completed) |
-| 31 May 2026 | G99 offer received — need to accept to unlock eligibility | ⏳ Pending |
-| TBC | New OA procurement window | ⏳ Check portal |
+| 20 Apr 2026 | Account created, PQQ submitted (blank workaround) | ✅ Done |
+| 20 Apr 2026 | PQQ **Approved** (Ronke same morning) | ✅ Done |
+| 20 Apr–5 May 2026 | OA window | ❌ **MISSED** — asset not eligible (G99 not completed at time) |
+| 8–22 Jun 2026 | Mini-competition window | ❌ **MISSED** — window passed |
+| **21 Sep – 5 Oct 2026** | **Next mini-competition window** | 🔴 **DO NOT MISS** — submit before 5 Oct 5pm |
 
-### Outstanding Asset Fields (need SSEN confirmation post-G99)
-- Network Location (feeder/substation) — SSEN to confirm after G99 completion
-- DNO Reference — from G99 acceptance
-- Connection Reference Number — from G99 acceptance
+### Outstanding Asset Fields (need SSEN post-G99)
+- Network Location (feeder/substation)
+- DNO Reference
+- Connection Reference Number
 
 ---
 
 ## VLP / BM / AGGREGATOR PIPELINE
 
-| Party | Action Taken | Date | Status | Next Action |
-|-------|-------------|------|--------|-------------|
-| **Engage Consulting** | Proposal received (28 Apr), Matt replied positively (29 Apr), Tom suggested 7 May follow-up call | 30 Apr 2026 | ⏸️ **ON HOLD** — Matt cannot afford fees at this stage. Will proceed via aggregator route instead. | No action needed for now. |
-| **Octopus VPP** | Chase email sent to power@octopus.energy | 2 Jun 2026 | ⏳ Awaiting response | — |
-| **Elexon VLP** | Chase sent via CS0019840 portal — chasing promised market entry email + Market Design input | 2 Jun 2026 | ⏳ Awaiting response | — |
-| **Flexitricity** | First contact email sent to info@flexitricity.com | 2 Jun 2026 | ⏳ Awaiting response | — |
+| Party | Last Action | Date | Status | Next Action |
+|-------|------------|------|--------|-------------|
+| **Flexitricity** | Jamie Hillis replied asking about the repurposed EV packs | 8 Jun 2026 | ⏳ **Matt has not replied** | Reply to Jamie — describe 3× Nissan e-NV200 packs, FoxESS KH10.5 HV, G99 accepted 5.5kW. Key aggregator candidate. |
+| **Octopus VPP** | Octopus replied with VPP enrolment process info | 24 Jun 2026 | ⏳ **Matt has not replied** | Read enrolment info, reply to progress. |
+| **Elexon VLP** | Case CS0019840 closed | 22 Jul 2026 | ✅ **RESOLVED** — no further action |  |
+| **Engage Consulting** | Proposal received, on hold | 29 Apr 2026 | ⏸️ **ON HOLD** — fees unaffordable. Aggregator route preferred. | No action for now |
 
 ### Commercial Context
-- **Agile arbitrage only**: ~£350/yr — not worth pursuing alone
-- **BM/VLP via aggregator**: £3,000–£8,000/yr realistic target (confirmed north star)
-- **Per-node target**: £3,497/yr
-- **Scale**: 26 nodes needed for £50k personal income
+- Agile arbitrage only: ~£350/yr
+- BM/VLP via aggregator: **£3,000–£8,000/yr** (confirmed north star)
+- Per-node target: **£3,497/yr**
+- Scale to £50k personal income: **26 nodes**
+
+---
+
+## HARDWARE / COMMISSIONING STATUS
+
+| Component | Status |
+|-----------|--------|
+| FoxESS KH10.5 HV inverter | Purchased, awaiting electrician |
+| 3× Nissan e-NV200 72kWh packs | On site |
+| T-2CAN (Battery-Emulator ESP32) | 1 flashed, available |
+| Waveshare MCP2551 CAN isolator | On hand |
+| JZK USB-RS485 adapter | On hand |
+| Raspberry Pi (hostname: node3) | Docker installed, stack ready to deploy |
+| LV wiring session | **In progress — 26 Aug 2026** |
+| HV wiring / commissioning | Awaiting electrician |
+| G99 SSEN witness test | After commissioning |
+
+### Software Stack (node3-energy repo)
+- Flask portal + LP dispatch + Mosquitto MQTT + hardware_bridge.py (Modbus RTU)
+- Portal: http://node3.local:8585
+- Repo: github.com/mb43/node3-energy (private)
+- Operational mode: `pre_commissioning` (no HV commands until G99 live + electrician sign-off)
 
 ---
 
 ## CRITICAL PATH TO REVENUE
 
 ```
-G99 Offer Accept (£0, 5.5kW)
+✅ G99 FJJ907/1 accepted (2 Jun 2026, 5.5kW, £0)
+✅ FJJ907/1 confirmed secure by SSEN (26 Aug 2026) — 27 Aug expiry does not apply
     ↓
-Commissioning + SSEN witness test
+🔧  HV wiring — electrician (book when paid)
     ↓
-Energisation confirmed
+🔧  Commissioning + SSEN G99 witness test
     ↓
-Update ElectronConnect asset (feeder/DNO ref)
+✅  Energisation confirmed
     ↓
-Accept new OA procurement window (when opens)
+📋  Update ElectronConnect asset (feeder/DNO ref from SSEN)
     ↓
-Engage aggregator (Octopus / Flexitricity / Engage)
+📅  ElectronConnect mini-competition: 21 Sep – 5 Oct 2026 — submit Service Agreement
     ↓
-BM/VLP revenue live
+🤝  Engage aggregator (Flexitricity / Octopus) — reply to both NOW
+    ↓
+💰  BM/VLP revenue live
 ```
-
-**Bottleneck right now:** G99 acceptance. Accept the offer.
 
 ---
 
@@ -148,37 +173,10 @@ BM/VLP revenue live
 
 | Name | Role | Contact |
 |------|------|---------|
-| Andrea Keith | SSEN Connections Designer | andrea.keith@sse.com / 01738 342440 |
+| Andrea Keith | SSEN Connections Designer (FJJ907/1) | andrea.keith@sse.com / 01738 342440 |
+| Robert Smith | SSEN (FKA552 / 10.5kW upgrade) | Robert.Smith5@sse.com |
 | Ronke Ajadi | SSEN ElectronConnect | Ronke.Ajadi@sse.com |
+| Jamie Hillis | Flexitricity | (via info@flexitricity.com) |
+| Stuart Hadley | SSEN (called 19 Aug re: FKA552) | via SSEN portal |
+| Sonny | Solent Renewables (ICP query) | No reply received |
 | Tom Desmond | Engage Consulting | info@engage-consulting.co.uk |
-| NorthMicroGen portal | G99 case management | notifications.northmicrogen@mailln.custhelp.com |
-
----
-
-## DRAFT REPLY TO ANDREA KEITH
-
-**To:** andrea.keith@sse.com  
-**Subject:** RE: Quotation for application FJJ907 — Acceptance and 10.5kW Load Increase Request  
-
-Dear Andrea,
-
-Thank you for sending the connection offer FJJ907/1 dated 29 May 2026.
-
-I am writing to confirm two things:
-
-1. **Acceptance of the 5.5kW offer** — I will accept the offer formally via the SSEN online portal. Please note this acceptance and I will provide an updated SLD prior to commissioning as requested.
-
-2. **Formal load increase request** — As set out in your letter, I would like to request a formal load increase to the full 10.5kW export capacity as originally applied for, including confirmation of any associated reinforcement costs.
-
-Please could you provide the formal load increase quote at your earliest convenience so I can assess the cost and make a decision on whether to proceed with the full export capacity.
-
-Our reference for this project: MPAN 2000022678841 / NorthMicroGen ref 260420-000198.
-
-Kind regards,  
-Matthew Brander  
-Director, Dovecote Systems Ltd  
-matt.brander@gmail.com  
-07763726307  
-
----
-*Tracker v1 (May 10 2026) superseded by this document. G99 offer received 29 May 2026. All information current as of 31 May 2026.*
