@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Node-3 LV Commissioning — Dovecote Systems Ltd</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 13px; background: #f5f6fa; color: #1a1a2e; }
+  .page { max-width: 960px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 22px; color: #1B4F72; border-bottom: 3px solid #1B4F72; padding-bottom: 8px; margin-bottom: 6px; }
+  h2 { font-size: 15px; color: #1B4F72; margin: 22px 0 8px; border-left: 4px solid #1B4F72; padding-left: 8px; }
+  h3 { font-size: 13px; color: #2C3E50; margin: 14px 0 6px; font-weight: bold; }
+  .subtitle { color: #555; font-size: 12px; margin-bottom: 20px; }
+  .diagram-box { background: #fff; border: 1px solid #dce1e7; border-radius: 6px; padding: 16px; margin-bottom: 20px; }
+  .diagram-title { font-size: 13px; font-weight: bold; color: #1B4F72; margin-bottom: 12px; background: #D6EAF8; padding: 6px 10px; border-radius: 4px; }
+  svg text { font-family: Arial, sans-serif; }
+  .step-section { background: #fff; border: 1px solid #dce1e7; border-radius: 6px; padding: 16px; margin-bottom: 20px; }
+  .step { display: flex; margin-bottom: 10px; align-items: flex-start; }
+  .step-num { background: #1B4F72; color: #fff; border-radius: 50%; width: 24px; height: 24px; min-width: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; margin-right: 10px; margin-top: 1px; }
+  .step-body { flex: 1; }
+  .step-body strong { display: block; margin-bottom: 2px; }
+  code { background: #1a1a2e; color: #7ec8e3; font-family: 'Courier New', monospace; font-size: 11px; padding: 2px 6px; border-radius: 3px; display: inline-block; }
+  .code-block { background: #1a1a2e; color: #7ec8e3; font-family: 'Courier New', monospace; font-size: 11px; padding: 10px 14px; border-radius: 4px; margin: 6px 0; line-height: 1.7; white-space: pre; overflow-x: auto; }
+  .warn { background: #FEF9E7; border-left: 4px solid #F39C12; padding: 8px 12px; margin: 8px 0; border-radius: 0 4px 4px 0; font-size: 12px; }
+  .danger { background: #FDEDEC; border-left: 4px solid #C0392B; padding: 8px 12px; margin: 8px 0; border-radius: 0 4px 4px 0; font-size: 12px; }
+  .ok { background: #E9F7EF; border-left: 4px solid #27AE60; padding: 8px 12px; margin: 8px 0; border-radius: 0 4px 4px 0; font-size: 12px; }
+  .pin-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+  .pin-table th { background: #1B4F72; color: #fff; padding: 5px 8px; text-align: left; }
+  .pin-table td { padding: 4px 8px; border-bottom: 1px solid #eee; }
+  .pin-table tr:nth-child(even) td { background: #f5f8fc; }
+  .wire-r { color: #C0392B; font-weight: bold; }
+  .wire-b { color: #1B4F72; font-weight: bold; }
+  .wire-g { color: #27AE60; font-weight: bold; }
+  .wire-y { color: #B7950B; font-weight: bold; }
+  .wire-w { color: #555; font-weight: bold; }
+  .phase-header { background: #1B4F72; color: #fff; padding: 8px 14px; border-radius: 4px; margin: 24px 0 12px; font-size: 14px; font-weight: bold; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { padding: 4px 0; padding-left: 22px; position: relative; font-size: 12px; }
+  .checklist li::before { content: "☐"; position: absolute; left: 0; color: #1B4F72; }
+  .toc { background: #fff; border: 1px solid #dce1e7; border-radius: 6px; padding: 14px; margin-bottom: 20px; }
+  .toc a { color: #1B4F72; text-decoration: none; display: block; padding: 2px 0; font-size: 12px; }
+  .toc a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Node-3 LV Commissioning</h1>
+<div class="subtitle">Dovecote Systems Ltd · Co. No. 17160178 · FoxESS KH10.5 HV · 72kWh (3× e-NV200) · G99 FJJ907/1 · 5.5kW export cap</div>
+
+<div class="toc">
+  <strong>Contents</strong><br><br>
+  <a href="#diag1">Diagram 1 — System Overview (block diagram)</a>
+  <a href="#diag2">Diagram 2 — Pi → FoxESS RS485/Modbus wiring</a>
+  <a href="#diag3">Diagram 3 — e-NV200 BMS CAN bus wiring</a>
+  <a href="#diag4">Diagram 4 — CT clamp positioning and connection</a>
+  <a href="#phase1">Phase 1 — Pi boot and connectivity check</a>
+  <a href="#phase2">Phase 2 — RS485/Modbus to FoxESS inverter</a>
+  <a href="#phase3">Phase 3 — CAN bus to e-NV200 BMS packs</a>
+  <a href="#phase4">Phase 4 — CT clamp installation (export limiting)</a>
+  <a href="#phase5">Phase 5 — Software verification and G99 export cap</a>
+  <a href="#checklist">Pre-HV-electrician sign-off checklist</a>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="diag1">Diagram 1 — System Overview</h2>
+<div class="diagram-box">
+  <div class="diagram-title">Node-3 Block Diagram — LV Control Layer</div>
+  <svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" width="100%">
+    <!-- Background -->
+    <rect width="900" height="380" fill="#fafbfc"/>
+
+    <!-- GRID BOX -->
+    <rect x="10" y="140" width="110" height="60" rx="6" fill="#FDEDEC" stroke="#C0392B" stroke-width="2"/>
+    <text x="65" y="162" text-anchor="middle" font-size="11" font-weight="bold" fill="#C0392B">GRID</text>
+    <text x="65" y="177" text-anchor="middle" font-size="10" fill="#C0392B">DNO incomer</text>
+    <text x="65" y="190" text-anchor="middle" font-size="10" fill="#C0392B">L1 / N / PE</text>
+
+    <!-- CT CLAMP -->
+    <ellipse cx="165" cy="170" rx="14" ry="9" fill="none" stroke="#F39C12" stroke-width="2.5"/>
+    <text x="165" y="147" text-anchor="middle" font-size="9" fill="#B7950B" font-weight="bold">CT CLAMP</text>
+    <text x="165" y="157" text-anchor="middle" font-size="9" fill="#B7950B">on L1</text>
+    <!-- Grid wire to CT -->
+    <line x1="120" y1="170" x2="151" y2="170" stroke="#C0392B" stroke-width="2.5"/>
+    <!-- CT to meter input (dotted signal line) -->
+    <line x1="165" y1="161" x2="165" y2="120" stroke="#F39C12" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="170" y="135" font-size="9" fill="#B7950B">S1/S2</text>
+    <text x="170" y="145" font-size="9" fill="#B7950B">signal</text>
+
+    <!-- FOXESS INVERTER BOX -->
+    <rect x="270" y="80" width="160" height="200" rx="6" fill="#D6EAF8" stroke="#1B4F72" stroke-width="2"/>
+    <text x="350" y="103" text-anchor="middle" font-size="12" font-weight="bold" fill="#1B4F72">FoxESS</text>
+    <text x="350" y="118" text-anchor="middle" font-size="12" font-weight="bold" fill="#1B4F72">KH10.5 HV</text>
+    <!-- Ports on inverter -->
+    <rect x="280" y="130" width="65" height="20" rx="3" fill="#1B4F72"/>
+    <text x="312" y="144" text-anchor="middle" font-size="9" fill="#fff">COM / RS485</text>
+    <rect x="280" y="158" width="65" height="20" rx="3" fill="#1B4F72"/>
+    <text x="312" y="172" text-anchor="middle" font-size="9" fill="#fff">CT / Meter IN</text>
+    <rect x="280" y="186" width="65" height="20" rx="3" fill="#1B4F72"/>
+    <text x="312" y="200" text-anchor="middle" font-size="9" fill="#fff">BAT CAN port</text>
+    <rect x="280" y="214" width="65" height="20" rx="3" fill="#555"/>
+    <text x="312" y="228" text-anchor="middle" font-size="9" fill="#fff">WiFi/Ethernet</text>
+    <text x="350" y="258" text-anchor="middle" font-size="9" fill="#1B4F72">HV DC bus ↑</text>
+
+    <!-- Grid wire through CT to inverter AC input -->
+    <line x1="179" y1="170" x2="270" y2="170" stroke="#C0392B" stroke-width="2.5"/>
+    <!-- CT signal line to CT/Meter IN -->
+    <line x1="165" y1="120" x2="280" y2="168" stroke="#F39C12" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+    <!-- RASPBERRY PI BOX -->
+    <rect x="530" y="110" width="140" height="120" rx="6" fill="#E9F7EF" stroke="#27AE60" stroke-width="2"/>
+    <text x="600" y="133" text-anchor="middle" font-size="12" font-weight="bold" fill="#27AE60">Raspberry Pi</text>
+    <text x="600" y="148" text-anchor="middle" font-size="10" fill="#27AE60">(Pi 4 or Pi 5)</text>
+    <rect x="540" y="158" width="60" height="18" rx="3" fill="#27AE60"/>
+    <text x="570" y="171" text-anchor="middle" font-size="9" fill="#fff">USB-RS485</text>
+    <rect x="540" y="182" width="60" height="18" rx="3" fill="#27AE60"/>
+    <text x="570" y="195" text-anchor="middle" font-size="9" fill="#fff">USB-CAN</text>
+    <rect x="610" y="158" width="50" height="18" rx="3" fill="#555"/>
+    <text x="635" y="171" text-anchor="middle" font-size="9" fill="#fff">WiFi/LAN</text>
+    <rect x="610" y="182" width="50" height="18" rx="3" fill="#555"/>
+    <text x="635" y="195" text-anchor="middle" font-size="9" fill="#fff">5V USB-C</text>
+
+    <!-- RS485 wire Pi → FoxESS COM -->
+    <line x1="530" y1="167" x2="430" y2="140" stroke="#1B4F72" stroke-width="2" stroke-dasharray="6,3"/>
+    <text x="480" y="152" text-anchor="middle" font-size="9" fill="#1B4F72" font-weight="bold">RS485 A/B</text>
+    <text x="480" y="163" text-anchor="middle" font-size="9" fill="#1B4F72">Modbus RTU</text>
+
+    <!-- e-NV200 PACKS -->
+    <rect x="270" y="310" width="160" height="55" rx="6" fill="#FCF3CF" stroke="#B7950B" stroke-width="2"/>
+    <text x="350" y="330" text-anchor="middle" font-size="11" font-weight="bold" fill="#B7950B">3× e-NV200</text>
+    <text x="350" y="345" text-anchor="middle" font-size="10" fill="#B7950B">battery packs</text>
+    <text x="350" y="358" text-anchor="middle" font-size="9" fill="#B7950B">72kWh · internal BMS</text>
+
+    <!-- HV DC lines (packs to inverter) -->
+    <line x1="350" y1="310" x2="350" y2="280" stroke="#B7950B" stroke-width="3"/>
+    <text x="358" y="298" font-size="9" fill="#B7950B" font-weight="bold">HV DC</text>
+    <text x="358" y="308" font-size="9" fill="#B7950B">pack strings</text>
+
+    <!-- CAN bus line (packs to Pi) -->
+    <line x1="430" y1="340" x2="530" y2="191" stroke="#F39C12" stroke-width="2" stroke-dasharray="5,3"/>
+    <text x="498" y="280" text-anchor="middle" font-size="9" fill="#B7950B" font-weight="bold">CAN-H/L</text>
+    <text x="498" y="292" text-anchor="middle" font-size="9" fill="#B7950B">BMS data</text>
+
+    <!-- Also BAT CAN to FoxESS (packs to inverter CAN) -->
+    <line x1="350" y1="310" x2="312" y2="206" stroke="#F39C12" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+    <!-- EXPORT arrow to grid -->
+    <line x1="120" y1="155" x2="120" y2="145" stroke="#27AE60" stroke-width="1.5"/>
+    <text x="128" y="143" font-size="9" fill="#27AE60" font-weight="bold">≤5.5kW export</text>
+
+    <!-- Legend -->
+    <rect x="700" y="100" width="185" height="170" rx="4" fill="#fff" stroke="#ccc" stroke-width="1"/>
+    <text x="792" y="118" text-anchor="middle" font-size="10" font-weight="bold" fill="#1B4F72">LEGEND</text>
+    <line x1="714" y1="132" x2="745" y2="132" stroke="#C0392B" stroke-width="2.5"/>
+    <text x="750" y="136" font-size="9" fill="#333">AC mains (L/N/PE)</text>
+    <line x1="714" y1="150" x2="745" y2="150" stroke="#B7950B" stroke-width="3"/>
+    <text x="750" y="154" font-size="9" fill="#333">HV DC (pack strings)</text>
+    <line x1="714" y1="168" x2="745" y2="168" stroke="#1B4F72" stroke-width="2" stroke-dasharray="6,3"/>
+    <text x="750" y="172" font-size="9" fill="#333">RS485/Modbus signal</text>
+    <line x1="714" y1="186" x2="745" y2="186" stroke="#F39C12" stroke-width="2" stroke-dasharray="4,3"/>
+    <text x="750" y="190" font-size="9" fill="#333">CAN bus signal</text>
+    <line x1="714" y1="204" x2="745" y2="204" stroke="#F39C12" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="750" y="208" font-size="9" fill="#333">CT clamp signal</text>
+    <rect x="714" y="217" width="16" height="10" rx="2" fill="#E9F7EF" stroke="#27AE60" stroke-width="1.5"/>
+    <text x="750" y="226" font-size="9" fill="#333">Pi (control layer)</text>
+    <rect x="714" y="232" width="16" height="10" rx="2" fill="#D6EAF8" stroke="#1B4F72" stroke-width="1.5"/>
+    <text x="750" y="241" font-size="9" fill="#333">FoxESS inverter</text>
+    <rect x="714" y="247" width="16" height="10" rx="2" fill="#FCF3CF" stroke="#B7950B" stroke-width="1.5"/>
+    <text x="750" y="256" font-size="9" fill="#333">Battery packs (BMS)</text>
+
+    <!-- PSU -->
+    <rect x="680" y="300" width="100" height="40" rx="4" fill="#E9F7EF" stroke="#27AE60" stroke-width="1.5"/>
+    <text x="730" y="316" text-anchor="middle" font-size="9" font-weight="bold" fill="#27AE60">5V 3A PSU</text>
+    <text x="730" y="330" text-anchor="middle" font-size="9" fill="#27AE60">isolated/DIN rail</text>
+    <line x1="670" y1="320" x2="610" y2="200" stroke="#27AE60" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="638" y="260" font-size="8" fill="#27AE60">5V USB-C</text>
+  </svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="diag2">Diagram 2 — Pi → FoxESS RS485/Modbus Wiring</h2>
+<div class="diagram-box">
+  <div class="diagram-title">USB-RS485 adapter → FoxESS KH10.5 HV COM port (RJ45 / screw terminals)</div>
+  <svg viewBox="0 0 860 220" xmlns="http://www.w3.org/2000/svg" width="100%">
+    <rect width="860" height="220" fill="#fafbfc"/>
+
+    <!-- Pi box -->
+    <rect x="20" y="40" width="150" height="140" rx="6" fill="#E9F7EF" stroke="#27AE60" stroke-width="2"/>
+    <text x="95" y="62" text-anchor="middle" font-size="12" font-weight="bold" fill="#27AE60">Raspberry Pi</text>
+    <!-- USB port on Pi -->
+    <rect x="155" y="80" width="18" height="30" rx="2" fill="#27AE60"/>
+    <text x="164" y="99" text-anchor="middle" font-size="8" fill="#fff" transform="rotate(-90,164,99)">USB-A</text>
+
+    <!-- USB-RS485 adapter -->
+    <rect x="200" y="65" width="140" height="60" rx="4" fill="#D6EAF8" stroke="#1B4F72" stroke-width="1.5"/>
+    <text x="270" y="85" text-anchor="middle" font-size="10" font-weight="bold" fill="#1B4F72">USB-RS485</text>
+    <text x="270" y="99" text-anchor="middle" font-size="10" fill="#1B4F72">adapter</text>
+    <text x="270" y="113" text-anchor="middle" font-size="9" fill="#555">(FTDI / CH340)</text>
+    <!-- USB cable -->
+    <line x1="173" y1="95" x2="200" y2="95" stroke="#27AE60" stroke-width="3"/>
+    <text x="186" y="90" text-anchor="middle" font-size="8" fill="#555">USB</text>
+    <!-- Terminal screws on adapter -->
+    <rect x="336" y="72" width="14" height="14" rx="2" fill="#B7950B" stroke="#8B6914" stroke-width="1"/>
+    <text x="343" y="83" text-anchor="middle" font-size="8" fill="#fff" font-weight="bold">A</text>
+    <rect x="336" y="92" width="14" height="14" rx="2" fill="#1B4F72" stroke="#0d2d4a" stroke-width="1"/>
+    <text x="343" y="103" text-anchor="middle" font-size="8" fill="#fff" font-weight="bold">B</text>
+    <rect x="336" y="112" width="14" height="14" rx="2" fill="#555" stroke="#333" stroke-width="1"/>
+    <text x="343" y="123" text-anchor="middle" font-size="8" fill="#fff" font-weight="bold">G</text>
+
+    <!-- Wires A B GND -->
+    <line x1="350" y1="79" x2="520" y2="79" stroke="#B7950B" stroke-width="2.5"/>
+    <line x1="350" y1="99" x2="520" y2="99" stroke="#1B4F72" stroke-width="2.5"/>
+    <line x1="350" y1="119" x2="520" y2="119" stroke="#555" stroke-width="1.5" stroke-dasharray="5,3"/>
+
+    <!-- Wire labels -->
+    <text x="435" y="73" text-anchor="middle" font-size="9" fill="#B7950B" font-weight="bold">RS485-A (Yellow/Orange)</text>
+    <text x="435" y="93" text-anchor="middle" font-size="9" fill="#1B4F72" font-weight="bold">RS485-B (Blue)</text>
+    <text x="435" y="113" text-anchor="middle" font-size="9" fill="#555">GND (Black) — recommended</text>
+
+    <!-- FoxESS box -->
+    <rect x="520" y="30" width="200" height="160" rx="6" fill="#D6EAF8" stroke="#1B4F72" stroke-width="2"/>
+    <text x="620" y="52" text-anchor="middle" font-size="12" font-weight="bold" fill="#1B4F72">FoxESS KH10.5 HV</text>
+    <text x="620" y="67" text-anchor="middle" font-size="10" fill="#555">COM port (RJ45 or terminals)</text>
+
+    <!-- RJ45 diagram -->
+    <rect x="540" y="80" width="80" height="80" rx="4" fill="#fff" stroke="#1B4F72" stroke-width="1.5"/>
+    <text x="580" y="97" text-anchor="middle" font-size="9" font-weight="bold" fill="#1B4F72">RJ45 / COM</text>
+    <!-- Pins -->
+    <rect x="548" y="104" width="12" height="10" rx="1" fill="#B7950B"/>
+    <text x="554" y="113" text-anchor="middle" font-size="7" fill="#fff">1</text>
+    <text x="548" y="130" font-size="7" fill="#B7950B">RS485-A</text>
+    <rect x="564" y="104" width="12" height="10" rx="1" fill="#1B4F72"/>
+    <text x="570" y="113" text-anchor="middle" font-size="7" fill="#fff">2</text>
+    <text x="564" y="130" font-size="7" fill="#1B4F72">RS485-B</text>
+    <rect x="580" y="104" width="12" height="10" rx="1" fill="#555"/>
+    <text x="586" y="113" text-anchor="middle" font-size="7" fill="#fff">3</text>
+    <text x="578" y="130" font-size="7" fill="#555">GND</text>
+    <rect x="596" y="104" width="12" height="10" rx="1" fill="#ccc"/>
+    <text x="602" y="113" text-anchor="middle" font-size="7" fill="#555">4–8</text>
+    <text x="590" y="130" font-size="7" fill="#999">other</text>
+
+    <!-- Connect wires to FoxESS pins -->
+    <line x1="520" y1="79" x2="554" y2="114" stroke="#B7950B" stroke-width="2"/>
+    <line x1="520" y1="99" x2="570" y2="114" stroke="#1B4F72" stroke-width="2"/>
+    <line x1="520" y1="119" x2="586" y2="114" stroke="#555" stroke-width="1.5"/>
+
+    <!-- Termination resistor note -->
+    <rect x="540" y="170" width="160" height="14" rx="3" fill="#FCF3CF" stroke="#B7950B" stroke-width="1"/>
+    <text x="620" y="181" text-anchor="middle" font-size="9" fill="#B7950B">120Ω across A-B if only device on bus</text>
+
+    <!-- Modbus settings box -->
+    <rect x="740" y="30" width="110" height="130" rx="4" fill="#fff" stroke="#ccc" stroke-width="1"/>
+    <text x="795" y="48" text-anchor="middle" font-size="9" font-weight="bold" fill="#1B4F72">Modbus Settings</text>
+    <text x="748" y="65" font-size="9" fill="#333">Slave addr: 1</text>
+    <text x="748" y="80" font-size="9" fill="#333">Baud: 9600</text>
+    <text x="748" y="95" font-size="9" fill="#333">Parity: None</text>
+    <text x="748" y="110" font-size="9" fill="#333">Data bits: 8</text>
+    <text x="748" y="125" font-size="9" fill="#333">Stop bits: 1</text>
+    <text x="748" y="140" font-size="9" fill="#555" font-style="italic">Verify in</text>
+    <text x="748" y="153" font-size="9" fill="#555" font-style="italic">Fox inverter menu</text>
+
+    <!-- Note about /dev/ttyUSB0 -->
+    <rect x="20" y="190" width="490" height="22" rx="3" fill="#FCF3CF" stroke="#F39C12" stroke-width="1"/>
+    <text x="265" y="205" text-anchor="middle" font-size="9" fill="#B7950B">⚠ Identify port: ls /dev/ttyUSB*  — will appear as /dev/ttyUSB0 or similar when adapter plugged in</text>
+  </svg>
+
+  <table class="pin-table" style="margin-top:12px;">
+    <thead><tr><th>FoxESS COM Pin</th><th>Signal</th><th>Wire colour (suggested)</th><th>Connect to adapter</th></tr></thead>
+    <tbody>
+      <tr><td>Pin 1</td><td>RS485-A (+)</td><td class="wire-y">Yellow or Orange</td><td>A terminal</td></tr>
+      <tr><td>Pin 2</td><td>RS485-B (−)</td><td class="wire-b">Blue</td><td>B terminal</td></tr>
+      <tr><td>Pin 3</td><td>GND</td><td class="wire-w">Black</td><td>GND terminal</td></tr>
+      <tr><td>Pins 4–8</td><td>Not used for Modbus</td><td>—</td><td>Leave open</td></tr>
+    </tbody>
+  </table>
+  <div class="warn">⚠ <strong>Verify pinout in your specific FoxESS KH10.5 HV installation manual</strong> — pin numbering is consistent across Fox H3 generation but confirm against the connector label on the inverter before wiring.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="diag3">Diagram 3 — e-NV200 BMS CAN Bus Wiring</h2>
+<div class="diagram-box">
+  <div class="diagram-title">Internal BMS (e-NV200 packs) → Raspberry Pi CAN interface + FoxESS BAT CAN port</div>
+  <svg viewBox="0 0 860 260" xmlns="http://www.w3.org/2000/svg" width="100%">
+    <rect width="860" height="260" fill="#fafbfc"/>
+
+    <!-- Pack 1 -->
+    <rect x="20" y="40" width="120" height="80" rx="5" fill="#FCF3CF" stroke="#B7950B" stroke-width="2"/>
+    <text x="80" y="64" text-anchor="middle" font-size="10" font-weight="bold" fill="#B7950B">e-NV200</text>
+    <text x="80" y="78" text-anchor="middle" font-size="10" fill="#B7950B">Pack 1</text>
+    <text x="80" y="92" text-anchor="middle" font-size="9" fill="#555">24kWh · internal BMS</text>
+    <!-- CAN connector on pack -->
+    <rect x="138" y="68" width="12" height="24" rx="2" fill="#B7950B"/>
+    <text x="144" y="84" text-anchor="middle" font-size="7" fill="#fff" transform="rotate(-90,144,84)">CAN</text>
+
+    <!-- Pack 2 -->
+    <rect x="20" y="150" width="120" height="80" rx="5" fill="#FCF3CF" stroke="#B7950B" stroke-width="2"/>
+    <text x="80" y="174" text-anchor="middle" font-size="10" font-weight="bold" fill="#B7950B">e-NV200</text>
+    <text x="80" y="188" text-anchor="middle" font-size="10" fill="#B7950B">Pack 2</text>
+    <text x="80" y="202" text-anchor="middle" font-size="9" fill="#555">24kWh · internal BMS</text>
+    <rect x="138" y="178" width="12" height="24" rx="2" fill="#B7950B"/>
+    <text x="144" y="194" text-anchor="middle" font-size="7" fill="#fff" transform="rotate(-90,144,194)">CAN</text>
+
+    <!-- Pack 3 (implied — dashed box) -->
+    <rect x="20" y="238" width="120" height="16" rx="3" fill="none" stroke="#B7950B" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="80" y="250" text-anchor="middle" font-size="9" fill="#B7950B" font-style="italic">Pack 3 (same wiring)</text>
+
+    <!-- CAN bus backbone lines -->
+    <line x1="150" y1="80" x2="210" y2="80" stroke="#C0392B" stroke-width="2"/>
+    <line x1="150" y1="95" x2="210" y2="95" stroke="#1B4F72" stroke-width="2"/>
+    <line x1="150" y1="190" x2="210" y2="190" stroke="#C0392B" stroke-width="2"/>
+    <line x1="150" y1="200" x2="210" y2="200" stroke="#1B4F72" stroke-width="2"/>
+    <!-- Vertical bus trunk -->
+    <line x1="210" y1="75" x2="210" y2="205" stroke="#C0392B" stroke-width="2"/>
+    <line x1="216" y1="75" x2="216" y2="205" stroke="#1B4F72" stroke-width="2"/>
+    <!-- Bus labels -->
+    <text x="220" y="140" font-size="9" fill="#C0392B" font-weight="bold">CAN-H</text>
+    <text x="220" y="152" font-size="9" fill="#1B4F72" font-weight="bold">CAN-L</text>
+
+    <!-- 120Ω at pack end -->
+    <rect x="155" y="88" width="30" height="12" rx="2" fill="#F39C12" stroke="#B7950B" stroke-width="1"/>
+    <text x="170" y="98" text-anchor="middle" font-size="8" fill="#fff">120Ω</text>
+    <text x="190" y="115" text-anchor="start" font-size="8" fill="#B7950B">Pack-end</text>
+    <text x="190" y="125" text-anchor="start" font-size="8" fill="#B7950B">termination</text>
+
+    <!-- CAN trunk continues to USB-CAN -->
+    <line x1="210" y1="80" x2="380" y2="100" stroke="#C0392B" stroke-width="2"/>
+    <line x1="216" y1="80" x2="386" y2="100" stroke="#1B4F72" stroke-width="2"/>
+
+    <!-- USB-CAN adapter -->
+    <rect x="380" y="80" width="130" height="65" rx="4" fill="#D6EAF8" stroke="#1B4F72" stroke-width="1.5"/>
+    <text x="445" y="100" text-anchor="middle" font-size="10" font-weight="bold" fill="#1B4F72">USB-CAN</text>
+    <text x="445" y="114" text-anchor="middle" font-size="9" fill="#1B4F72">adapter</text>
+    <text x="445" y="128" text-anchor="middle" font-size="9" fill="#555">(e.g. CANable / PCAN)</text>
+    <!-- 120Ω at this end -->
+    <rect x="392" y="102" width="30" height="12" rx="2" fill="#F39C12" stroke="#B7950B" stroke-width="1"/>
+    <text x="407" y="112" text-anchor="middle" font-size="8" fill="#fff">120Ω</text>
+    <text x="426" y="148" text-anchor="middle" font-size="8" fill="#B7950B">Pi-end termination</text>
+    <!-- USB to Pi -->
+    <rect x="505" y="90" width="14" height="30" rx="2" fill="#27AE60"/>
+    <text x="512" y="109" text-anchor="middle" font-size="8" fill="#fff" transform="rotate(-90,512,109)">USB</text>
+
+    <!-- Pi box -->
+    <rect x="540" y="60" width="140" height="120" rx="6" fill="#E9F7EF" stroke="#27AE60" stroke-width="2"/>
+    <text x="610" y="82" text-anchor="middle" font-size="12" font-weight="bold" fill="#27AE60">Raspberry Pi</text>
+    <line x1="519" y1="105" x2="540" y2="105" stroke="#27AE60" stroke-width="3"/>
+    <text x="555" y="110" font-size="9" fill="#555">USB-CAN in</text>
+    <!-- Also RS485 input -->
+    <text x="555" y="135" font-size="9" fill="#555">USB-RS485 in</text>
+    <text x="555" y="155" font-size="9" fill="#555">Power: 5V USB-C</text>
+    <text x="555" y="175" font-size="9" fill="#555">WiFi → server</text>
+
+    <!-- FoxESS BAT CAN port -->
+    <rect x="380" y="180" width="160" height="60" rx="5" fill="#D6EAF8" stroke="#1B4F72" stroke-width="1.5"/>
+    <text x="460" y="200" text-anchor="middle" font-size="10" font-weight="bold" fill="#1B4F72">FoxESS BAT CAN port</text>
+    <text x="460" y="215" text-anchor="middle" font-size="9" fill="#555">(4-pin RJ10 or Molex)</text>
+    <text x="460" y="228" text-anchor="middle" font-size="9" fill="#555">CAN-H · CAN-L · 12V · GND</text>
+    <!-- Pack CAN also feeds FoxESS BAT port -->
+    <line x1="213" y1="195" x2="380" y2="200" stroke="#C0392B" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <line x1="213" y1="202" x2="380" y2="210" stroke="#1B4F72" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <text x="300" y="214" text-anchor="middle" font-size="9" fill="#B7950B">Optional: packs → FoxESS BAT CAN</text>
+    <text x="300" y="226" text-anchor="middle" font-size="9" fill="#B7950B">(if FoxESS needs BMS handshake)</text>
+
+    <!-- CAN notes box -->
+    <rect x="700" y="60" width="150" height="160" rx="4" fill="#fff" stroke="#ccc" stroke-width="1"/>
+    <text x="775" y="78" text-anchor="middle" font-size="9" font-weight="bold" fill="#1B4F72">CAN Bus Notes</text>
+    <text x="708" y="95" font-size="8" fill="#333">• Standard: CAN 2.0B</text>
+    <text x="708" y="110" font-size="8" fill="#333">• Speed: 500 kbps</text>
+    <text x="708" y="125" font-size="8" fill="#333">  (e-NV200 default)</text>
+    <text x="708" y="140" font-size="8" fill="#333">• 120Ω at EACH end</text>
+    <text x="708" y="155" font-size="8" fill="#333">• Twisted pair wire</text>
+    <text x="708" y="170" font-size="8" fill="#333">• Max stub length: 0.3m</text>
+    <text x="708" y="185" font-size="8" fill="#333">• can0 interface in Pi</text>
+    <text x="708" y="200" font-size="8" fill="#C0392B">• CAN-H: Yellow/Red</text>
+    <text x="708" y="215" font-size="8" fill="#1B4F72">• CAN-L: White/Blue</text>
+  </svg>
+
+  <div class="warn">⚠ <strong>e-NV200 CAN connector</strong> — the BMS CAN bus is on the 12-pin low-voltage service connector, NOT the HV orange connector. Identify via OBDII CAN sniffer if unsure of pin positions before wiring. CAN-H typically measures ~2.5–3.5V, CAN-L ~1.5–2.5V.</div>
+  <div class="danger">⛔ <strong>NEVER probe or connect anything to the orange HV connectors. These are ≥350V DC. LV work only — all HV must be isolated and locked out before any work near the packs.</strong></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="diag4">Diagram 4 — CT Clamp Position and Connection</h2>
+<div class="diagram-box">
+  <div class="diagram-title">CT clamp at grid incomer → FoxESS meter input (S1/S2) — G99 export limiting</div>
+  <svg viewBox="0 0 860 240" xmlns="http://www.w3.org/2000/svg" width="100%">
+    <rect width="860" height="240" fill="#fafbfc"/>
+
+    <!-- Grid supply -->
+    <rect x="10" y="80" width="80" height="80" rx="5" fill="#FDEDEC" stroke="#C0392B" stroke-width="2"/>
+    <text x="50" y="107" text-anchor="middle" font-size="10" font-weight="bold" fill="#C0392B">DNO</text>
+    <text x="50" y="121" text-anchor="middle" font-size="10" fill="#C0392B">Meter</text>
+    <text x="50" y="137" text-anchor="middle" font-size="9" fill="#555">grid incomer</text>
+
+    <!-- 3 wires from grid -->
+    <line x1="90" y1="100" x2="200" y2="100" stroke="#C0392B" stroke-width="3"/>
+    <line x1="90" y1="120" x2="200" y2="120" stroke="#B8B8B8" stroke-width="2.5"/>
+    <line x1="90" y1="140" x2="200" y2="140" stroke="#4CAF50" stroke-width="2.5"/>
+    <text x="130" y="95" font-size="9" fill="#C0392B" font-weight="bold">L1 (Live)</text>
+    <text x="130" y="115" font-size="9" fill="#666">N (Neutral)</text>
+    <text x="130" y="135" font-size="9" fill="#27AE60">PE (Earth)</text>
+
+    <!-- CT clamp on L1 -->
+    <ellipse cx="200" cy="100" rx="18" ry="12" fill="none" stroke="#F39C12" stroke-width="3"/>
+    <text x="200" y="72" text-anchor="middle" font-size="10" font-weight="bold" fill="#B7950B">CT CLAMP</text>
+    <text x="200" y="83" text-anchor="middle" font-size="9" fill="#B7950B">clips around</text>
+    <text x="200" y="93" text-anchor="middle" font-size="9" fill="#B7950B">L1 only</text>
+    <!-- CT signal leads -->
+    <line x1="200" y1="88" x2="200" y2="50" stroke="#F39C12" stroke-width="2" stroke-dasharray="4,3"/>
+    <!-- CT output terminals -->
+    <rect x="184" y="36" width="32" height="14" rx="2" fill="#F39C12"/>
+    <text x="200" y="47" text-anchor="middle" font-size="8" fill="#fff" font-weight="bold">S1 · S2</text>
+    <text x="200" y="30" text-anchor="middle" font-size="8" fill="#B7950B">CT output</text>
+
+    <!-- Wire continues past CT to consumer unit -->
+    <line x1="218" y1="100" x2="320" y2="100" stroke="#C0392B" stroke-width="3"/>
+    <line x1="200" y1="120" x2="320" y2="120" stroke="#B8B8B8" stroke-width="2.5"/>
+    <line x1="200" y1="140" x2="320" y2="140" stroke="#4CAF50" stroke-width="2.5"/>
+
+    <!-- Consumer unit / MAIN INCOMER -->
+    <rect x="320" y="70" width="100" height="90" rx="5" fill="#e8e8e8" stroke="#555" stroke-width="2"/>
+    <text x="370" y="95" text-anchor="middle" font-size="10" font-weight="bold" fill="#333">Consumer</text>
+    <text x="370" y="109" text-anchor="middle" font-size="10" fill="#333">Unit</text>
+    <text x="370" y="124" text-anchor="middle" font-size="9" fill="#555">+ isolator</text>
+    <text x="370" y="138" text-anchor="middle" font-size="9" fill="#555">MCBs</text>
+
+    <!-- Wire to FoxESS AC input -->
+    <line x1="420" y1="100" x2="520" y2="100" stroke="#C0392B" stroke-width="3"/>
+    <line x1="420" y1="120" x2="520" y2="120" stroke="#B8B8B8" stroke-width="2.5"/>
+    <text x="470" y="95" text-anchor="middle" font-size="9" fill="#555">→ FoxESS</text>
+    <text x="470" y="108" text-anchor="middle" font-size="9" fill="#555">AC input</text>
+
+    <!-- CT signal wire to FoxESS meter input -->
+    <line x1="216" y1="43" x2="520" y2="43" stroke="#F39C12" stroke-width="2" stroke-dasharray="4,3"/>
+    <line x1="520" y1="43" x2="520" y2="80" stroke="#F39C12" stroke-width="2" stroke-dasharray="4,3"/>
+    <text x="360" y="37" text-anchor="middle" font-size="9" fill="#B7950B" font-weight="bold">CT signal cable (screened, 2-core)</text>
+
+    <!-- FoxESS box -->
+    <rect x="520" y="60" width="160" height="120" rx="6" fill="#D6EAF8" stroke="#1B4F72" stroke-width="2"/>
+    <text x="600" y="82" text-anchor="middle" font-size="11" font-weight="bold" fill="#1B4F72">FoxESS KH10.5 HV</text>
+    <!-- CT meter input terminals -->
+    <rect x="533" y="88" width="70" height="20" rx="3" fill="#1B4F72"/>
+    <text x="568" y="102" text-anchor="middle" font-size="9" fill="#fff">S1 · S2 (CT in)</text>
+    <text x="568" y="122" text-anchor="middle" font-size="9" fill="#555">Internal meter</text>
+    <text x="568" y="135" text-anchor="middle" font-size="9" fill="#555">reads grid flow</text>
+    <text x="568" y="150" text-anchor="middle" font-size="9" fill="#555">Export ≤ 5.5kW</text>
+    <text x="568" y="165" text-anchor="middle" font-size="9" fill="#555">enforced in FW</text>
+
+    <!-- Export cap label -->
+    <rect x="700" y="80" width="150" height="90" rx="4" fill="#E9F7EF" stroke="#27AE60" stroke-width="1.5"/>
+    <text x="775" y="98" text-anchor="middle" font-size="9" font-weight="bold" fill="#27AE60">G99 Export Limit</text>
+    <text x="708" y="115" font-size="8" fill="#333">Set in FoxESS menu:</text>
+    <text x="708" y="130" font-size="8" fill="#333">Settings → Grid</text>
+    <text x="708" y="145" font-size="8" fill="#333">→ Export limit</text>
+    <text x="708" y="160" font-size="8" fill="#C0392B" font-weight="bold">→ 5,500W (5.5kW)</text>
+
+    <!-- Correct placement note -->
+    <rect x="10" y="190" width="690" height="38" rx="4" fill="#FDEDEC" stroke="#C0392B" stroke-width="1"/>
+    <text x="355" y="206" text-anchor="middle" font-size="9" fill="#C0392B" font-weight="bold">⚠ CT PLACEMENT RULES</text>
+    <text x="355" y="220" text-anchor="middle" font-size="9" fill="#C0392B">CT clips around the L1 conductor ONLY (not around L+N together — that reads zero). Position: between DNO meter and main isolator/consumer unit. Do NOT position on load side of FoxESS AC output.</text>
+  </svg>
+
+  <div class="ok">✓ <strong>CT clamp type</strong>: Use a split-core (clip-on) CT rated for your supply current. Typical UK domestic: 100A CT. Output: 333mV or 5A secondary — match to FoxESS meter input spec (check Fox manual for S1/S2 rating). Screen the signal cable and connect screen at FoxESS end only (one-end grounding).</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2>Step-by-Step Commissioning Sequence</h2>
+
+<div class="phase-header" id="phase1">⚡ Phase 1 — Pi Boot and Connectivity</div>
+<div class="step-section">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <strong>Connect 5V PSU to Pi — dedicated supply only</strong>
+      Use an isolated 5V 3A PSU (DIN rail type recommended). Do NOT use the FoxESS USB output — inverter USB is noisy and may cause brownouts. Connect USB-C (Pi 4/5) or micro-USB (Pi 3).
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <strong>Boot and find Pi on the network</strong>
+      <div class="code-block">ping raspberrypi.local          # or use your router DHCP table
+ssh pi@raspberrypi.local       # default pass: raspberry (change immediately)</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <strong>Update OS and install dependencies</strong>
+      <div class="code-block">sudo apt update && sudo apt upgrade -y
+sudo apt install -y python3-pip python3-serial can-utils
+pip3 install minimalmodbus pyserial python-can</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <strong>Enable SPI and configure overlays (if using MCP2515 CAN HAT)</strong>
+      <div class="code-block">sudo raspi-config
+# → Interface Options → SPI → Enable
+# Then edit /boot/config.txt and add:
+# dtoverlay=mcp2515-can0,oscillator=8000000,interrupt=25
+# dtoverlay=spi-bcm2835</div>
+      If using USB-CAN adapter (CANable/PCAN): skip this — it auto-appears as <code>can0</code> via slcand.
+    </div>
+  </div>
+</div>
+
+<div class="phase-header" id="phase2">⚡ Phase 2 — RS485/Modbus to FoxESS Inverter</div>
+<div class="step-section">
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <strong>Plug in USB-RS485 adapter — identify the device</strong>
+      <div class="code-block">ls /dev/ttyUSB*
+# Should show /dev/ttyUSB0 (first adapter)
+# If two adapters: RS485 = ttyUSB0, USB-CAN = different</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-body">
+      <strong>Wire RS485 A/B to FoxESS COM port</strong>
+      With inverter powered off: connect RS485-A (Yellow) to COM pin 1, RS485-B (Blue) to COM pin 2, GND to pin 3. If this is the only device on the Modbus bus, fit a 120Ω resistor across A and B at the adapter end.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">7</div>
+    <div class="step-body">
+      <strong>Power inverter, test Modbus read</strong>
+      <div class="code-block">python3 << 'EOF'
+import minimalmodbus
+inst = minimalmodbus.Instrument('/dev/ttyUSB0', 1)  # address 1
+inst.serial.baudrate = 9600
+inst.serial.parity = 'N'
+inst.serial.stopbits = 1
+inst.mode = minimalmodbus.MODE_RTU
+# Read grid power register (Fox H3 register 0x0006 = grid power, signed int)
+val = inst.read_register(6, 0, 4, signed=True)
+print(f"Grid power: {val} W")  # +ve = import, -ve = export
+EOF</div>
+      <div class="ok">✓ If you get a number (even 0W) — Modbus is working. If TimeoutError: check baud rate, slave address, and A/B polarity (swap if needed).</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">8</div>
+    <div class="step-body">
+      <strong>Key FoxESS KH10.5 Modbus registers to verify</strong>
+      <table class="pin-table">
+        <thead><tr><th>Register (hex)</th><th>Description</th><th>Units</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>0x0006</td><td>Grid power</td><td>W (signed)</td><td>+ve = import, −ve = export</td></tr>
+          <tr><td>0x0010</td><td>Battery SOC</td><td>%</td><td>0–100</td></tr>
+          <tr><td>0x000B</td><td>Battery charge/discharge</td><td>W (signed)</td><td>+ve = charging</td></tr>
+          <tr><td>0x0020</td><td>Inverter temperature</td><td>°C × 10</td><td>divide by 10</td></tr>
+          <tr><td>0x001C</td><td>PV power</td><td>W</td><td>0 if no PV</td></tr>
+        </tbody>
+      </table>
+      <div class="warn">⚠ Register map varies slightly between FoxESS firmware versions. Cross-check against your inverter's Modbus register table in the Fox ESS Open API documentation or the community register list.</div>
+    </div>
+  </div>
+</div>
+
+<div class="phase-header" id="phase3">⚡ Phase 3 — CAN Bus to e-NV200 BMS</div>
+<div class="step-section">
+  <div class="step">
+    <div class="step-num">9</div>
+    <div class="step-body">
+      <strong>Locate the e-NV200 BMS CAN connector</strong>
+      The low-voltage BMS service connector is on the upper face of the battery pack (not the orange HV connector). It's a multi-pin automotive connector. Identify CAN-H and CAN-L using a multimeter in voltage mode: CAN-H ≈ 2.5–3.5V, CAN-L ≈ 1.5–2.5V during BMS activity.
+      <div class="danger">⛔ HV must be isolated before working within arm's reach of the pack. LV connector only — orange = HV = hands off.</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">10</div>
+    <div class="step-body">
+      <strong>Wire CAN-H/CAN-L from master pack to USB-CAN adapter</strong>
+      Use twisted pair (Cat5 works). Fit 120Ω across CAN-H/L at the pack connector end. Fit 120Ω at the USB-CAN adapter end. CAN-H = Red/Yellow wire, CAN-L = Blue/White wire (label clearly).
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">11</div>
+    <div class="step-body">
+      <strong>Bring up CAN interface and confirm traffic</strong>
+      <div class="code-block"># USB-CAN adapter (CANable/slcan method):
+sudo slcand -o -c -f -s6 /dev/ttyACM0 can0
+sudo ip link set can0 up type can bitrate 500000
+
+# OR if using MCP2515 HAT:
+sudo ip link set can0 up type can bitrate 500000
+
+# Check for traffic:
+candump can0 | head -20
+# You should see e-NV200 BMS frames (IDs in range 0x100–0x7FF)</div>
+      <div class="ok">✓ BMS actively broadcasts: SOC, cell voltages, temperatures, current, fault codes. Typical IDs: 0x355 (SOC/SOH), 0x356 (voltage/current/temp), 0x35A (alarms).</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">12</div>
+    <div class="step-body">
+      <strong>Decode BMS data — key CAN IDs for e-NV200</strong>
+      <div class="code-block">python3 << 'EOF'
+import can
+bus = can.interface.Bus(channel='can0', interface='socketcan')
+for msg in bus:
+    if msg.arbitration_id == 0x355:
+        soc = int.from_bytes(msg.data[0:2], 'little') / 10
+        print(f"SOC: {soc:.1f}%")
+    elif msg.arbitration_id == 0x356:
+        volts = int.from_bytes(msg.data[0:2], 'little', signed=True) / 100
+        amps  = int.from_bytes(msg.data[2:4], 'little', signed=True) / 10
+        temp  = int.from_bytes(msg.data[4:6], 'little', signed=True) / 10
+        print(f"V: {volts:.2f}V  A: {amps:.1f}A  T: {temp:.1f}°C")
+    if msg.arbitration_id > 0x400: break
+EOF</div>
+      <div class="warn">⚠ CAN IDs and byte ordering vary between e-NV200 model year (2014 vs 2018+). Sniff with <code>candump -l can0</code> to log a session, then decode empirically if values look wrong.</div>
+    </div>
+  </div>
+</div>
+
+<div class="phase-header" id="phase4">⚡ Phase 4 — CT Clamp (G99 Export Limiting)</div>
+<div class="step-section">
+  <div class="step">
+    <div class="step-num">13</div>
+    <div class="step-body">
+      <strong>Isolate at main incomer before any CT work</strong>
+      Switch OFF the main isolator in the consumer unit. Verify dead with a voltage tester on L1/N at the terminals. The CT clamp is clip-on (non-contact) but the meter tails are still live unless you isolate. DO NOT work on meter tails — contact your DNO if access is needed at the sealed meter head.
+      <div class="danger">⛔ Main supply meter tails (between DNO meter and main switch) remain live even with main isolator OFF. Never touch or clip CT onto these without DNO authorisation or an approved isolator upstream.</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">14</div>
+    <div class="step-body">
+      <strong>Clip CT around L1 only — after the DNO meter, before the main switch</strong>
+      Open the CT clamp jaws, clip around the L1 (brown) conductor. The arrow/mark on the CT faces toward the load (away from the grid). Route the CT signal cable to the FoxESS meter input terminals.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">15</div>
+    <div class="step-body">
+      <strong>Connect CT output to FoxESS S1/S2 terminals</strong>
+      Use screened 2-core cable. Connect S1 and S2 to the FoxESS meter input. Connect the cable screen at the FoxESS end only (one-end grounding prevents ground loops).
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">16</div>
+    <div class="step-body">
+      <strong>Set export limit in FoxESS settings</strong>
+      Power up, navigate to: <em>Settings → Grid Settings → Export Limit</em><br>
+      Set to <strong>5500 W</strong> (your G99 conditioned limit per FJJ907/1).
+      <div class="ok">✓ FoxESS uses CT reading to throttle battery discharge/AC export in real time. If CT is reversed (reads negative), swap S1↔S2 at the FoxESS terminals (do not re-clip CT).</div>
+    </div>
+  </div>
+</div>
+
+<div class="phase-header" id="phase5">⚡ Phase 5 — Software Verification</div>
+<div class="step-section">
+  <div class="step">
+    <div class="step-num">17</div>
+    <div class="step-body">
+      <strong>Run full connectivity check — confirm all three data paths</strong>
+      <div class="code-block"># Check RS485 Modbus (FoxESS inverter)
+python3 -c "
+import minimalmodbus
+i = minimalmodbus.Instrument('/dev/ttyUSB0', 1)
+i.serial.baudrate = 9600; i.mode = minimalmodbus.MODE_RTU
+print('SOC:', i.read_register(0x10, 0, 4), '%')
+print('Grid:', i.read_register(0x06, 0, 4, signed=True), 'W')
+"
+
+# Check CAN bus (BMS)
+candump can0 -n 5   # 5 frames, should show BMS data immediately
+
+# Check export limit is active
+# Watch grid register — discharge battery while reading grid power
+# It should self-limit to ≤ 5500W export</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">18</div>
+    <div class="step-body">
+      <strong>Verify Dovecote node3 server sees the hardware</strong>
+      <div class="code-block"># On Pi (or server), check node3 bridge is picking up inverter data:
+curl http://localhost:8585/api/status | python3 -m json.tool
+# Should return real SOC, grid_power, battery_power — NOT simulated values
+# "source": "hardware"  ← look for this</div>
+      <div class="warn">⚠ The 19 Aug bug sweep found the dashboard JS fallback simulation was hiding behind a tiny label — if you see perfect curves instead of real jagged data, check the source field in /api/status.</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">19</div>
+    <div class="step-body">
+      <strong>Log a test discharge cycle and verify export cap</strong>
+      Command a discharge to grid via Modbus or FoxESS app. Watch grid_power on the dashboard. Export should clamp at 5.5kW. If it exceeds this, re-check CT orientation and the FoxESS export limit setting.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">20</div>
+    <div class="step-body">
+      <strong>Record commissioning data for G99 / DNO sign-off</strong>
+      Note: inverter serial number, firmware version, CT type and installation point, measured export at cap, BMS serial and SOC at test. Your HV electrician will need this for the witness test documentation.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="checklist">Pre-HV-Electrician Sign-Off Checklist</h2>
+<div class="step-section">
+  <p style="margin-bottom:10px;font-size:12px;">Complete all of the following before calling in the HV electrician for G99 witness testing:</p>
+  <div class="two-col">
+    <div>
+      <h3>LV Control Layer</h3>
+      <ul class="checklist">
+        <li>Pi boots, SSH accessible, OS up to date</li>
+        <li>USB-RS485 identified at /dev/ttyUSB0</li>
+        <li>Modbus read of FoxESS SOC returns real value</li>
+        <li>Modbus read of grid power returns real value</li>
+        <li>USB-CAN interface can0 is up</li>
+        <li>candump can0 shows live BMS frames</li>
+        <li>SOC decoded from CAN matches inverter display</li>
+        <li>BMS temperatures reading (no sensor faults)</li>
+        <li>CT clamp installed on L1, after meter, pre-isolator</li>
+        <li>CT signal wired to FoxESS S1/S2</li>
+        <li>Screen earthed at FoxESS end only</li>
+        <li>Export limit set to 5,500W in FoxESS settings</li>
+        <li>Export cap verified under discharge test</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Software / Monitoring</h3>
+      <ul class="checklist">
+        <li>node3 server returning "source: hardware" not simulated</li>
+        <li>G99 5.5kW cap active and confirmed in live test</li>
+        <li>Dashboard at dovecoteltd.co.uk:8585 showing real data</li>
+        <li>LP dispatch running (not greedy fallback)</li>
+        <li>Battery SOC logging to database</li>
+        <li>Inverter temperature within spec (≤70°C)</li>
+        <li>No BMS fault codes in CAN frames (0x35A = 0)</li>
+        <li>Export data being logged for G99 compliance records</li>
+        <li>Engage/aggregator notified of commissioning date</li>
+        <li>FoxESS WiFi connected and reporting to FoxCloud (optional but useful)</li>
+        <li>Inverter serial + firmware version recorded</li>
+        <li>All wiring labelled and cable-managed</li>
+        <li>Commissioning log started with today's date</li>
+      </ul>
+    </div>
+  </div>
+  <div class="danger" style="margin-top:14px;">⛔ <strong>Do not energise the HV DC bus without your G99-qualified electrician present.</strong> The HV side (FoxESS ↔ e-NV200 pack strings) requires isolation verification, continuity checks, and insulation resistance testing before first energisation. LV commissioning above is preparatory only.</div>
+</div>
+
+<div style="text-align:center;font-size:10px;color:#999;margin-top:20px;padding-top:10px;border-top:1px solid #eee;">
+  Dovecote Systems Ltd · Co. No. 17160178 · Node-3 LV Commissioning Guide · Generated Sept 2026
+</div>
+
+</div>
+</body>
+</html>
