@@ -36,7 +36,7 @@ CORS(app)
 # ─────────────────────────────────────────────
 _MQTT_HOST  = os.environ.get("MQTT_HOST", "")
 _MQTT_PORT  = int(os.environ.get("MQTT_PORT", "1883"))
-_BATT_TOPIC = os.environ.get("BATTERY_EMULATOR_MQTT_TOPIC", "battery-emulator")
+_BATT_TOPIC = os.environ.get("BATTERY_EMULATOR_MQTT_TOPIC", "battery-emulator-f3dc")
 _real_soc_lock = threading.Lock()
 
 
@@ -99,7 +99,7 @@ def _start_mqtt_soc_listener():
 
     def on_connect(client, userdata, flags, rc):
         if rc == 0:
-            client.subscribe(_BATT_TOPIC)
+            client.subscribe(_BATT_TOPIC + "/#")
             print(f"[MQTT-SOC] Connected to {_MQTT_HOST}:{_MQTT_PORT} — subscribed to '{_BATT_TOPIC}'", flush=True)
         else:
             print(f"[MQTT-SOC] Connect failed rc={rc}", flush=True)
@@ -228,7 +228,7 @@ import simulate as _sim   # reuse the real LP dispatch engine — do not re-impl
 _BT_RTE              = 0.88          # round-trip efficiency
 _BT_VLP_P            = 40.0          # Very Large Price threshold
 _BT_EXPORT_DEF_P     = 15.0          # flat fallback when live export prices absent
-_BT_DAILY_LOAD_KWH   = 12.0
+_BT_HOUSE_KWH_DAY    = 12.0          # profiled household load (PC1) — used for SVT saving calc
 _BT_SVT_REF_P        = 25.0          # Ofgem Standard Variable Tariff reference
 _BT_REGION           = os.environ.get("AGILE_REGION", "H")  # Southern England
 
@@ -245,10 +245,12 @@ _PC1_SUM     = sum(_PC1_RAW)
 _PC1_PROFILE = [v / _PC1_SUM for v in _PC1_RAW]
 
 
-def _bt_home_load(dt_utc):
-    """kWh home draws this 30-min slot (PC1-weighted, UTC time index)."""
+def _bt_home_load(dt_utc, house_kwh_day=None):
+    """Profiled house kWh this 30-min slot (Elexon PC1, UTC). Does NOT include
+    the constant baseload — that's added separately as a flat per-slot drain."""
     si = dt_utc.hour * 2 + (1 if dt_utc.minute >= 30 else 0)
-    return _BT_DAILY_LOAD_KWH * _PC1_PROFILE[si % 48]
+    h = house_kwh_day if house_kwh_day is not None else _BT_HOUSE_KWH_DAY
+    return h * _PC1_PROFILE[si % 48]
 
 
 def _bt_fetch_all(url, max_pages=20):
@@ -337,11 +339,15 @@ def _run_backtest(months=12):
     # plan runs out (every 96 slots / 48h, since each replan covers a 96-slot
     # lookahead window), using the actual running SOC as the starting point —
     # not a per-slot percentile threshold.
-    _bt_cfg           = _cfg.load_config()
-    _BT_BATTERY_KWH   = _bt_cfg["battery_kwh"]
-    _BT_MIN_SOC_KWH   = _BT_BATTERY_KWH * (_bt_cfg["min_soc_pct"] / 100.0)
-    _BT_EXPORT_KWH    = _bt_cfg["export_kw"] * 0.5
+    _bt_cfg             = _cfg.load_config()
+    _BT_BATTERY_KWH     = _bt_cfg["battery_kwh"]
+    _BT_MIN_SOC_KWH     = _BT_BATTERY_KWH * (_bt_cfg["min_soc_pct"] / 100.0)
+    _BT_EXPORT_KWH      = _bt_cfg["export_kw"] * 0.5
     _BT_CHARGE_KWH_SLOT = _bt_cfg["import_kw"] * 0.5
+    _bt_house_kwh       = _bt_cfg.get("house_kwh_day", 12.0)
+    _bt_baseload_kw     = _bt_cfg.get("baseload_kw", 0.0)
+    _bt_baseload_slot   = _bt_baseload_kw * 0.5        # kWh/slot (constant, flat)
+    _bt_total_load_day  = _bt_house_kwh + _bt_baseload_kw * 24.0  # for LP planning
 
     n   = len(import_prices)
     soc = _BT_BATTERY_KWH * 0.5   # start at 50% SOC
@@ -372,7 +378,8 @@ def _run_backtest(months=12):
             dispatch_plan.update(
                 _sim.plan_optimal_dispatch(window, soc, battery_kwh=_BT_BATTERY_KWH,
                                             min_soc_kwh=_BT_MIN_SOC_KWH,
-                                            export_kwh_cap=_BT_EXPORT_KWH)
+                                            export_kwh_cap=_BT_EXPORT_KWH,
+                                            daily_load_kwh=_bt_total_load_day)
             )
         planned = dispatch_plan.get(slot['valid_from'])
 
@@ -393,21 +400,13 @@ def _run_backtest(months=12):
 
         slot_profit   = 0.0
         is_vlp        = price >= _BT_VLP_P
-        home_load     = _bt_home_load(dt)
-
-        # Home load ALWAYS drains SOC, every slot — matching simulate.py's
-        # simulate_slot() exactly (see its comment: "home load already
-        # deducted from SOC above. Do NOT re-deduct house_served here — that
-        # was the previous double-deduction bug"). Previously this backtest
-        # only drained SOC for home load during VLP slots and separately
-        # "sold" the avoided import as revenue — a different, inconsistent
-        # physical model from the live system, found + fixed 19 Aug 2026 so
-        # the 12-month backtest's SOC trajectory (and therefore its
-        # charge/discharge decisions) genuinely matches live behaviour. The
-        # separate 'homeEnergySaved' stat below (Agile vs SVT) is unaffected
-        # — that's an independent informational figure, not part of the SOC/
-        # dispatch mechanics.
-        soc = max(0.0, soc - home_load)
+        home_load     = _bt_home_load(dt, house_kwh_day=_bt_house_kwh)
+        # Total SOC drain = PC1-profiled house load + constant baseload (miner etc).
+        # Home load ALWAYS drains SOC every slot — matching simulate.py's
+        # simulate_slot() exactly. The separate 'homeEnergySaved' stat below (Agile vs SVT)
+        # covers house only (profiled, PC1); baseload is tracked separately in the return.
+        slot_drain    = home_load + _bt_baseload_slot
+        soc = max(0.0, soc - slot_drain)
 
         if is_vlp and soc > _BT_MIN_SOC_KWH + 0.1:
             # VLP: export whatever's available above the reserve floor.
@@ -540,6 +539,12 @@ _SCHEMATIC_ASSETS = {
     "NODE3_Distributed_Topology.svg",
     "NODE3_Wall_Elevation.svg",
     "NODE3_G99_SLD_DSL-SLD-001_RevA_preview.png",
+    "Node3_Wiring_Overlay.html",
+    "Node3_LV_Commissioning.html",
+    "NODE3_Schematic.html",
+    "G99_MoreInfo_Response.html",
+    "G99_SatelliteMap.html",
+    "NODE3_SitePlan_G99.html",
 }
 
 @app.route("/<string:asset_name>")
@@ -599,13 +604,17 @@ def api_settings():
 
     body = request.get_json(silent=True) or {}
     updates = {}
-    for key in ("battery_kwh", "import_kw", "export_kw", "min_soc_pct"):
+    NON_NEGATIVE_KEYS = {"baseload_kw", "house_kwh_day"}
+    for key in ("battery_kwh", "import_kw", "export_kw", "min_soc_pct",
+                "baseload_kw", "house_kwh_day"):
         if key in body:
             try:
                 v = float(body[key])
             except (TypeError, ValueError):
                 return jsonify({"error": f"{key} must be numeric"}), 400
-            if v <= 0:
+            if key in NON_NEGATIVE_KEYS and v < 0:
+                return jsonify({"error": f"{key} must be >= 0"}), 400
+            elif key not in NON_NEGATIVE_KEYS and v <= 0:
                 return jsonify({"error": f"{key} must be > 0"}), 400
             updates[key] = v
     if not updates:
@@ -614,6 +623,114 @@ def api_settings():
     merged = _cfg.save_config(updates)
     print(f"[SETTINGS] Updated: {updates} -> {merged}")
     return jsonify(merged)
+
+
+# ─────────────────────────────────────────────
+# ALERTS — baseload / SOC / grid import warnings
+# Designed for high-baseload sites (e.g. ASIC miners) where running dry during
+# expensive grid slots is costly. Polled by dashboard every 60s.
+# ─────────────────────────────────────────────
+_ALERT_GRID_IMPORT_P  = 25.0   # p/kWh threshold: warn if importing above this
+_ALERT_HOURS_TO_EMPTY = 4.0    # warn if battery will hit floor within this many hours
+
+@app.route("/api/alerts")
+def api_alerts():
+    """
+    Returns a list of active operational alerts.
+
+    Each alert: {level: 'warning'|'critical', code: str, message: str}
+
+    Checks:
+    - battery SOC trending to min floor before next cheap window
+    - grid import at expensive rate with non-trivial baseload configured
+    - battery will be empty within N hours at current drain rate
+    """
+    alerts = []
+    try:
+        cfg        = _cfg.load_config()
+        state_raw  = load_json("fleet_state.json") or {}
+        prices_raw = load_json("prices.json") or []
+
+        battery_kwh   = cfg["battery_kwh"]
+        min_soc_kwh   = battery_kwh * (cfg["min_soc_pct"] / 100.0)
+        baseload_kw   = cfg.get("baseload_kw", 0.0)
+        house_kwh_day = cfg.get("house_kwh_day", 12.0)
+        total_load_kw = baseload_kw + (house_kwh_day / 24.0)  # avg kW including house
+
+        soc_kwh = state_raw.get("soc_kwh")
+        if soc_kwh is None:
+            soc_pct = state_raw.get("soc_pct")
+            soc_kwh = (float(soc_pct) / 100.0 * battery_kwh) if soc_pct is not None else None
+
+        # ── Alert: SOC approaching floor ─────────────────────────────────────
+        if soc_kwh is not None and total_load_kw > 0:
+            usable_kwh  = max(0.0, float(soc_kwh) - min_soc_kwh)
+            hours_left  = usable_kwh / total_load_kw if total_load_kw > 0 else 999.0
+
+            if hours_left < 1.0:
+                alerts.append({
+                    "level": "critical",
+                    "code":  "SOC_CRITICAL",
+                    "message": (
+                        f"Battery at {soc_kwh:.1f} kWh — LESS THAN 1 HOUR of load remaining "
+                        f"at {total_load_kw:.1f} kW average. Grid import imminent."
+                    )
+                })
+            elif hours_left < _ALERT_HOURS_TO_EMPTY:
+                alerts.append({
+                    "level": "warning",
+                    "code":  "SOC_LOW",
+                    "message": (
+                        f"Battery at {soc_kwh:.1f} kWh — ~{hours_left:.1f}h of load "
+                        f"remaining at {total_load_kw:.1f} kW. Check next charge window."
+                    )
+                })
+
+        # ── Alert: importing during expensive slot ────────────────────────────
+        # Infer current grid state from prices: if current slot price is high
+        # and SOC is at/near floor, we are likely importing at that price.
+        now_utc = datetime.now(timezone.utc)
+        if prices_raw and soc_kwh is not None:
+            slot_key = now_utc.strftime("%Y-%m-%dT%H:") + ("30" if now_utc.minute >= 30 else "00")
+            cur_price = None
+            for s in prices_raw:
+                if s.get("valid_from", "")[:16] == slot_key[:16]:
+                    cur_price = float(s["value_inc_vat"])
+                    break
+            if cur_price is not None and cur_price >= _ALERT_GRID_IMPORT_P:
+                usable = max(0.0, float(soc_kwh) - min_soc_kwh)
+                if usable < total_load_kw * 0.5:  # less than 30 mins of load above floor
+                    alerts.append({
+                        "level": "warning",
+                        "code":  "EXPENSIVE_IMPORT",
+                        "message": (
+                            f"Grid price now {cur_price:.1f}p/kWh and battery nearly empty "
+                            f"({soc_kwh:.1f} kWh). Baseload ({baseload_kw:.1f} kW) likely "
+                            f"drawing from grid at expensive rate."
+                        )
+                    })
+
+        # ── Alert: baseload configured reminder ──────────────────────────────
+        # Not an error — just surface the active baseload so it's visible.
+        if baseload_kw > 0:
+            total_kwh_day = house_kwh_day + baseload_kw * 24.0
+            # Estimate effective cost/kWh from most recent history if available
+            alerts.append({
+                "level": "info",
+                "code":  "BASELOAD_ACTIVE",
+                "message": (
+                    f"Baseload: {baseload_kw:.2f} kW ({baseload_kw * 24:.0f} kWh/day miner) "
+                    f"+ {house_kwh_day:.0f} kWh/day house = {total_kwh_day:.0f} kWh/day total. "
+                    f"LP plans {total_kwh_day/48:.2f} kWh/slot drain."
+                )
+            })
+
+    except Exception as e:
+        print(f"[ALERTS] Error: {e}", flush=True)
+        alerts.append({"level": "warning", "code": "ALERTS_ERROR",
+                        "message": f"Alert check failed: {e}"})
+
+    return jsonify({"alerts": alerts, "ts": datetime.now(timezone.utc).isoformat()})
 
 
 @app.route("/api/status")

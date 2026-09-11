@@ -52,7 +52,7 @@ services:
       - MQTT_HOST=mosquitto
       - MQTT_PORT=1883
       - MQTT_TOPIC=node3/cmd
-      - BATTERY_EMULATOR_MQTT_TOPIC=battery-emulator
+      - BATTERY_EMULATOR_MQTT_TOPIC=battery-emulator-f3dc
       - FOXESS_API_KEY=${FOXESS_API_KEY:-}
       - FOXESS_DEVICE_SN=${FOXESS_DEVICE_SN:-}
       - FOXESS_MODBUS_HOST=${FOXESS_MODBUS_HOST:-}

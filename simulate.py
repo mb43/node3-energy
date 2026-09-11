@@ -80,7 +80,12 @@ RESERVE_SOC_KWH    = 36.0    # 50% operational reserve — maintain this between
                               # price spikes; starting depleted destroys arbitrage capacity.
 INITIAL_SOC_KWH    = BATTERY_KWH * 0.5   # starting SOC assumption when real state unavailable
 INVERTER_KW        = _CFG["import_kw"]   # configurable import/charge rate (default 10kW)
-DAILY_LOAD_KWH     = 12.0    # household consumption per day
+# Daily load = profiled household draw + flat baseload (e.g. ASIC miner running 24/7).
+# Reads fresh config so a settings change takes effect on the next simulate.py run.
+# plan_optimal_dispatch() re-reads this fresh per call for immediate effect.
+_HOUSE_KWH_DAY     = _CFG.get("house_kwh_day", 12.0)
+_BASELOAD_KW       = _CFG.get("baseload_kw",   0.0)
+DAILY_LOAD_KWH     = _HOUSE_KWH_DAY + _BASELOAD_KW * 24.0  # total kWh/day
 SOLAR_KWP          = 0.0     # no solar modelled (pure arbitrage)
 SOLAR_EFFICIENCY   = 0.18    # panel efficiency
 ROUND_TRIP_EFF     = 0.88    # FoxESS + Nissan cell round-trip efficiency
@@ -557,7 +562,7 @@ def percentile(values, pct):
 
 def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
                           min_soc_kwh=MIN_SOC_KWH, historical_stats=None,
-                          export_kwh_cap=None):
+                          export_kwh_cap=None, daily_load_kwh=None):
     """
     Linear-programming optimal dispatch over the known Agile price window.
 
@@ -579,10 +584,19 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
 
     Falls back to a simple greedy schedule if scipy is unavailable.
 
+    daily_load_kwh: total household + baseload kWh/day for SOC drain modelling.
+    If None, reads fresh from config (house_kwh_day + baseload_kw*24) so a
+    settings change takes effect immediately on the next call.
+
     Returns: dict mapping valid_from string -> 'charge' | 'discharge' | 'idle'
     """
     if not price_slots:
         return {}
+
+    # Read fresh config for load so settings changes take effect immediately.
+    if daily_load_kwh is None:
+        _live = _cfg.load_config()
+        daily_load_kwh = _live.get("house_kwh_day", 12.0) + _live.get("baseload_kw", 0.0) * 24.0
 
     discharge_per_slot = export_kwh_cap if export_kwh_cap is not None else EXPORT_KWH
     # Charge cap = the configurable import rate (node3_config, default 10kW/
@@ -591,7 +605,7 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
     # way export is. See CHARGE_KWH / asymmetric-rates note near the top of
     # this file for why this is intentional, not the earlier 5.25-vs-3.68 bug.
     charge_per_slot    = CHARGE_KWH
-    load_per_slot      = DAILY_LOAD_KWH / 48.0
+    load_per_slot      = daily_load_kwh / 48.0
 
     n           = len(price_slots)
     prices_vals = [s['value_inc_vat'] for s in price_slots]

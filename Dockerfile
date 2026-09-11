@@ -19,6 +19,8 @@ COPY index.html .
 # which is why the schematic page complained the files weren't present even
 # though they sat right there in the project folder on the Mac.
 COPY NODE3_Schematic.html .
+COPY Node3_Wiring_Overlay.html .
+COPY Node3_LV_Commissioning.html .
 COPY NODE3_DEFINITIVE_Schematic.svg .
 COPY NODE3_LV_Wiring_Schematic.svg .
 COPY NODE3_DEFINITIVE_BoxLayout.svg .

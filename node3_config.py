@@ -30,12 +30,17 @@ BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, "node3_config.json")
 
 DEFAULTS = {
-    "battery_kwh":  72.0,   # usable pack capacity (3x Nissan e-NV200)
-    "import_kw":    10.0,   # charge rate — inverter/import limit
-    "export_kw":     6.0,   # discharge rate — export limit (self-imposed; must not exceed
+    "battery_kwh":   72.0,  # usable pack capacity (3x Nissan e-NV200)
+    "import_kw":     10.0,  # charge rate — inverter/import limit
+    "export_kw":      6.0,  # discharge rate — export limit (self-imposed; must not exceed
                              # the real DNO cap for whichever connection is active — 7.36kW
                              # for G98/32A, 11.5kW for G99/50A)
-    "min_soc_pct":  10.0,   # absolute floor, % of battery_kwh
+    "min_soc_pct":   10.0,  # absolute floor, % of battery_kwh
+    "baseload_kw":    0.0,  # constant background load (kW) added to the 12kWh/day house
+                             # profile — e.g. 1.5 for a 36kWh/day ASIC miner running 24/7.
+                             # Affects LP planning and SOC drain every slot.
+                             # Matt's site: 1.5 (Z15 draws ~1510W constant).
+    "house_kwh_day": 12.0,  # profiled household consumption per day (Elexon PC1 shape)
 }
 
 
@@ -57,13 +62,17 @@ def load_config():
 
 def save_config(updates):
     """Merge `updates` onto the current saved config and persist. Returns the
-    full merged config. Silently ignores unknown keys and non-numeric values."""
+    full merged config. Silently ignores unknown keys and non-numeric values.
+    baseload_kw and house_kwh_day allow zero (>= 0); others require > 0."""
+    NON_NEGATIVE = {"baseload_kw", "house_kwh_day"}
     cfg = load_config()
     for k in DEFAULTS:
         if k in updates:
             try:
                 v = float(updates[k])
-                if v > 0:
+                if k in NON_NEGATIVE and v >= 0:
+                    cfg[k] = v
+                elif k not in NON_NEGATIVE and v > 0:
                     cfg[k] = v
             except (TypeError, ValueError):
                 pass

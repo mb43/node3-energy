@@ -777,6 +777,9 @@
     </div>
   </div>
 
+  <!-- ALERTS BANNER — baseload / SOC warnings, polled every 60s -->
+  <div id="alerts-bar" style="display:none;padding:6px 18px;font-size:12px;line-height:1.5;background:#1a1a00;border-bottom:1px solid #5a5000;color:#e6c44a"></div>
+
   <!-- SETTINGS MODAL — battery capacity / import / export rate, single source
        of truth for simulate.py + every dispatch/backtest engine in server.py
        (node3_config.json). Added 19 Aug 2026 per Matt's explicit request. -->
@@ -795,7 +798,14 @@
       <input type="number" id="set-export-kw" step="0.1" min="0.1" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;margin-bottom:12px;font-size:13px">
 
       <label style="display:block;font-size:11px;color:#8b949e;margin-bottom:3px">Min SOC floor (%)</label>
-      <input type="number" id="set-min-soc-pct" step="1" min="0" max="90" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;margin-bottom:16px;font-size:13px">
+      <input type="number" id="set-min-soc-pct" step="1" min="0" max="90" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;margin-bottom:12px;font-size:13px">
+
+      <label style="display:block;font-size:11px;color:#8b949e;margin-bottom:3px">House load (kWh/day) — PC1-profiled household</label>
+      <input type="number" id="set-house-kwh-day" step="0.5" min="0" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;margin-bottom:12px;font-size:13px">
+
+      <label style="display:block;font-size:11px;color:#8b949e;margin-bottom:3px">Constant baseload (kW) — ASIC miner / always-on load</label>
+      <input type="number" id="set-baseload-kw" step="0.1" min="0" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;margin-bottom:4px;font-size:13px">
+      <div id="set-baseload-hint" style="font-size:10px;color:#8b949e;margin-bottom:16px">Z15 miner ≈ 1.51 kW = 36 kWh/day. Total daily load shown above.</div>
 
       <div id="settings-msg" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px"></div>
 
@@ -820,6 +830,7 @@
     <button class="tab-btn"        id="tbn-g98"         onclick="switchTab('g98')"         title="G98 current 32A cap scenario">G98</button>
     <button class="tab-btn"        id="tbn-g99"         onclick="switchTab('g99')"         title="G99 upgrade 50A scenario & upgrade value">G99</button>
     <button class="tab-btn"        id="tbn-schematic"   onclick="switchTab('schematic')"   title="Full electrical schematic">⚡ SCHEMATIC</button>
+    <button class="tab-btn"        id="tbn-overlay"     onclick="switchTab('overlay')"     title="Bench wiring photo overlay">📸 WIRING</button>
     <button class="tab-btn"        id="tbn-hardware"    onclick="switchTab('hardware')"    title="Live pack telemetry &amp; FoxESS hardware bridge status">🔋 PACK STATUS</button>
     <button class="tab-btn"        id="tbn-homeowner"   onclick="switchTab('homeowner')"   title="Homeowner savings portal">🏠 HOMEOWNER</button>
     <button class="tab-btn"        id="tbn-vpp"         onclick="switchTab('vpp')"         title="Virtual Power Plant — future revenue pathway &amp; enrolment status">🔌 VPP</button>
@@ -1370,6 +1381,13 @@
       <iframe id="schematic-frame" src="" style="width:100%;height:100%;border:none;background:var(--bg)" title="NODE-3 Electrical Schematic"></iframe>
     </div>
   </div><!-- /tab-schematic -->
+
+  <!-- ══ TAB: WIRING OVERLAY ══════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-overlay">
+    <div class="chart-card" style="padding:0;overflow:hidden;border-radius:8px;height:80vh;min-height:600px">
+      <iframe id="overlay-frame" src="" style="width:100%;height:100%;border:none;background:var(--bg)" title="NODE-3 Bench Wiring Overlay"></iframe>
+    </div>
+  </div><!-- /tab-overlay -->
 
   <!-- ══ TAB: PACK STATUS ══════════════════════════════════════ -->
   <div class="tab-panel" id="tab-hardware">
@@ -3216,10 +3234,13 @@ async function openSettings() {
   try {
     const res = await fetch('/api/settings', { signal: AbortSignal.timeout(6000) });
     const cfg = await res.json();
-    document.getElementById('set-battery-kwh').value  = cfg.battery_kwh;
-    document.getElementById('set-import-kw').value    = cfg.import_kw;
-    document.getElementById('set-export-kw').value    = cfg.export_kw;
-    document.getElementById('set-min-soc-pct').value  = cfg.min_soc_pct;
+    document.getElementById('set-battery-kwh').value    = cfg.battery_kwh;
+    document.getElementById('set-import-kw').value      = cfg.import_kw;
+    document.getElementById('set-export-kw').value      = cfg.export_kw;
+    document.getElementById('set-min-soc-pct').value    = cfg.min_soc_pct;
+    document.getElementById('set-house-kwh-day').value  = cfg.house_kwh_day ?? 12;
+    document.getElementById('set-baseload-kw').value    = cfg.baseload_kw ?? 0;
+    _updateBaseloadHint(cfg);
   } catch (e) {
     msg.textContent = 'Could not load current settings: ' + e.message;
   }
@@ -3229,17 +3250,39 @@ function closeSettings() {
   document.getElementById('settings-modal').style.display = 'none';
 }
 
+function _updateBaseloadHint(cfg) {
+  const bl = parseFloat(document.getElementById('set-baseload-kw')?.value ?? cfg?.baseload_kw ?? 0);
+  const h  = parseFloat(document.getElementById('set-house-kwh-day')?.value ?? cfg?.house_kwh_day ?? 12);
+  const total = (isFinite(bl) ? bl : 0) * 24 + (isFinite(h) ? h : 12);
+  const hint = document.getElementById('set-baseload-hint');
+  if (hint) hint.textContent = `Z15 miner ≈ 1.51 kW = 36 kWh/day. Total daily load: ${total.toFixed(0)} kWh/day (${(total/48).toFixed(2)} kWh/slot).`;
+}
+
+// Wire live hint updates when user edits the fields
+document.addEventListener('DOMContentLoaded', () => {
+  ['set-baseload-kw','set-house-kwh-day'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', () => _updateBaseloadHint(null));
+  });
+});
+
 async function saveSettings() {
   const msg = document.getElementById('settings-msg');
   msg.style.color = 'var(--red)';
   const body = {
-    battery_kwh:  parseFloat(document.getElementById('set-battery-kwh').value),
-    import_kw:    parseFloat(document.getElementById('set-import-kw').value),
-    export_kw:    parseFloat(document.getElementById('set-export-kw').value),
-    min_soc_pct:  parseFloat(document.getElementById('set-min-soc-pct').value),
+    battery_kwh:   parseFloat(document.getElementById('set-battery-kwh').value),
+    import_kw:     parseFloat(document.getElementById('set-import-kw').value),
+    export_kw:     parseFloat(document.getElementById('set-export-kw').value),
+    min_soc_pct:   parseFloat(document.getElementById('set-min-soc-pct').value),
+    house_kwh_day: parseFloat(document.getElementById('set-house-kwh-day').value),
+    baseload_kw:   parseFloat(document.getElementById('set-baseload-kw').value),
   };
-  for (const [k, v] of Object.entries(body)) {
-    if (!isFinite(v) || v <= 0) { msg.textContent = `${k} must be a positive number.`; return; }
+  const mustBePositive = ['battery_kwh','import_kw','export_kw','min_soc_pct','house_kwh_day'];
+  for (const k of mustBePositive) {
+    if (!isFinite(body[k]) || body[k] <= 0) { msg.textContent = `${k} must be a positive number.`; return; }
+  }
+  if (!isFinite(body.baseload_kw) || body.baseload_kw < 0) {
+    msg.textContent = 'baseload_kw must be 0 or positive.'; return;
   }
   try {
     const res = await fetch('/api/settings', {
@@ -3946,6 +3989,7 @@ const TAB_COLORS = {
   g98:        'active',
   g99:        'active-purple',
   schematic:  'active-blue',
+  overlay:    'active-blue',
   hardware:   'active-cyan',
   homeowner:  'active-cyan',
   vpp:        'active-purple',
@@ -3973,6 +4017,11 @@ function switchTab(name) {
   if (name === 'schematic') {
     const frame = document.getElementById('schematic-frame');
     if (frame && !frame.getAttribute('src')) frame.src = 'NODE3_Schematic.html';
+  }
+  // Lazy-load wiring overlay iframe
+  if (name === 'overlay') {
+    const frame = document.getElementById('overlay-frame');
+    if (frame && !frame.getAttribute('src')) frame.src = 'Node3_Wiring_Overlay.html';
   }
 
   // Render G98/G99 tab content when switching to it
@@ -4402,6 +4451,40 @@ function msToNextSlot() {
   await refresh();
   firstLoadSettled = true;
   setInterval(refresh, CFG.REFRESH_MS);
+
+  // ── Alert polling — every 60s ─────────────────────────────────────────────
+  async function pollAlerts() {
+    try {
+      const res  = await fetch('/api/alerts', { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) return;
+      const data = await res.json();
+      const bar  = document.getElementById('alerts-bar');
+      if (!bar) return;
+      const important = (data.alerts || []).filter(a => a.level !== 'info');
+      const info      = (data.alerts || []).filter(a => a.level === 'info');
+      if (important.length > 0) {
+        bar.style.display = 'block';
+        bar.style.background = important.some(a => a.level === 'critical') ? '#1a0000' : '#1a1200';
+        bar.style.borderBottomColor = important.some(a => a.level === 'critical') ? '#c00' : '#a07000';
+        bar.style.color = important.some(a => a.level === 'critical') ? '#ff6b6b' : '#e6c44a';
+        bar.innerHTML = important.map(a =>
+          `<span style="margin-right:12px">${a.level === 'critical' ? '🔴' : '⚠️'} ${a.message}</span>`
+        ).join('');
+      } else if (info.length > 0) {
+        bar.style.display = 'block';
+        bar.style.background = '#0d1117';
+        bar.style.borderBottomColor = '#21262d';
+        bar.style.color = '#8b949e';
+        bar.innerHTML = info.map(a => `<span style="margin-right:12px">ℹ️ ${a.message}</span>`).join('');
+      } else {
+        bar.style.display = 'none';
+      }
+    } catch (e) {
+      console.warn('[NODE-3] Alert poll failed:', e.message);
+    }
+  }
+  pollAlerts();
+  setInterval(pollAlerts, 60000);
 
   // Load historical data immediately on startup (2s delay for live data to settle)
   setTimeout(() => {

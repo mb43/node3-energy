@@ -1,6 +1,6 @@
 # Node-3 VLP / G99 / ElectronConnect Project Tracker
-**Version:** 3.0  
-**Updated:** 26 August 2026 (weekly review run)  
+**Version:** 3.1  
+**Updated:** 7 September 2026 (weekly review run)  
 **Property:** 179 King Georges Avenue, Southampton SO15 4LD  
 **MPAN:** 2000022678841  
 **Entity:** Dovecote Systems Ltd (Co. No. 17160178)  
@@ -14,8 +14,9 @@
 |---|--------|-------|----------|-------|
 | 1 | ~~Check email for SSEN reply re FJJ907/1 expiry~~ | Matt | ✅ **RESOLVED 26 Aug** | Robert Smith (SSEN) replied 09:38 26 Aug: **"FJJ907 has already been accepted so has secured the export."** No further action needed — 27 Aug expiry does not apply. |
 | 2 | **ElectronConnect mini-competition** | Matt | **21 Sep 11am – 5 Oct 5pm 2026** | SSEN confirmed process by email 24 Aug: Electron will notify on 21 Sep when window opens; download, complete and upload the "mini-competition response form" before 5pm 5 Oct; contract issued for signature after due diligence. Questions → flexibilityprocurement@sse.com. Platform issues → support@electron.net. PQQ already approved — no re-registration needed. |
-| 3 | **Reply to Flexitricity (Jamie Hillis)** | Matt | Soon | Jamie Hillis replied 8 Jun asking about the BESS (repurposed EV packs). No reply sent yet. Key aggregator. |
-| 4 | **Reply to Octopus VPP** | Matt | Soon | Octopus replied 24 Jun with VPP enrolment process info. No reply sent yet. |
+| 3 | ~~Reply to Flexitricity (Jamie Hillis)~~ | Matt | ✅ **CLOSED 4 Sep** | Jamie Hillis replied 16:27 4 Sep: FlexGO needs **300–500kW dispatchable**; BM needs 1MW aggregated in a GSP group; **Flexitricity does not participate in DSO local flexibility platforms at all** ("difficult for us to automate dispatch"), though they are in cross-DSO streamlining workshops. **Flexitricity is a NO for Node-3 and for the 10-node (~105kW) stage.** Revisit at ~300kW+ (≈30 nodes). |
+| 3b | **Find aggregators that DO take domestic-scale / DSO flex** | Matt | 🔴 **NOW** | Flexitricity's exit leaves Octopus (Kraken Flex) as the only live aggregator thread. Need 2–3 more: Social Energy, Axle Energy, Cuckoo/Loop, GivEnergy, Tesla/Octopus VPPs, or ElectronConnect-registered VLPs willing to route small assets. |
+| 4 | **Octopus VPP — chase correct team** | Matt | 🔴 **OVERDUE — chase now** | Matt replied 09:52 26 Aug pointing out Octopus's 24 Jun reply was about export tariffs (already on Agile Outgoing), not VPP/Kraken Flex enrolment. **12 days, no reply.** Now the only live aggregator route. |
 | 5 | **Provide updated SLD to SSEN** | Matt | Before commissioning | Required before energisation. Current SLD: DSL-SLD-001 Rev B. |
 | 6 | **Book electrician** | Matt | When HV ready | Inverter wiring and commissioning. Matt has electrician ready once paid. |
 | 7 | **Arrange public liability insurance** | Matt | Before OA executed | Min £2M cover required. |
@@ -53,6 +54,10 @@
 | 26 Aug 2026 | **Declined FKA552** — email sent to Robert Smith, cc Andrea Keith. Confirmed proceeding with FJJ907/1. Asked SSEN to confirm FJJ907/1 status is not affected by the 27 Aug stated expiry. | ✅ Done |
 | 26 Aug 2026 | **Robert Smith (SSEN) confirmed FJJ907 already accepted and export secured** — no action needed re: 27 Aug expiry notice | ✅ **RESOLVED** |
 | 27 Aug 2026 | STATED offer expiry (FJJ907/1) | ✅ **Does not apply — offer confirmed secure by SSEN** |
+| 28 Aug 2026 | SSEN automated "Quotation Acceptance" confirmation received — introduces two new named contacts: **Gemma Overall** (Construction/Delivery Manager) and **Madeleine Pain** (Wayleaves Officer, 02380 817327). No new technical data (Network Location / DNO Ref / Connection Ref Number still outstanding). | ✅ Received |
+| 29 Aug 2026 | Matt forwarded SSEN acceptance confirmation to Sonny (Solent Renewables) FYI | ✅ Done |
+| 1–7 Sep 2026 | **No SSEN correspondence this week.** Network Location / DNO Ref / Connection Ref Number still outstanding. Gemma Overall (Delivery) and Madeleine Pain (Wayleaves) not yet contacted. | ⏳ Quiet |
+| 4 Sep 2026 | **Flexitricity (Jamie Hillis) closed the door** — 300–500kW min for FlexGO wholesale; 1MW aggregated for BM; no involvement in DSO local flexibility platforms | ❌ Route closed |
 
 ### Offer: FJJ907/1 (Active — accepted 2 Jun 2026)
 
@@ -111,8 +116,9 @@
 
 | Party | Last Action | Date | Status | Next Action |
 |-------|------------|------|--------|-------------|
-| **Flexitricity** | Jamie Hillis replied asking about the repurposed EV packs | 8 Jun 2026 | ⏳ **Matt has not replied** | Reply to Jamie — describe 3× Nissan e-NV200 packs, FoxESS KH10.5 HV, G99 accepted 5.5kW. Key aggregator candidate. |
-| **Octopus VPP** | Octopus replied with VPP enrolment process info | 24 Jun 2026 | ⏳ **Matt has not replied** | Read enrolment info, reply to progress. |
+| **Flexitricity** | Jamie Hillis replied — 300–500kW min for FlexGO; 1MW for BM; **no DSO local flex participation at all** | 4 Sep 2026 | ❌ **CLOSED — not a fit** | Park. Revisit at ~300kW fleet (≈30 nodes). Keep Jamie warm — he's in the cross-DSO streamlining workshops. |
+| **Octopus VPP** | Matt replied flagging misroute (their 24 Jun reply was export-tariff info, not VPP enrolment) | 26 Aug 2026 | 🔴 **12 days silent — CHASE** | Phone/re-email Kraken Flex team. Now the only live aggregator thread. |
+| **New aggregators (TBC)** | Not yet contacted | — | 🔴 **Gap opened by Flexitricity exit** | Approach Social Energy, Axle Energy, GivEnergy, Cuckoo/Loop, and any ElectronConnect-listed VLP accepting sub-100kW. |
 | **Elexon VLP** | Case CS0019840 closed | 22 Jul 2026 | ✅ **RESOLVED** — no further action |  |
 | **Engage Consulting** | Proposal received, on hold | 29 Apr 2026 | ⏸️ **ON HOLD** — fees unaffordable. Aggregator route preferred. | No action for now |
 
@@ -121,6 +127,8 @@
 - BM/VLP via aggregator: **£3,000–£8,000/yr** (confirmed north star)
 - Per-node target: **£3,497/yr**
 - Scale to £50k personal income: **26 nodes**
+
+> ⚠️ **Commercial reality check (4 Sep 2026):** Flexitricity's thresholds (100kW/site to onboard, 300–500kW dispatchable for wholesale, 1MW per GSP group for BM) confirm the BM route is closed until the fleet is ~30 nodes. Until then the realistic revenue stack is **DSO flexibility (ElectronConnect) + Agile arbitrage + a domestic-scale VPP (Octopus/Kraken or similar)** — not the BM. This makes the **21 Sep–5 Oct ElectronConnect window the single most valuable commercial event in the pipeline**, not a nice-to-have.
 
 ---
 
@@ -162,7 +170,7 @@
     ↓
 📅  ElectronConnect mini-competition: 21 Sep – 5 Oct 2026 — submit Service Agreement
     ↓
-🤝  Engage aggregator (Flexitricity / Octopus) — reply to both NOW
+🤝  Engage aggregator — Flexitricity CLOSED (4 Sep). Octopus + new names needed.
     ↓
 💰  BM/VLP revenue live
 ```
@@ -173,8 +181,10 @@
 
 | Name | Role | Contact |
 |------|------|---------|
-| Andrea Keith | SSEN Connections Designer (FJJ907/1) | andrea.keith@sse.com / 01738 342440 |
+| Andrea Keith | SSEN Connections Designer / system planner (FJJ907/1) | andrea.keith@sse.com / 01738 342440 |
 | Robert Smith | SSEN (FKA552 / 10.5kW upgrade) | Robert.Smith5@sse.com |
+| Gemma Overall | SSEN Construction/Delivery Manager (scheduling & build through to energisation) | Gemma.overall@sse.com |
+| Madeleine Pain | SSEN Wayleaves Officer (land rights) | madeleine.pain@sse.com / 02380 817327 |
 | Ronke Ajadi | SSEN ElectronConnect | Ronke.Ajadi@sse.com |
 | Jamie Hillis | Flexitricity | (via info@flexitricity.com) |
 | Stuart Hadley | SSEN (called 19 Aug re: FKA552) | via SSEN portal |
