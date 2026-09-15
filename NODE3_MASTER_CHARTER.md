@@ -4,6 +4,28 @@
 
 ---
 
+## 0. System Architecture — Two Layers
+
+Node-3 is a two-layer system. The **Node-3 Python algorithm is the master controller**. The DALA/T-2CAN layer is hardware abstraction only.
+
+**Layer 1 — DALA on LilyGo T-2CAN ESP32 (hardware abstraction)**
+- CAN-B (native GPIO 6/7) ← LEAF BMS → reads Pack 1 SOC/voltage/temperature
+- DALA scales and reports 72kWh capacity to FoxESS via CAN-A (MCP2515 add-on)
+- IO21/IO48/IO17 on underside expansion header → SSR-04 → sequence contactors on all 3 packs
+- Makes the FoxESS accept the LEAF battery pack. No commercial intelligence here.
+
+**Layer 2 — Node-3 Python on Raspberry Pi 4B (master controller)**
+- `simulate.py` fetches Octopus Agile prices, runs scipy HiGHS LP optimiser every 30 min
+- `hardware_bridge.py` sends Modbus RTU commands to FoxESS via USB-RS485 dongle (/dev/ttyUSB1)
+  - Sets work mode: ForceChg / ForceDischg / SelfUse register 0x09D0
+  - Sets export power limit register 0x09D2 (W), respecting G98/G99 DNO caps
+- `server.py` Flask API on port 8585: operator dashboard, backtest, mode switching
+- All commercial decisions — when to charge, when to export, at what rate — made here
+
+The FoxESS inverter is a power electronics execution unit. It does what it is told via Modbus. It does not make scheduling decisions.
+
+---
+
 ## 1. The Asset: The Node-3 "Slab"
 
 - **Dimensions:** 1.5m (W) × 1.2m (H) × 0.9m (D) — "Slab-Vertical" configuration
@@ -61,8 +83,8 @@ At 26 nodes: £12,570 salary + £43,500 dividends = £50,000+ personal income. 1
 
 ### Phase B: Corporate Setup
 4. **IP Valuation:** Instruct professional valuer to value "node3" algorithm at £71,500+ based on verified profit data
-5. **DSO Compliance:** Monitor ElectronConnect portal for OA approval (window closes 5 May 2026)
-6. **G99 Application:** G99 Fast-Track sent 20 Apr 2026 — CRM ref **260420-000198** — await SSEN response, chase by 27 Apr if no reply
+5. **DSO Compliance:** **⚡ URGENT — ElectronConnect portal opens 21 Sep 2026 at 11am. Register Node-3 as a VLP asset NOW.** Window is open as of today. CRM ref 260420-000198 (G99 SSEN application, submitted 20 Apr 2026) is the parallel grid approval process.
+6. **G99 Application:** G99 Fast-Track sent 20 Apr 2026 — CRM ref **260420-000198** — chase SSEN if still no response
 
 ### Phase C: The SSAS Transfer
 7. **Transfer Initiation:** Start move of £143,000 into new scheme

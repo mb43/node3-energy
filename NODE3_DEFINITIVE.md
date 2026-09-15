@@ -13,7 +13,9 @@
 
 ## 1. Topology in one paragraph
 
-3× Nissan e-NV200 24kWh packs are paralleled at a +/− busbar inside one IP65 enclosure. Each pack keeps its own internal precharge resistor and internal positive/negative main contactors — these do all the HV switching. The LilyGo T-2CAN ESP32 (already flashed with DALA "Nissan Leaf 3P" firmware) reads Pack 1's BMS on CAN-A and reports 3× scaled capacity to the FoxESS KH10.5 on CAN-B (isolated). The LilyGo also drives three SSR-04 channels (precharge, +contactor, −contactor) whose outputs are daisy-chained to the corresponding contactor coil pins on **all three** Yazaki connectors, so all three packs sequence in lockstep. A 12V rail powers Yazaki Pin 1 (BAT+IGN) on all three packs via an E-stop NC contact — pressing E-stop drops the wake signal and all three packs open within ~100 ms. Branch protection is a TOMZN DC 2P breaker per pack; a fourth TOMZN sits downstream of the busbar as the master isolator before the inverter.
+3× Nissan e-NV200 24kWh packs are paralleled at a +/− busbar inside one IP65 enclosure. Each pack keeps its own internal precharge resistor and internal positive/negative main contactors — these do all the HV switching. The LilyGo T-2CAN ESP32 (already flashed with DALA "Nissan Leaf 3P" firmware) reads Pack 1's BMS on **CAN-B** (native ESP32-S3 CAN, GPIO 6/7) and reports 3× scaled capacity to the FoxESS KH10.5 on **CAN-A** (MCP2515/2518 add-on, galvanically isolated — no external isolator needed). The LilyGo also drives three SSR-04 channels (precharge, +contactor, −contactor) via GPIOs **IO21** (precharge), **IO48** (positive contactor), **IO17** (negative contactor) on the underside 26-pin expansion header, whose outputs are daisy-chained to the corresponding contactor coil pins on **all three** Yazaki connectors, so all three packs sequence in lockstep. A 12V rail powers Yazaki Pin 1 (BAT+IGN) on all three packs via an E-stop NC contact — pressing E-stop drops the wake signal and all three packs open within ~100 ms. Branch protection is a TOMZN DC 2P breaker per pack; a fourth TOMZN sits downstream of the busbar as the master isolator before the inverter.
+
+**The Node-3 Python system (server.py / simulate.py / hardware_bridge.py) running on the Raspberry Pi 4B is the master controller.** It fetches Octopus Agile prices, runs a linear-programming optimiser to decide charge/discharge schedules, and sends Modbus RTU commands directly to the FoxESS KH10.5 via a USB-RS485 dongle at every 30-minute slot boundary. The T-2CAN/DALA layer is purely a hardware abstraction: it makes the FoxESS accept the LEAF batteries and sequences the contactors. All commercial intelligence — when to charge, when to export, at what rate, respecting G98/G99 export caps — lives in the Pi software layer.
 
 ---
 
@@ -67,13 +69,13 @@
             │              │     │
             │           ┌──┴─────┴────┐
             │           │  LilyGo     │
-            │           │  T-2CAN     │  GPIO 25 → SSR1 IN (Precharge)
-            │           │  ESP32-S3   │  GPIO 32 → SSR2 IN (+Cont)
-            │           │  (DALA)     │  GPIO 33 → SSR3 IN (−Cont)
-            │           └──┬─────────┬┘  GPIO GND → all SSR IN-
-            └──CAN-B───────┘         │
-              via Waveshare          │
-              isolated CAN HAT       │
+            │           │  T-2CAN     │  IO21 → SSR Ch1 IN (Precharge)
+            │           │  ESP32-S3   │  IO48 → SSR Ch2 IN (+Pos Cont)
+            │           │  (DALA)     │  IO17 → SSR Ch3 IN (−Neg Cont)
+            │           └──┬─────────┬┘  GND  → all SSR IN−
+            └──CAN-A───────┘         │    (underside 26-pin expansion header)
+              (MCP2515 add-on,       │    (CAN-B = native ESP32, ← LEAF BMS)
+               galv. isolated)       │
                                 12V from Mean Well DR-60-12 PSU
                                 (mains AC 230V → 12V DC 5A DIN rail)
                                      │
@@ -131,7 +133,7 @@ Rough total: ~£100–120
 #### ORDER 3 — Amazon UK (next-day)
 | Item | Qty | Search |
 |---|---|---|
-| Waveshare 2-CH Isolated CAN HAT | 1 | Amazon B087RJ6XGG |
+| ~~Waveshare 2-CH Isolated CAN HAT~~ | ~~1~~ | **DO NOT BUY** — T-2CAN CAN-A/CAN-B are already galvanically isolated. No external CAN isolator needed. DALA wiki confirms "FoxESS cannot fry the T-2CAN." |
 | YHDC SCT-013-100 CT clamps | 2 | "YHDC SCT-013-100" |
 | DS18B20 waterproof temperature probes | 6-pack | "DS18B20 waterproof probe 6" |
 | DROK 12V → 5V buck converter, 3A | 1 | "DROK LM2596 12V to 5V" |
@@ -214,8 +216,8 @@ Each pack's Yazaki carries the same five low-voltage signals. Only Pack 1 additi
 |---|---|---|---|---|
 | BAT+IGN (12V wake) | Pin 1 | ✅ from 12V rail via E-stop NC + 1A fuse | ✅ same rail (daisy) | ✅ same rail (daisy) |
 | GND | Pin 2 | ✅ to common LV GND | ✅ | ✅ |
-| CAN-H | Pin 3 | ✅ to LilyGo CAN-A H | ❌ leave open | ❌ leave open |
-| CAN-L | Pin 4 | ✅ to LilyGo CAN-A L | ❌ leave open | ❌ leave open |
+| CAN-H | Pin 3 | ✅ to LilyGo CAN-B H (native ESP32-S3 CAN) | ❌ leave open | ❌ leave open |
+| CAN-L | Pin 4 | ✅ to LilyGo CAN-B L (native ESP32-S3 CAN) | ❌ leave open | ❌ leave open |
 | Precharge coil | per DALA wiring diagram | ✅ from SSR1 OUT (12V switched) | ✅ daisy | ✅ daisy |
 | +Contactor coil | per DALA wiring diagram | ✅ from SSR2 OUT | ✅ daisy | ✅ daisy |
 | −Contactor coil | per DALA wiring diagram | ✅ from SSR3 OUT | ✅ daisy | ✅ daisy |
@@ -228,28 +230,38 @@ Pack 1 CAN bus needs a 120Ω termination resistor across CAN-H/CAN-L at the Lily
 
 ## 6. LilyGo T-2CAN GPIO usage
 
-| GPIO | Role | Wired to |
-|---|---|---|
-| 25 | Precharge SSR drive (3.3V) | SSR-04 channel 1 IN |
-| 32 | +Contactor SSR drive (3.3V) | SSR-04 channel 2 IN |
-| 33 | −Contactor SSR drive (3.3V) | SSR-04 channel 3 IN |
-| GND | Common return | SSR-04 IN-common |
-| CAN-A (built-in) | Pack 1 BMS read | Yazaki Pack 1 Pins 3/4 |
-| CAN-B (built-in)* | FoxESS comms | Waveshare isolated CAN HAT input |
-| 5V / 3.3V | Module power | DROK 12→5V output |
+All contactor GPIOs are on the **underside 26-pin 2.54mm expansion header**, right column.
+Right column, counting from top: Row 9 = IO48, Row 10 = IO21, Row 11 = IO17, Row 12 = GND.
+Solder wires directly to pads, or fit a 2×13 2.54mm pin header and use Dupont connectors.
 
-*The T-2CAN has two on-board CAN channels. The Waveshare isolated HAT is wired between CAN-B and the FoxESS to give galvanic isolation, because the FoxESS HV2600 CAN sits at ±110V DC to PE and would fry an unisolated transceiver.
+| GPIO | Row (right col) | Role | Wired to |
+|---|---|---|---|
+| IO21 | Row 10 | Precharge SSR drive (3.3V) | SSR-04 channel 1 IN+ |
+| IO48 | Row 9  | +Contactor SSR drive (3.3V) | SSR-04 channel 2 IN+ |
+| IO17 | Row 11 | −Contactor SSR drive (3.3V) | SSR-04 channel 3 IN+ |
+| GND  | Row 12 | Common return | SSR-04 IN− common |
+| CAN-B (native ESP32-S3, GPIO 6/7) | — | Pack 1 BMS read | Yazaki Pack 1 Pins 3/4 (CAN-H/L) |
+| CAN-A (MCP2515/2518 add-on) | — | FoxESS BAT CAN comms | FoxESS KH10.5 BAT CAN port direct |
+| 5V / 3.3V | — | Module power | DROK 12→5V output |
+
+**CAN isolation note:** Both CAN channels on the T-2CAN are galvanically isolated by the MCP2515/TJA1051 transceivers. No external CAN isolator or Waveshare HAT is required. The DALA wiki explicitly states "FoxESS cannot fry the T-2CAN."
+
+**RS485 note (separate from CAN):** The T-2CAN also exposes RS485 on its top 4-pin SH-1.0mm connector (GPIO43=TX, GPIO44=RX). This is **not** used for contactor control. It is a separate independent RS485 port — if needed, it can bridge to an RS485 device. The Pi uses its own USB-RS485 dongle (/dev/ttyUSB1) to talk Modbus RTU directly to the FoxESS control port — that path is entirely independent of the T-2CAN.
+
+**Software control note:** The Pi's Node-3 Python stack (hardware_bridge.py) is the master controller. It sends Modbus RTU commands to the FoxESS every 30 minutes to set charge/discharge mode and export limits. The T-2CAN/DALA handles only battery emulation and contactor sequencing — it does not make any energy trading decisions.
 
 ---
 
 ## 7. SSR-04 channel allocation
 
-| SSR-04 channel | IN- | IN+ from LilyGo | OUT (switches 12V to coil) |
-|---|---|---|---|
-| 1 | GND | GPIO 25 | Precharge coil pin on all 3 Yazakis |
-| 2 | GND | GPIO 32 | +Contactor coil pin on all 3 Yazakis |
-| 3 | GND | GPIO 33 | −Contactor coil pin on all 3 Yazakis |
-| 4 | — | — | Spare (could drive E-stop status LED, fan, etc.) |
+GPIO assignments per DALA wiki confirmed pinout (underside expansion header, right column):
+
+| SSR-04 channel | IN− | IN+ from LilyGo GPIO | Function | OUT (switches 12V to coil) |
+|---|---|---|---|---|
+| 1 | GND | IO21 (row 10) | Precharge | Precharge coil pin on all 3 Yazakis (daisy-chained) |
+| 2 | GND | IO48 (row 9)  | +Contactor | Positive contactor coil pin on all 3 Yazakis |
+| 3 | GND | IO17 (row 11) | −Contactor | Negative contactor coil pin on all 3 Yazakis |
+| 4 | — | — | Spare | Could drive E-stop status LED, fan, etc. |
 
 Each SSR-04 OUT switches 12V from the same rail that feeds Pin 1. When LilyGo decides it's safe, it sequences: precharge ON → wait → +cont ON → −cont ON → precharge OFF. Each pack's internal BMS sees the coil signal arrive and operates its own internal contactor accordingly.
 
@@ -307,11 +319,85 @@ Listing for reference: https://www.ebay.co.uk/itm/305824485941 (£89.10 each, 2 
 
 ---
 
-## 12. Files in this folder
+## 12. Node-3 Software — Master Controller Architecture
+
+The hardware (DALA/T-2CAN/FoxESS) does nothing intelligent on its own. The **Node-3 Python system on the Raspberry Pi 4B is the master controller** — it makes all commercial and operational decisions.
+
+### Two-layer architecture
+
+```
+LAYER 1 — Hardware Abstraction (DALA on T-2CAN ESP32)
+──────────────────────────────────────────────────────
+  CAN-B (native) ← LEAF BMS (Pack 1) ← SOC, voltage, temperature
+  DALA scales 1×24kWh → 3×72kWh (3P firmware mode)
+  CAN-A (MCP add-on) → FoxESS BAT CAN port (battery emulation protocol)
+  IO21/IO48/IO17 → SSR-04 → contactor coils on all 3 packs
+
+  Result: FoxESS thinks it has a compatible 72kWh battery attached.
+  DALA sequences contactors safely. No custom code needed here.
+
+LAYER 2 — Intelligence / Master Control (Node-3 Python on Pi 4B)
+──────────────────────────────────────────────────────────────────
+  simulate.py         LP-optimal dispatch planner (scipy HiGHS)
+                        → fetches Octopus Agile import/export prices
+                        → solves LP over 96-slot (48h) lookahead
+                        → writes dispatch_plan.json
+                        → updates fleet_state.json, history.csv
+                        → runs every 30 minutes at slot boundaries
+
+  hardware_bridge.py  Hardware command sender (PRIMARY CONTROL PATH)
+                        → reads current slot from dispatch_plan.json
+                        → sends Modbus RTU to FoxESS via USB-RS485 dongle
+                          (/dev/ttyUSB1, 9600 baud, slave addr 0xF7)
+                          - REG 0x09D0: work mode (ForceChg / ForceDischg / SelfUse)
+                          - REG 0x09D2: export power limit (W)
+                        → falls back to Modbus TCP, FoxESS cloud API, or MQTT
+                        → runs after every simulate.py slot
+
+  server.py           Flask REST API + backtest engine
+                        → serves dashboard.html operator portal on port 8585
+                        → /api/plan, /api/node, /api/backtest, /api/hardware-status
+                        → /api/set-mode: switches pre_commissioning / self_consumption / full_export
+                        → background scheduler runs simulate.py + hardware_bridge.py
+                          at each 30-min slot boundary automatically
+
+  node3_config.py     Single source of truth for configurable parameters
+                        → battery_kwh (72), import_kw (10), export_kw (6), min_soc_pct (10)
+```
+
+### Operational modes (set via /api/set-mode or hardware_bridge.py --set-mode)
+
+| Mode | What happens |
+|---|---|
+| `pre_commissioning` | No Modbus commands sent. Simulation only. Safe during build/test. |
+| `self_consumption` | Charges from grid, zero export. Use before G99 approval. |
+| `full_export` | Full arbitrage — charge cheap, export expensive, up to G98/G99 cap. |
+
+### Control path priority (hardware_bridge.py)
+
+1. **Modbus RTU via USB-RS485** (`/dev/ttyUSB1`) — primary, local, no internet needed
+2. **Modbus TCP** (FoxESS LAN IP) — secondary
+3. **FoxESS Cloud API** (foxesscloud.com) — fallback only
+4. **MQTT** (Pi → Mosquitto → T-2CAN) — alternative
+
+### G99 export cap
+
+G98 (current): 3.68 kW continuous (32A × 230V) — configurable via `export_kw` setting, hard-capped at 7.36 kW legal maximum.
+G99 (pending ref 260420-000198): 11.5 kW continuous (50A × 230V) — fixed in code, represents a different physical grid connection, not a configurable parameter.
+
+---
+
+## 13. Files in this folder
 
 | File | Status |
 |---|---|
-| **NODE3_DEFINITIVE.md** | ⭐ THIS FILE — single source of truth |
+| **NODE3_DEFINITIVE.md** | ⭐ THIS FILE — single source of truth for hardware build |
+| **hardware_bridge.py** | ⭐ Node-3 master controller — Modbus RTU to FoxESS |
+| **simulate.py** | ⭐ LP dispatch planner — all trading decisions made here |
+| **server.py** | Flask API + background scheduler + backtest engine |
+| **node3_config.py** | Shared config (battery_kwh, import_kw, export_kw, min_soc_pct) |
+| **dashboard.html** | Operator portal UI |
+| NODE3_MASTER_CHARTER.md | Corporate/financial strategy |
 | NODE3_Wiring_Schematic.md | Superseded — kept for reference |
 | NODE3_Shopping_List.md | Superseded |
 | NODE3_Complete_Shopping_List.md | Superseded |

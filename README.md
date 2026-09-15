@@ -36,12 +36,15 @@ The battery also serves the home's 12 kWh/day consumption from those same charge
 | Component | Spec |
 |-----------|------|
 | Battery | 72 kWh nominal (3× Nissan e-NV200 packs) |
-| Inverter | FoxESS 10.5 kW HV |
-| Export cap | 3.68 kWh/slot (G98 single-phase, 32A) |
-| Charge rate | 5.25 kWh/slot (10.5 kW × 0.5h) |
+| Inverter | FoxESS KH10.5 HV |
+| Export cap | 3.0 kWh/slot G98 (configurable ≤ 3.68 kWh/slot, 32A legal max) |
+| Charge rate | 5.0 kWh/slot (10 kW × 0.5h, configurable) |
 | Min SOC reserve | 7.2 kWh (10%) |
 | Solar | None modelled (pure arbitrage) |
 | Location | Southern England, Region H |
+| BMS comms | LilyGo T-2CAN CAN-B (native) ← LEAF BMS Pack 1 |
+| FoxESS BAT CAN | LilyGo T-2CAN CAN-A (MCP2515 add-on) → FoxESS BAT CAN port |
+| Master control | Modbus RTU: Pi /dev/ttyUSB1 → FoxESS RS485 port (hardware_bridge.py) |
 
 ## Wiring Schematic
 
@@ -75,39 +78,69 @@ A=Eastern · B=East Midlands · C=London · D=N Wales/Merseyside · E=Midlands �
 
 ## Architecture
 
+Node-3 is a two-layer system. The Python stack on the Pi is the master controller.
+
 ```
-index.html           Public-facing landing page for Dovecote Systems. Nav link and Web: address now
-                      point to dovecoteltd.co.uk (updated 19 Aug 2026). Contact email left as
-                      info@doesnthavetocosttheearth.com — confirm that mailbox still exists before
-                      changing it to a dovecoteltd.co.uk address.
-style.css            Unified CSS design system (dark mode, glassmorphism, responsive utilities).
-dashboard.html       Self-contained operator portal. Displays live telemetry from server,
-                     historical backtest graphs, and rolling 48-slot dispatch schedules.
+LAYER 1 — Hardware Abstraction (LilyGo T-2CAN, DALA firmware)
+  CAN-B (native ESP32-S3) ← LEAF BMS Pack 1 (reads SOC, voltage, temp)
+  DALA scales 24kWh → 72kWh (3P firmware) for FoxESS
+  CAN-A (MCP2515 add-on, isolated) → FoxESS BAT CAN port
+  IO21/IO48/IO17 (underside expansion header) → SSR-04 → contactors on all 3 packs
 
-simulate.py          Rolling-window optimiser + slot simulator. Writes history.csv.
-                     Runs every 30 min via GitHub Actions cron.
+LAYER 2 — Master Controller (Raspberry Pi 4B, Python)
 
-server.py            Flask REST API + backtest engine.
+simulate.py          LP-optimal dispatch planner (scipy HiGHS).
+                     Fetches Octopus Agile prices → solves LP over 96-slot lookahead →
+                     writes dispatch_plan.json. Runs every 30 min at slot boundaries.
+
+hardware_bridge.py   ★ MASTER CONTROL ★ — sends actual commands to FoxESS.
+                     Reads dispatch_plan.json → sends Modbus RTU via USB-RS485 dongle
+                     (/dev/ttyUSB1, 9600 baud) → FoxESS RS485 control port.
+                     Work mode register 0x09D0 (ForceChg/ForceDischg/SelfUse).
+                     Export limit register 0x09D2 (Watts, G98/G99 cap enforced).
+                     Falls back: Modbus TCP → FoxESS cloud API → MQTT.
+                     Modes: pre_commissioning (safe/no commands) | self_consumption | full_export
+
+server.py            Flask REST API + backtest engine (port 8585).
   /api/node          Current SOC, profit, last action
   /api/prices        Last 48h of Agile import prices
   /api/history       Recent slot-by-slot history (up to 200 rows)
-  /api/backtest      12-month historical backtest (Python, cached 24h)
+  /api/backtest      12-month historical backtest (Python LP, cached 24h)
+  /api/backtest-lp   LP vs greedy comparison, day-by-day
+  /api/plan          Forward dispatch plan with SOC trace and G98/G99 P&L
   /api/trigger       Manually trigger simulate.py (GET=single, POST?mode=backfill)
   /api/status        Server health + data freshness
+  /api/hardware-status  Hardware bridge status: mode, last command, control paths
+  /api/set-mode      Change operational mode (pre_commissioning|self_consumption|full_export)
+  /api/alerts        Active operational alerts (SOC low, expensive import, baseload)
+  /api/settings      GET/POST configurable params (battery_kwh, import_kw, export_kw)
+  /api/reset         Clear state + history (requires NODE3_API_KEY)
 
-.github/workflows/   simulate.yml — 30-min cron + GitHub Pages deploy
+node3_config.py      Single source of truth for physical parameters (72kWh/10kW/6kW).
+                     Persisted to node3_config.json. Editable via /api/settings.
+
+index.html           Public-facing landing page (dovecoteltd.co.uk).
+style.css            Unified CSS design system (dark mode, glassmorphism).
+dashboard.html       Operator portal: live telemetry, backtest graphs, dispatch schedule.
 ```
 
 ## API endpoints
 
 ```
-GET /api/node          Current state: SOC, profit, last action, thresholds
-GET /api/prices        Agile import prices (last 48h, 96 slots)
-GET /api/history       Slot history CSV as JSON (limit=N)
-GET /api/backtest      12-month backtest results (cached; ?force=1 to re-run)
-GET /api/status        Server health check
-GET/POST /api/trigger  Run simulate.py (?mode=backfill for 48h replay)
-POST /api/reset        Clear state + history (requires NODE3_API_KEY if set)
+GET  /api/node              Current state: SOC, profit, last action
+GET  /api/prices            Agile import prices (last 48h, 96 slots)
+GET  /api/history           Slot history CSV as JSON (limit=N)
+GET  /api/backtest          12-month LP backtest results (cached 24h; ?force=1 to re-run)
+GET  /api/backtest-lp       LP vs greedy day-by-day comparison (cached 24h)
+GET  /api/plan              Forward dispatch plan with SOC trace + G98/G99 P&L
+GET  /api/status            Server health + data freshness
+GET  /api/hardware-status   Hardware bridge: mode, last Modbus command, control paths
+GET  /api/alerts            Active alerts: SOC low, expensive import, baseload
+GET  /api/settings          Current configurable params (battery_kwh, import_kw, etc.)
+POST /api/settings          Update params (body: {battery_kwh, import_kw, export_kw, ...})
+POST /api/set-mode          Change operational mode {mode, g99_active}
+GET/POST /api/trigger       Run simulate.py manually (?mode=backfill for 48h replay)
+POST /api/reset             Clear state + history (requires NODE3_API_KEY if set)
 ```
 ## Local Docker Replica
 
