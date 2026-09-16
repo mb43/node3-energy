@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1030" font-family="Inter, Arial, sans-serif" font-size="12">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1060" font-family="Inter, Arial, sans-serif" font-size="12">
   <style>
     .lv12   { stroke: #0066cc; stroke-width: 3; fill: none; }
     .lv12sw { stroke: #0066cc; stroke-width: 2.5; fill: none; stroke-dasharray: 7 4; }
@@ -20,11 +20,13 @@
     .small  { font-size: 8.7px; fill: #555; }
     .legend { font-size: 10.5px; fill: #222; }
     .warn   { font-size: 9px; fill: #aa0000; font-weight: 700; }
+    .rs485  { stroke: #996633; stroke-width: 2.2; fill: none; stroke-dasharray: 8 3; }
+    .pi     { fill: #fff5f5; stroke: #c0392b; stroke-width: 1.5; }
   </style>
 
   <!-- ============ TITLE ============ -->
   <text x="800" y="24" text-anchor="middle" class="ttl">NODE-3 — LV Control &amp; Comms Wiring (12V / CAN / GPIO only — HV busbar &amp; breakers NOT shown)</text>
-  <text x="800" y="41" text-anchor="middle" class="small">Source of truth: NODE3_DEFINITIVE.md §5–§7 · single-BMS-read mode · all 3 packs daisy-chained identically except CAN · CORRECTED 16 Sep 2026</text>
+  <text x="800" y="41" text-anchor="middle" class="small">Source of truth: NODE3_DEFINITIVE.md §5–§7 · single-BMS-read mode · all 3 packs daisy-chained identically except CAN · CORRECTED 16 Sep 2026 · Pi + RS485 path added</text>
 
   <!-- ============ LEGEND ============ -->
   <g transform="translate(20, 56)">
@@ -40,6 +42,8 @@
     <text x="901" y="4" class="legend">CAN-B (Pack 1 BMS, native ESP32-S3)</text>
     <line x1="1160" y1="0" x2="1186" y2="0" class="gnd"/>
     <text x="1191" y="4" class="legend">GND / 0V</text>
+    <line x1="0" y1="18" x2="26" y2="18" class="rs485"/>
+    <text x="31" y="22" class="legend">RS485 Modbus RTU (Pi supervisor → FoxESS COM port, via JZK USB-RS485 adapter)</text>
   </g>
 
   <!-- ============ PSU ============ -->
@@ -152,6 +156,29 @@
   <!-- CAN-A lands here -->
   <circle cx="1260" cy="215" r="4" fill="#009933"/>
 
+  <!-- ============ FoxESS RS485 COM port ============ -->
+  <rect x="1170" y="228" width="200" height="60" class="fox"/>
+  <rect x="1170" y="228" width="200" height="18" fill="#004400"/>
+  <text x="1270" y="241" text-anchor="middle" fill="#fff" font-weight="700" font-size="10">FoxESS KH10.5</text>
+  <text x="1270" y="258" text-anchor="middle" class="small">RS485 COM port</text>
+  <text x="1270" y="271" text-anchor="middle" class="small">Modbus RTU — Pi supervisor control</text>
+  <text x="1270" y="283" text-anchor="middle" class="small">(separate port from BAT CAN above)</text>
+
+  <!-- ============ RASPBERRY Pi 4B ============ -->
+  <rect x="1140" y="318" width="260" height="112" class="pi"/>
+  <rect x="1140" y="318" width="260" height="22" fill="#c0392b"/>
+  <text x="1270" y="334" text-anchor="middle" fill="#fff" font-weight="700" font-size="11">Raspberry Pi 4B (Node-3)</text>
+  <text x="1270" y="353" text-anchor="middle" class="small">server.py / hardware_bridge.py (Docker)</text>
+  <text x="1270" y="366" text-anchor="middle" class="small">Modbus RTU supervisor — reads registers,</text>
+  <text x="1270" y="379" text-anchor="middle" class="small">sends charge/discharge control commands</text>
+  <text x="1270" y="392" text-anchor="middle" class="small" font-weight="700">JZK USB-RS485 adapter → /dev/ttyUSB0</text>
+  <text x="1270" y="408" text-anchor="middle" class="small">Wi-Fi / Ethernet → home network</text>
+  <text x="1270" y="422" text-anchor="middle" class="small">(LilyGo + Pi are INDEPENDENT of each other)</text>
+
+  <!-- RS485 wire: Pi → FoxESS RS485 COM port -->
+  <path d="M 1270 318 L 1270 288" class="rs485"/>
+  <text x="1276" y="307" class="small" fill="#996633">RS485 A+/B−</text>
+
   <!-- ============ FIVE HORIZONTAL DAISY BUSES ============ -->
   <line x1="150" y1="500" x2="1470" y2="500" class="lv12sw"/>
   <text x="1476" y="504" class="legend" fill="#0066cc">PIN1 BUS (12V, via E-stop)</text>
@@ -241,7 +268,7 @@
   </g>
 
   <!-- ============ NOTES ============ -->
-  <rect x="20" y="915" width="1560" height="110" fill="#fffbe0" stroke="#aa8800" stroke-width="1"/>
+  <rect x="20" y="915" width="1560" height="138" fill="#fffbe0" stroke="#aa8800" stroke-width="1"/>
   <text x="32" y="932" class="lblw">Key rules for LV wiring (verified against NODE3_DEFINITIVE.md §5–§7, 16 Sep 2026):</text>
   <text x="32" y="947" class="lbl">• CAN-A (green) = MCP2515 chip → FoxESS KH10.5 BAT CAN port DIRECT. CAN-B (purple) = native ESP32-S3 (GPIO 6/7) → Pack 1 BMS only (Yazaki pins 3/4).</text>
   <text x="32" y="962" class="lbl">• No Waveshare CAN HAT needed — T-2CAN is galvanically isolated on BOTH channels natively. Do NOT fit the Waveshare HAT in the main DALA data path.</text>
@@ -249,4 +276,6 @@
   <text x="32" y="992" class="lbl">• GPIO IO21 (Row 10) = precharge → SSR Ch1. IO48 (Row 9) = +contactor → SSR Ch2. IO17 (Row 11) = −contactor → SSR Ch3. GND = Row 12. All on underside 26-pin 2.54mm header, right column.</text>
   <text x="32" y="1007" class="lbl">• E-stop is wired in series with the Pin1 (BAT+IGN) feed ONLY. Daisy chain the 5 LV signals (Pin1, GND, Precharge, +Cont, −Cont) identically on all 3 Yazaki connectors.</text>
   <text x="32" y="1022" class="lbl">• Bench-test LV side fully (LilyGo web UI shows Pack 1 BMS data, SSR outputs measured with DMM) BEFORE inserting any Service Disconnect Plug. See NODE3_DEFINITIVE.md §8 commissioning sequence.</text>
+  <text x="32" y="1037" class="lbl">• Pi 4B comms: JZK USB-RS485 adapter (blue USB dongle) → /dev/ttyUSB0 in Docker → FoxESS RS485 COM port. Modbus RTU only — supervisor reads registers and sends control. Completely separate from LilyGo CAN-A BAT CAN path.</text>
+  <text x="32" y="1052" class="lbl">• LilyGo and Pi are independent controllers. LilyGo emulates the Nissan Leaf BMS (CAN). Pi supervises the inverter (RS485 Modbus). Both talk to FoxESS simultaneously on different ports.</text>
 </svg>
