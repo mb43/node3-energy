@@ -1644,6 +1644,12 @@ const HOME_CONFIGS = Array.from({length: CFG.NUM_HOMES}, (_, i) => ({
 let USE_SERVER = false;
 let serverBase = '';
 
+// Raw settings from /api/settings — populated by syncCfgFromSettings().
+// Declared globally so renderStats() and other render functions can use
+// cfg.battery_kwh / cfg.min_soc_pct / cfg.export_kw directly.
+// Defaults match node3_config.json live values (G99 confirmed, 64kWh).
+let cfg = { battery_kwh: 64, min_soc_pct: 5, import_kw: 10.5, export_kw: 5.5 };
+
 // ══════════════════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════════════════
@@ -3155,7 +3161,7 @@ async function syncCfgFromSettings() {
     // console errors. Bounded now so the page always continues either way.
     const res = await fetch('/api/settings', { signal: AbortSignal.timeout(6000) });
     if (!res.ok) return;
-    const cfg = await res.json();
+    cfg = await res.json();   // update the module-level cfg global (not a new local)
     CFG.BATTERY_KWH = cfg.battery_kwh;
     CFG.MIN_SOC_KWH = cfg.battery_kwh * (cfg.min_soc_pct / 100);
     CFG.CHARGE_KWH  = cfg.import_kw * 0.5;
