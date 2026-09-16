@@ -2570,7 +2570,7 @@ function renderStats() {
   document.getElementById('buy-thr').textContent       = fmt_p(buyThreshold);
   document.getElementById('sell-thr').textContent      = fmt_p(sellThreshold);
   document.getElementById('n-charging').textContent    = actionStr.trim();
-  document.getElementById('n-discharging').textContent = homeAction.toUpperCase();
+  document.getElementById('n-discharging').textContent = curAction.toUpperCase();
 
   // Refresh open drill panels
   const profitCard = document.getElementById('profit-card');
