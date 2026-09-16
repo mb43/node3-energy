@@ -239,25 +239,22 @@
 
     /* ══════════════════════════════════════════
        TOOLTIPS  (data-tip="..." on any element)
+       JS-managed — floating fixed div on <body>, never clipped by parent.
     ══════════════════════════════════════════ */
-    [data-tip] { position: relative; }
-    [data-tip]::after {
-      content: attr(data-tip);
-      position: absolute; bottom: calc(100% + 10px); left: 50%;
-      transform: translateX(-50%);
+    [data-tip] { cursor: default; }
+    #tip-float {
+      position: fixed;
       background: #1c2128; border: 1px solid #30363d;
       color: #c9d1d9; padding: 9px 13px; border-radius: 7px;
       font-size: 11px; white-space: normal; text-align: left;
-      z-index: 9999; opacity: 0; pointer-events: none;
-      transition: opacity 0.15s ease;
-      width: max-content; max-width: 260px;
+      z-index: 99999; pointer-events: none;
+      width: max-content; max-width: 300px;
       line-height: 1.55; letter-spacing: 0;
       font-weight: normal; text-transform: none;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+      opacity: 0; transition: opacity 0.12s ease;
     }
-    [data-tip]:hover::after { opacity: 1; }
-    [data-tip-left]::after  { left: 0; transform: none; }
-    [data-tip-right]::after { left: auto; right: 0; transform: none; }
+    #tip-float.tip-visible { opacity: 1; }
 
 
     /* ══════════════════════════════════════════
@@ -2408,18 +2405,18 @@ function renderSchedule(planData) {
       const tStr   = new Date(s.time).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
       const socStr = s.planSoc != null ? s.planSoc.toFixed(0) + 'kWh' : '—';
       const tip    = `${tStr} | imp:${(s.importP||0).toFixed(1)}p exp:${(s.exportP||0).toFixed(1)}p | ${(s.action||'idle').toUpperCase()} | SOC→${socStr}${isPast?' ✓':''}`;
-      return `<div title="${tip}" style="flex:1;min-width:8px;max-width:18px;height:40px;background:${col};border-radius:3px;${border}display:flex;align-items:flex-end;justify-content:center;cursor:default">
+      return `<div data-tip="${tip}" style="flex:1;min-width:0;height:40px;background:${col};border-radius:3px;${border}display:flex;align-items:flex-end;justify-content:center;cursor:default">
         <span style="font-size:6px;color:#fff;opacity:${isPast?'.3':'.75'};padding-bottom:1px;writing-mode:vertical-lr;transform:rotate(180deg)">${label}</span>
       </div>`;
     } catch(e) { return ''; }
   }).join('');
 
   const summaryEl = document.getElementById('sched-summary');
+  const _dispNet = netG99 != null ? netG99 : netG98;
   if (summaryEl) summaryEl.textContent =
     `${chSlots.length} charge / ${exSlots.length} export`
     + ` · avg import ${avgBuyP}p · avg export ${avgSellP}p`
-    + ` · G98 net ${netG98>=0?'+':''}£${netG98.toFixed(3)}`
-    + (netG99 != null ? ` · G99 net ${netG99>=0?'+':''}£${netG99.toFixed(3)}` : '');
+    + ` · G99 net ${_dispNet>=0?'+':''}£${_dispNet.toFixed(3)}`;
 
   // P&L breakdown: show hosting cost split if server provided it
   const hostingLine = (hostingCost != null && houseLoadKwh != null)
@@ -2444,7 +2441,8 @@ function renderSchedule(planData) {
   // will swing wildly day to day depending on whether the next window
   // happens to catch a wide or narrow spread. Labelled and coloured as a
   // one-off illustrative snapshot, not a trustworthy annual number.
-  const annualBlock = (annualG98 != null) ? `
+  const _annualDisp = annualG99 != null ? annualG99 : annualG98;
+  const annualBlock = (_annualDisp != null) ? `
     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;padding:8px 10px;
                 background:rgba(0,0,0,0.2);border-radius:6px;border:1px dashed var(--border)">
       <div style="font-size:10px;color:var(--amber)">
@@ -2455,23 +2453,10 @@ function renderSchedule(planData) {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <div style="display:flex;flex-direction:column;align-items:center;min-width:80px">
-          <span style="font-size:9px;color:var(--muted);letter-spacing:.8px">G98 · IF EVERY DAY = THIS WINDOW</span>
-          <span style="font-size:15px;font-weight:700;color:var(--muted)">~£${Math.round(annualG98)}</span>
-          <span style="font-size:9px;color:var(--muted)">charge ${CFG.CHARGE_KWH.toFixed(2)} · export ${CFG.EXPORT_KWH.toFixed(2)} kWh</span>
-        </div>
-        ${annualG99 != null ? `
-        <div style="width:1px;background:var(--border);margin:0 4px"></div>
-        <div style="display:flex;flex-direction:column;align-items:center;min-width:80px">
-          <span style="font-size:9px;color:var(--muted);letter-spacing:.8px">G99 · IF EVERY DAY = THIS WINDOW</span>
-          <span style="font-size:15px;font-weight:700;color:var(--muted)">~£${Math.round(annualG99)}</span>
+          <span style="font-size:9px;color:var(--muted);letter-spacing:.8px">G99 (LIVE 5.5kW CAP) · IF EVERY DAY = THIS WINDOW</span>
+          <span style="font-size:15px;font-weight:700;color:var(--muted)">~£${Math.round(_annualDisp)}</span>
           <span style="font-size:9px;color:var(--muted)">charge ${CFG.CHARGE_KWH.toFixed(2)} · export ${CFG.EXPORT_KWH_G99.toFixed(2)} kWh</span>
         </div>
-        <div style="width:1px;background:var(--border);margin:0 4px"></div>
-        <div style="display:flex;flex-direction:column;align-items:center;min-width:70px">
-          <span style="font-size:9px;color:var(--muted);letter-spacing:.8px">G99 UPLIFT (same snapshot)</span>
-          <span style="font-size:15px;font-weight:700;color:var(--muted)">+£${Math.round(annualDelta)}</span>
-          <span style="font-size:9px;color:var(--muted)">vs G98 — pending SSEN OA</span>
-        </div>` : ''}
         <div style="flex:1"></div>
         <div style="font-size:10px;color:var(--muted);align-self:flex-end;text-align:right">
           Extrapolated from ${slots.length}-slot window only · LP-optimised
@@ -2487,11 +2472,10 @@ function renderSchedule(planData) {
       <span style="color:var(--muted)">·</span>
       <span style="font-size:11px;color:#3fb950;font-weight:600">↑ ${exSlots.length} export (${exKwh.toFixed(1)}kWh @ avg ${avgSellP}p export)</span>
       <span style="color:var(--muted)">·</span>
-      <span style="font-size:11px;color:${netG98>=0?'#3fb950':'#f85149'};font-weight:700">G98 net: ${netG98>=0?'+':''}£${netG98.toFixed(3)}</span>
-      ${netG99 != null ? `<span style="color:var(--muted)">·</span><span style="font-size:11px;color:var(--purple);font-weight:700">G99 net: ${netG99>=0?'+':''}£${netG99.toFixed(3)}</span>` : ''}
+      <span style="font-size:11px;color:${_dispNet>=0?'#3fb950':'#f85149'};font-weight:700">G99 net: ${_dispNet>=0?'+':''}£${_dispNet.toFixed(3)}</span>
       ${hostingLine}
     </div>
-    <div style="display:flex;gap:2px;align-items:stretch;height:44px">${bars}</div>
+    <div style="display:flex;gap:2px;align-items:stretch;height:44px;width:100%">${bars}</div>
     <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:2px">
       <span>00:00</span>
       <span style="color:#388bfd">■ charge</span>
@@ -3209,6 +3193,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', () => _updateBaseloadHint(null));
   });
+
+  // ── FLOATING TOOLTIP ─────────────────────────────────────────────────────
+  // Uses position:fixed on a body-level div — never clipped by parent containers.
+  const tipEl = document.createElement('div');
+  tipEl.id = 'tip-float';
+  document.body.appendChild(tipEl);
+  let tipTarget = null;
+
+  document.addEventListener('mouseover', function(e) {
+    const el = e.target.closest('[data-tip]');
+    if (el === tipTarget) return;
+    tipTarget = el;
+    if (!el) { tipEl.classList.remove('tip-visible'); return; }
+    tipEl.textContent = el.getAttribute('data-tip');
+    tipEl.classList.add('tip-visible');
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!tipTarget) return;
+    const tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
+    const vw = window.innerWidth,  vh = window.innerHeight;
+    let left = e.clientX + 16;
+    let top  = e.clientY - Math.round(th / 2);
+    if (left + tw > vw - 8) left = e.clientX - tw - 16;
+    if (top < 6) top = 6;
+    if (top + th > vh - 6) top = vh - th - 6;
+    tipEl.style.left = left + 'px';
+    tipEl.style.top  = top  + 'px';
+  });
+
+  document.addEventListener('mouseout', function(e) {
+    if (tipTarget && (!e.relatedTarget || !e.relatedTarget.closest('[data-tip]'))) {
+      tipTarget = null;
+      tipEl.classList.remove('tip-visible');
+    }
+  });
+
+  document.addEventListener('scroll', function() {
+    tipTarget = null; tipEl.classList.remove('tip-visible');
+  }, true);
 });
 
 async function saveSettings() {
