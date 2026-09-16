@@ -74,7 +74,7 @@
 <header>
   <div>
     <h1>NODE-3 ELECTRICAL SCHEMATIC — Dovecote Systems Ltd</h1>
-    <div class="sub">Source of truth: NODE3_DEFINITIVE.md (30 May 2026) · single-BMS-read mode · pack-internal contactors, no Albright</div>
+    <div class="sub">Source of truth: NODE3_DEFINITIVE.md §5–§7 · single-BMS-read mode · pack-internal contactors, no Albright · CAN/GPIO corrected 16 Sep 2026</div>
   </div>
   <a class="back" href="/">← Back to Portal</a>
 </header>
@@ -108,8 +108,8 @@
     <tr><th>Pin</th><th>Signal</th><th class="mono">Pack 1</th><th class="mono">Pack 2</th><th class="mono">Pack 3</th></tr>
     <tr><td>1</td><td>BAT+IGN (12V wake)</td><td>✅ from 12V rail via E-stop NC + 1A fuse</td><td>✅ same rail (daisy)</td><td>✅ same rail (daisy)</td></tr>
     <tr><td>2</td><td>GND</td><td>✅ to common LV GND</td><td>✅</td><td>✅</td></tr>
-    <tr class="only1"><td>3</td><td>CAN-H</td><td>✅ to LilyGo CAN-A H</td><td>❌ leave open</td><td>❌ leave open</td></tr>
-    <tr class="only1"><td>4</td><td>CAN-L</td><td>✅ to LilyGo CAN-A L</td><td>❌ leave open</td><td>❌ leave open</td></tr>
+    <tr class="only1"><td>3</td><td>CAN-H</td><td>✅ to LilyGo CAN-B H (native ESP32-S3)</td><td>❌ leave open</td><td>❌ leave open</td></tr>
+    <tr class="only1"><td>4</td><td>CAN-L</td><td>✅ to LilyGo CAN-B L (native ESP32-S3)</td><td>❌ leave open</td><td>❌ leave open</td></tr>
     <tr><td>—</td><td>Precharge coil</td><td>✅ from SSR-04 OUT1 (12V switched)</td><td>✅ daisy</td><td>✅ daisy</td></tr>
     <tr><td>—</td><td>+Contactor coil</td><td>✅ from SSR-04 OUT2</td><td>✅ daisy</td><td>✅ daisy</td></tr>
     <tr><td>—</td><td>−Contactor coil</td><td>✅ from SSR-04 OUT3</td><td>✅ daisy</td><td>✅ daisy</td></tr>
@@ -120,22 +120,22 @@
   <h2 class="section-h">LilyGo T-2CAN — GPIO usage</h2>
   <table class="wire-table">
     <tr><th>GPIO / pin</th><th>Role</th><th>Wired to</th></tr>
-    <tr><td class="mono">25</td><td>Precharge SSR drive (3.3V)</td><td>SSR-04 channel 1 IN</td></tr>
-    <tr><td class="mono">32</td><td>+Contactor SSR drive (3.3V)</td><td>SSR-04 channel 2 IN</td></tr>
-    <tr><td class="mono">33</td><td>−Contactor SSR drive (3.3V)</td><td>SSR-04 channel 3 IN</td></tr>
-    <tr><td class="mono">GND</td><td>Common return</td><td>SSR-04 IN-common</td></tr>
-    <tr><td class="mono">CAN-A</td><td>Pack 1 BMS read</td><td>Yazaki Pack 1 pins 3 / 4</td></tr>
-    <tr><td class="mono">CAN-B</td><td>FoxESS comms</td><td>Waveshare isolated CAN HAT input</td></tr>
+    <tr><td class="mono">IO21 (row 10)</td><td>Precharge SSR drive (3.3V)</td><td>SSR-04 channel 1 IN+ — underside 26-pin header R.col</td></tr>
+    <tr><td class="mono">IO48 (row 9)</td><td>+Contactor SSR drive (3.3V)</td><td>SSR-04 channel 2 IN+ — underside 26-pin header R.col</td></tr>
+    <tr><td class="mono">IO17 (row 11)</td><td>−Contactor SSR drive (3.3V)</td><td>SSR-04 channel 3 IN+ — underside 26-pin header R.col</td></tr>
+    <tr><td class="mono">GND (row 12)</td><td>Common return</td><td>SSR-04 IN− common — underside 26-pin header R.col</td></tr>
+    <tr><td class="mono">CAN-B (native GPIO 6/7)</td><td>Pack 1 BMS read</td><td>Yazaki Pack 1 pins 3 / 4 (CAN-H / CAN-L)</td></tr>
+    <tr><td class="mono">CAN-A (MCP2515 chip)</td><td>FoxESS BAT CAN comms</td><td>FoxESS KH10.5 BAT CAN port — DIRECT (T-2CAN galv. isolated, no external HAT needed)</td></tr>
     <tr><td class="mono">5V / VIN</td><td>Module power</td><td>DROK 12V→5V buck output</td></tr>
   </table>
-  <p class="note">The T-2CAN has two on-board CAN channels. The Waveshare isolated HAT sits between CAN-B and the FoxESS for galvanic isolation — the FoxESS HV2600 CAN can float at up to ±110V DC to PE and would destroy an unisolated transceiver (and could injure you). This isolator is mandatory, not optional.</p>
+  <p class="note"><strong>CAN-B (native ESP32-S3, GPIO 6/7)</strong> reads the LEAF BMS. <strong>CAN-A (MCP2515 chip)</strong> talks to FoxESS BAT CAN — wired DIRECT, no external isolator. Both channels on the T-2CAN are galvanically isolated on-board by the MCP2515/TJA1051 transceivers. Do NOT fit the Waveshare 2-CH CAN HAT in the main DALA data path (it is a "DO NOT BUY" item — DALA wiki confirms "FoxESS cannot fry the T-2CAN"). Add 120Ω across CAN-B H/L at the LilyGo end (pack self-terminates at BMS end). Add 120Ω at LilyGo end AND FoxESS end of CAN-A (3 resistors total).</p>
 
   <h2 class="section-h">SSR-04 channel allocation</h2>
   <table class="wire-table">
     <tr><th>Channel</th><th>IN−</th><th>IN+ from LilyGo</th><th>OUT (switches 12V to coil)</th></tr>
-    <tr><td>1</td><td>GND</td><td class="mono">GPIO 25</td><td>Precharge coil pin — all 3 Yazakis</td></tr>
-    <tr><td>2</td><td>GND</td><td class="mono">GPIO 32</td><td>+Contactor coil pin — all 3 Yazakis</td></tr>
-    <tr><td>3</td><td>GND</td><td class="mono">GPIO 33</td><td>−Contactor coil pin — all 3 Yazakis</td></tr>
+    <tr><td>1</td><td>GND</td><td class="mono">IO21 (row 10)</td><td>Precharge coil pin — all 3 Yazakis (daisy-chained)</td></tr>
+    <tr><td>2</td><td>GND</td><td class="mono">IO48 (row 9)</td><td>+Contactor coil pin — all 3 Yazakis (daisy-chained)</td></tr>
+    <tr><td>3</td><td>GND</td><td class="mono">IO17 (row 11)</td><td>−Contactor coil pin — all 3 Yazakis (daisy-chained)</td></tr>
     <tr><td>4</td><td>—</td><td>—</td><td>Spare (E-stop status LED / fan)</td></tr>
   </table>
   <p class="note">Each SSR-04 OUT switches 12V from the same rail that feeds Pin 1. Sequence (driven by LilyGo firmware): precharge ON → wait → +cont ON → −cont ON → precharge OFF. Each pack's internal BMS sees its own coil signal arrive and operates its own internal contactor accordingly.</p>

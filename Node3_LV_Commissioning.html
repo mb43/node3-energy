@@ -59,9 +59,9 @@ The correct architecture is:<br>
 • T-2CAN CAN-A → <b>FoxESS BAT CAN port</b> (DALA emulates HV2600 battery to inverter)<br>
 • Raspberry Pi → <b>USB serial → T-2CAN</b> (DALA config/monitoring only)<br>
 • Raspberry Pi → <b>RS485/USB → FoxESS COM port</b> (Modbus for energy dispatch control)<br>
-• T-2CAN GPIO 21 → SSR-04 Ch1 → precharge coil<br>
-• T-2CAN GPIO 17 → SSR-04 Ch2 → negative contactor coil<br>
-• T-2CAN GPIO 48 → SSR-04 Ch3 → positive contactor coil<br><br>
+• T-2CAN IO21 (header row 10) → SSR-04 Ch1 → precharge coil<br>
+• T-2CAN IO48 (header row 9) → SSR-04 Ch2 → positive (+) contactor coil<br>
+• T-2CAN IO17 (header row 11) → SSR-04 Ch3 → negative (−) contactor coil<br><br>
 Diagrams 1 and 3 in this document are wrong. The step-by-step phases for RS485/Modbus (Phase 2) and CT clamp (Phase 4) remain valid. Use Node3_Wiring_Overlay.html for the corrected LV wiring reference.
 </div>
 <div class="toc">

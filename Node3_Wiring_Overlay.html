@@ -120,7 +120,7 @@ Three errors found in original document and corrected:<br>
 <div class="conn-col"><div style="background:#0a2a0a;border:1px solid #27ae60;border-radius:4px;padding:6px 10px;margin-bottom:10px;font-size:9px;color:#7ed6a0;">
 <b>✔ Inventory confirmed 8 Sep 2026</b><br>
 Mean Well HDR-60-12 · SSR-04 · E-stop NC mushroom · TOMZN DC breakers · Pi 4B + Waveshare 2-CH CAN HAT (optional, not in main DALA path) · JZK USB-RS485 dongle · LilyGo T-2CAN · WAGO connectors · Yazaki 36-pin harness<br>
-<span style="color:#e67e22;">⚠ Still needed: 4× 120Ω resistors (CAN terminators: CAN-A LilyGo end, CAN-A FoxESS end, CAN-B LilyGo end, CAN-B Yazaki pack end)</span>
+<span style="color:#e67e22;">⚠ Still needed: 3× 120Ω resistors (CAN terminators: CAN-A LilyGo end, CAN-A FoxESS end, CAN-B LilyGo end — pack self-terminates at BMS end, no 4th needed)</span>
 </div>
 <h2 id="sec-mw">③ MEAN WELL HDR-60-12</h2>
 <table><thead><tr><th>Terminal</th><th>Wire</th><th>To</th></tr></thead><tbody>
@@ -140,14 +140,14 @@ Mean Well HDR-60-12 · SSR-04 · E-stop NC mushroom · TOMZN DC breakers · Pi 4
 <table><thead><tr><th>Pin</th><th>Wire</th><th>To</th></tr></thead><tbody>
 <tr><td>CAN-B H/L ✔</td><td class="wire-y">White/Blue</td><td>Yazaki CAN-H/L Pack 1 ← LEAF battery BMS (corrected: was CAN-A)</td></tr>
 <tr><td>CAN-A H/L ✔</td><td class="wire-y">White/Blue</td><td>FoxESS BAT CAN port — direct, no HAT needed (T-2CAN already isolated)</td></tr>
-<tr><td>GPIO 21/17/48 ✔</td><td class="wire-o">Orange</td><td>SSR-04 IN+ Ch1(precharge)/Ch2(negative)/Ch3(positive) — <strong>UNDERSIDE 26-pin expansion header, RIGHT column: IO48(row9)=POS, IO21(row10)=PRE, IO17(row11)=NEG. Solder wires to pads or fit 2×13 2.54mm header + Dupont.</strong></td></tr>
+<tr><td>IO21/IO48/IO17 ✔</td><td class="wire-o">Orange</td><td>SSR-04 IN+ Ch1=IO21(row10,precharge) / Ch2=IO48(row9,+cont) / Ch3=IO17(row11,−cont) — <strong>UNDERSIDE 26-pin expansion header RIGHT column: row9=IO48=+POS, row10=IO21=PRE, row11=IO17=−NEG, row12=GND. Solder wires to pads or fit 2×13 2.54mm header + Dupont.</strong></td></tr>
 <tr><td>GND (contactor ref)</td><td class="wire-k">Black</td><td>SSR-04 IN− common — <strong>UNDERSIDE header RIGHT column row 12 (GND, immediately below IO17 NEG pad)</strong></td></tr>
 <tr><td>RS485 SH port (top)</td><td class="wire-y">White</td><td>4-pin SH-1.0mm → RS485 TTL module → Pi /dev/ttyUSB1 → FoxESS Modbus (GPIO43=TX, GPIO44=RX)</td></tr>
 <tr><td>USB (data + 5V pwr)</td><td class="wire-o">Orange dashed</td><td>Pi /dev/ttyUSB0 · LilyGo powered from Pi USB 5V</td></tr>
 </tbody></table><hr class="d"/>
 <h2 id="sec-ssr">⑤ SSR-04 - contactor coil switching</h2>
 <table><thead><tr><th>Terminal</th><th>Wire</th><th>To</th></tr></thead><tbody>
-<tr><td>IN+ Ch1/2/3</td><td class="wire-o">Orange</td><td>LilyGo GPIO 21(precharge) / 17(negative) / 48(positive) (corrected: was 25/32/33)</td></tr>
+<tr><td>IN+ Ch1/2/3</td><td class="wire-o">Orange</td><td>LilyGo IO21(Ch1,precharge) / IO48(Ch2,+cont) / IO17(Ch3,−cont) — underside 26-pin R.col rows 10/9/11 (corrected: was GPIO 25/32/33)</td></tr>
 <tr><td>IN- shared</td><td class="wire-k">Black</td><td>LilyGo GND</td></tr>
 <tr><td>OUT+ common</td><td class="wire-r">Red</td><td>12V from WAGO</td></tr>
 <tr><td>OUT Ch1/2/3</td><td class="wire-o">Orange/Red/Blue</td><td>Yazaki coil wires</td></tr>
