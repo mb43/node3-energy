@@ -523,9 +523,12 @@
       margin-bottom: 4px;
     }
     .revenue-cell-value {
-      font-size: 16px;
+      font-size: 14px;
       font-weight: bold;
       line-height: 1.2;
+    }
+    .revenue-section.dovecote .revenue-cell-value {
+      font-size: 20px;
     }
 
     /* ══════════════════════════════════════════
@@ -838,7 +841,8 @@
 
   <!-- REVENUE BREAKDOWN SECTION -->
   <div class="revenue-grid">
-    <div class="revenue-section dovecote">
+    <div class="revenue-section dovecote"
+         data-tip="Dovecote Technology Ltd grid arbitrage revenue: battery charges at cheap overnight Agile rates and exports at peak Agile Outgoing prices. Figures are based on the 12-month backtest daily average (LP optimiser on real historical prices). Day = daily avg · Week = ×7 · Month = ×30.4 · Year = backtest annual total.">
       <div class="revenue-title" style="color:var(--green)">Dovecote Technology Ltd Revenue</div>
       <div class="revenue-cells">
         <div class="revenue-cell">
@@ -858,6 +862,23 @@
           <div class="revenue-cell-value" style="color:var(--green)" id="rev-dov-year">—</div>
         </div>
       </div>
+      <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:8px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--muted);margin-bottom:6px">ANNUAL PROFIT BREAKDOWN</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+          <div class="revenue-cell">
+            <div class="revenue-cell-label">Export Income</div>
+            <div style="font-size:15px;font-weight:700;color:var(--green)" id="rev-dov-export">—</div>
+          </div>
+          <div class="revenue-cell">
+            <div class="revenue-cell-label">Charge Cost</div>
+            <div style="font-size:15px;font-weight:700;color:var(--red)" id="rev-dov-charge">—</div>
+          </div>
+          <div class="revenue-cell">
+            <div class="revenue-cell-label" style="font-weight:800;color:var(--green)">Net Profit</div>
+            <div style="font-size:17px;font-weight:900;color:var(--green)" id="rev-dov-net">—</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- TOTAL CONSUMER BENEFIT — full value Node-3 delivers to homeowner:
@@ -865,9 +886,6 @@
     <div class="revenue-section" style="border-left:3px solid var(--amber)"
          data-tip="Full annual value delivered to the consumer: free energy from the battery at SVT reference price (25p/kWh) plus the monthly subscription cost. This is the total package value — what it would cost them to get the same from the grid plus a fixed service.">
       <div class="revenue-title" style="color:var(--green)">Net Consumer Saving / yr</div>
-      <div id="cb-workings" style="font-size:10px;color:var(--muted);line-height:1.7;margin-bottom:10px">
-        — loading…
-      </div>
       <div class="revenue-cells" style="grid-template-columns:repeat(3,1fr)">
         <div class="revenue-cell">
           <div class="revenue-cell-label">Energy Value</div>
@@ -1087,16 +1105,6 @@
   </div>
 
   <!-- CHARTS -->
-  <!-- G99 live performance banner -->
-  <div id="g99-upgrade-badge" style="
-    background:linear-gradient(135deg,#1a1230 0%,#1e1535 100%);
-    border:1px solid rgba(163,113,247,0.35);
-    border-radius:8px;padding:10px 16px;margin:8px 0;
-    min-height:52px;
-  ">
-    <span style="color:var(--muted);font-size:12px">G99 live data loading…</span>
-  </div>
-
   <div class="charts-row">
     <div class="chart-card">
       <div class="chart-title">
@@ -2891,8 +2899,6 @@ function renderProfitChart() {
     spanEl.textContent = txt;
   }
 
-  updateG99Badge();
-
   if (profitChart) profitChart.destroy();
   profitChart = new Chart(ctx, {
     type: 'bar',
@@ -2964,28 +2970,6 @@ function renderProfitChart() {
       }
     }
   });
-}
-
-function updateG99Badge() {
-  const el = document.getElementById('g99-upgrade-badge');
-  if (!el || !historyData.length) return;
-  const today48 = get48Window();
-  if (!today48.some(d => d.g99Profit != null || d.g99SlotProfit != null)) return;
-  // 24hr totals for both scenarios
-  const g98daily = window24hrProfit(today48);
-  const g99daily = window24hrG99Profit(today48);
-  const delta    = g99daily - g98daily;
-  const annualised = delta * 365;
-  const sign = delta >= 0 ? '+' : '';
-  el.innerHTML =
-    `<span style="color:var(--muted);font-size:11px;letter-spacing:1px">G99 LIVE — 5.5kW CONFIRMED · 24HR WINDOW (48 SLOTS)</span>` +
-    `<div style="display:flex;gap:20px;align-items:baseline;margin-top:4px;flex-wrap:wrap">` +
-    `<div><span style="color:var(--muted);font-size:10px">G99 TODAY</span><br><span style="color:var(--green);font-size:17px;font-weight:700">£${g98daily.toFixed(4)}</span></div>` +
-    `<div><span style="color:var(--muted);font-size:10px">PLAN OPTIMAL</span><br><span style="color:var(--purple);font-size:17px;font-weight:700">£${g99daily.toFixed(4)}</span></div>` +
-    `<div><span style="color:var(--muted);font-size:10px">DAILY DELTA</span><br><span style="color:var(--purple);font-size:17px;font-weight:700">${sign}£${delta.toFixed(4)}</span></div>` +
-    `<div><span style="color:var(--muted);font-size:10px">ANNUALISED</span><br><span style="color:var(--purple);font-size:20px;font-weight:800">≈ £${Math.round(annualised)}/yr</span></div>` +
-    `</div>` +
-    `<div style="font-size:10px;color:var(--muted);margin-top:4px">G99 confirmed 5.5kW · SSEN ref 260420-000198/FJJ907/1 · 2.75 kWh/slot · annualised = daily × 365</div>`;
 }
 
 function renderPriceChart() {
@@ -3667,10 +3651,15 @@ function populateRevenueBreakdown(res) {
   const homeownerYearSave  = homeownerDaySave * 365;
 
   // Update HTML elements
-  document.getElementById('rev-dov-day').textContent = dovecodeDayRev >= 0 ? '£' + dovecodeDayRev.toFixed(2) : '−£' + Math.abs(dovecodeDayRev).toFixed(2);
-  document.getElementById('rev-dov-week').textContent = dovecodeWeekRev >= 0 ? '£' + dovecodeWeekRev.toFixed(2) : '−£' + Math.abs(dovecodeWeekRev).toFixed(2);
-  document.getElementById('rev-dov-month').textContent = dovecodeMonthRev >= 0 ? '£' + dovecodeMonthRev.toFixed(2) : '−£' + Math.abs(dovecodeMonthRev).toFixed(2);
-  document.getElementById('rev-dov-year').textContent = dovecodeYearRev >= 0 ? '£' + dovecodeYearRev.toFixed(2) : '−£' + Math.abs(dovecodeYearRev).toFixed(2);
+  const _fmtRev = v => v >= 0 ? '£' + v.toFixed(2) : '−£' + Math.abs(v).toFixed(2);
+  document.getElementById('rev-dov-day').textContent   = _fmtRev(dovecodeDayRev);
+  document.getElementById('rev-dov-week').textContent  = _fmtRev(dovecodeWeekRev);
+  document.getElementById('rev-dov-month').textContent = _fmtRev(dovecodeMonthRev);
+  document.getElementById('rev-dov-year').textContent  = _fmtRev(dovecodeYearRev);
+  // Annual breakdown: export income / charge cost / net
+  document.getElementById('rev-dov-export').textContent = '£' + totalExportIncome.toFixed(2);
+  document.getElementById('rev-dov-charge').textContent = '−£' + Math.abs(totalChargeCost).toFixed(2);
+  document.getElementById('rev-dov-net').textContent    = _fmtRev(dovecodeYearRev);
 
   // Homeowner Savings vs SVT card removed — superseded by Net Consumer Saving card
 
@@ -3683,12 +3672,6 @@ function populateRevenueBreakdown(res) {
   const energyValYr = totalKwhYr * SVT_PPU;
   const subValYr    = SUB_PCM * 12;
   const netBenYr   = energyValYr - subValYr;   // what consumer actually saves after paying sub
-
-  const workEl = document.getElementById('cb-workings');
-  if (workEl) workEl.innerHTML =
-    `${houseKwhPd}kWh/day × 365 = <b style="color:var(--text)">${totalKwhYr.toLocaleString()}kWh/yr</b><br>` +
-    `${totalKwhYr.toLocaleString()}kWh × 25p SVT = <b style="color:var(--amber)">£${energyValYr.toFixed(0)}/yr</b> free energy<br>` +
-    `less £${SUB_PCM}/mo × 12 = <b style="color:var(--muted)">−£${subValYr}/yr</b> subscription`;
 
   const cbE = document.getElementById('cb-energy-yr');
   const cbS = document.getElementById('cb-sub-yr');
@@ -3791,7 +3774,13 @@ function renderHistoricalResults(res) {
   const scaleTotal        = total;
   const scaleExport       = totalExportIncome;
   const scaleCharge       = totalChargeCost;
-  const scaleHomeSaved    = totalHomeEnergySaved;
+  // Use guaranteed contractual formula (12kWh/day × 25p × actual days in each month)
+  // NOT the simulation's totalHomeEnergySaved which uses Agile-tariff weighting
+  const _gKwhDayScale = cfg.house_kwh_day || 12;
+  const scaleHomeSaved = Object.keys(monthly).reduce((s, m) => {
+    const [y, mn] = m.split('-');
+    return s + _gKwhDayScale * 0.25 * new Date(+y, +mn, 0).getDate();
+  }, 0);
   // scaleNetTotal = true total value = arbitrage grid P&L + home energy value
   // The grid P&L alone is negative (charging covers home load + arbitrage, exports only cover arbitrage)
   // Adding home energy value gives the correct total benefit of the system
