@@ -51,6 +51,19 @@
 <h1>Node-3 LV Commissioning</h1>
 <div class="subtitle">Dovecote Systems Ltd · Co. No. 17160178 · FoxESS KH10.5 HV · 72kWh (3× e-NV200) · G99 FJJ907/1 · 5.5kW export cap</div>
 
+<div style="background:#5c0000;border:2px solid #ff0000;border-radius:6px;padding:12px 16px;margin-bottom:18px;font-size:12px;color:#fff;">
+⛔ <b>ARCHITECTURAL ERROR IN THIS DOCUMENT — DO NOT USE FOR WIRING — 15 Sep 2026</b><br><br>
+This commissioning guide was built on a wrong architecture. It shows the Raspberry Pi connecting via USB-CAN directly to the e-NV200 battery packs. <b>That is not the DALA design.</b><br><br>
+The correct architecture is:<br>
+• LEAF battery BMS CAN → <b>T-2CAN CAN-B</b> (DALA firmware handles BMS comms)<br>
+• T-2CAN CAN-A → <b>FoxESS BAT CAN port</b> (DALA emulates HV2600 battery to inverter)<br>
+• Raspberry Pi → <b>USB serial → T-2CAN</b> (DALA config/monitoring only)<br>
+• Raspberry Pi → <b>RS485/USB → FoxESS COM port</b> (Modbus for energy dispatch control)<br>
+• T-2CAN GPIO 21 → SSR-04 Ch1 → precharge coil<br>
+• T-2CAN GPIO 17 → SSR-04 Ch2 → negative contactor coil<br>
+• T-2CAN GPIO 48 → SSR-04 Ch3 → positive contactor coil<br><br>
+Diagrams 1 and 3 in this document are wrong. The step-by-step phases for RS485/Modbus (Phase 2) and CT clamp (Phase 4) remain valid. Use Node3_Wiring_Overlay.html for the corrected LV wiring reference.
+</div>
 <div class="toc">
   <strong>Contents</strong><br><br>
   <a href="#diag1">Diagram 1 — System Overview (block diagram)</a>

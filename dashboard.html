@@ -864,14 +864,18 @@
       </div>
       <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:8px">
         <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--muted);margin-bottom:6px">ANNUAL PROFIT BREAKDOWN</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px">
           <div class="revenue-cell">
             <div class="revenue-cell-label">Export Income</div>
-            <div style="font-size:15px;font-weight:700;color:var(--green)" id="rev-dov-export">—</div>
+            <div style="font-size:14px;font-weight:700;color:var(--green)" id="rev-dov-export">—</div>
           </div>
           <div class="revenue-cell">
             <div class="revenue-cell-label">Charge Cost</div>
-            <div style="font-size:15px;font-weight:700;color:var(--red)" id="rev-dov-charge">—</div>
+            <div style="font-size:14px;font-weight:700;color:var(--red)" id="rev-dov-charge">—</div>
+          </div>
+          <div class="revenue-cell">
+            <div class="revenue-cell-label">Subscription</div>
+            <div style="font-size:14px;font-weight:700;color:var(--amber)" id="rev-dov-sub">—</div>
           </div>
           <div class="revenue-cell">
             <div class="revenue-cell-label" style="font-weight:800;color:var(--green)">Net Profit</div>
@@ -3633,11 +3637,14 @@ function populateRevenueBreakdown(res) {
   const monthsCount = months.length;
   const yearsCount = 1;
 
-  // Dovecote revenue = export income - charge cost (arbitrage only, pure cash)
-  const dovecodeDayRev = (totalExportIncome - totalChargeCost) / daysCount;
+  // Dovecote revenue = export income - charge cost + subscription (full company P&L)
+  const DOVECOTE_SUB_PCM = 29;          // £29/month subscription per home
+  const dovecoteSubYr   = DOVECOTE_SUB_PCM * 12;   // £348/yr
+  const dovecodeArbitrageYr = totalExportIncome - totalChargeCost;
+  const dovecodeYearRev = dovecodeArbitrageYr + dovecoteSubYr;
+  const dovecodeDayRev  = dovecodeYearRev / daysCount;
   const dovecodeWeekRev = dovecodeDayRev * 7;
   const dovecodeMonthRev = dovecodeDayRev * 30;
-  const dovecodeYearRev = totalExportIncome - totalChargeCost;
 
   // Homeowner savings vs SVT — Node-3 guarantees 12kWh/day free to the household.
   // That IS the service. Use the guaranteed figure directly: house_kwh_day × 25p SVT.
@@ -3656,9 +3663,10 @@ function populateRevenueBreakdown(res) {
   document.getElementById('rev-dov-week').textContent  = _fmtRev(dovecodeWeekRev);
   document.getElementById('rev-dov-month').textContent = _fmtRev(dovecodeMonthRev);
   document.getElementById('rev-dov-year').textContent  = _fmtRev(dovecodeYearRev);
-  // Annual breakdown: export income / charge cost / net
+  // Annual breakdown: export income / charge cost / subscription / net
   document.getElementById('rev-dov-export').textContent = '£' + totalExportIncome.toFixed(2);
   document.getElementById('rev-dov-charge').textContent = '−£' + Math.abs(totalChargeCost).toFixed(2);
+  document.getElementById('rev-dov-sub').textContent    = '+£' + dovecoteSubYr.toFixed(2);
   document.getElementById('rev-dov-net').textContent    = _fmtRev(dovecodeYearRev);
 
   // Homeowner Savings vs SVT card removed — superseded by Net Consumer Saving card
