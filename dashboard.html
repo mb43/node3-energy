@@ -483,12 +483,13 @@
        REVENUE BREAKDOWN PANEL
     ══════════════════════════════════════════ */
     .revenue-grid {
+      /* 2fr for Dovecote revenue, 1fr for Net Consumer Saving — was 1fr 1fr 1fr when homeowner card existed */
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 2fr 1fr;
       gap: 12px;
       margin-bottom: 16px;
     }
-    @media (max-width: 900px) { .revenue-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 700px) { .revenue-grid { grid-template-columns: 1fr; } }
     .revenue-section {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -949,6 +950,69 @@
       <div class="stat-label">Node-3 Status</div>
       <div class="stat-value purple" id="fleet-action">--</div>
       <div class="stat-sub" id="action-sub">LP optimiser</div>
+    </div>
+  </div>
+
+  <!-- PERFORMANCE CALIBRATION — actual vs backtest, min 7 days live data -->
+  <div id="perf-cal-section" style="background:var(--card);border:1px solid var(--border);
+       border-radius:10px;padding:14px 18px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <span style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--muted)">PERFORMANCE CALIBRATION</span>
+      <span style="font-size:10px;color:var(--muted)"
+            data-tip="Compares actual live operational profit (history.csv) against the 12-month backtest prediction for the same average day. After 7 days of live data the ratio is reliable enough to adjust the forward annual projection. Below 7 days the sample is too small to mean anything.">ⓘ</span>
+      <span id="pc-days-badge" style="font-size:10px;padding:2px 8px;border-radius:4px;
+            background:rgba(139,148,158,0.1);color:var(--muted)">— days live</span>
+    </div>
+
+    <!-- Pending: < 7 days of live data -->
+    <div id="pc-pending" style="display:none">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+        ⏳ Calibration needs <b style="color:var(--text)">7 days</b> of live operational data before the ratio is meaningful.
+        Currently <span id="pc-days-count" style="color:var(--amber)">0.0</span> days recorded.
+      </div>
+      <div style="height:6px;background:rgba(139,148,158,0.12);border-radius:3px;overflow:hidden">
+        <div id="pc-progress-bar" style="height:100%;background:var(--amber);border-radius:3px;
+             transition:width 0.4s ease;width:0%"></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:5px">
+        Backtest predicts <span id="pc-backtest-preview" style="color:var(--green)">—</span>/day avg ·
+        live data will calibrate this as it accumulates
+      </div>
+    </div>
+
+    <!-- Active: ≥ 7 days of live data -->
+    <div id="pc-active" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 2fr;gap:16px;align-items:start">
+
+        <div>
+          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">BACKTEST AVG/DAY</div>
+          <div style="font-size:20px;font-weight:700;color:var(--green)" id="pc-predicted">—</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">12-month LP simulation</div>
+        </div>
+
+        <div>
+          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">ACTUAL AVG/DAY</div>
+          <div style="font-size:20px;font-weight:700" id="pc-actual">—</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px" id="pc-actual-sub">7-day live avg</div>
+        </div>
+
+        <div>
+          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">PERFORMANCE</div>
+          <div style="font-size:20px;font-weight:700" id="pc-pct">—</div>
+          <div style="font-size:10px;margin-top:2px" id="pc-delta">—</div>
+        </div>
+
+        <div style="border-left:1px solid var(--border);padding-left:16px">
+          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px">ADJUSTED ANNUAL PROJECTION</div>
+          <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+            <div style="font-size:24px;font-weight:900" id="pc-adj-annual">—</div>
+            <div style="font-size:11px;color:var(--muted)">vs <span id="pc-backtest-annual" style="color:var(--green)">—</span> backtest</div>
+          </div>
+          <div style="font-size:10px;margin-top:4px" id="pc-annual-delta">—</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px" id="pc-caveat"></div>
+        </div>
+
+      </div>
     </div>
   </div>
 
@@ -2519,24 +2583,22 @@ function window24hrG99Profit(data48) {
 function renderStats() {
   const avgSoc = fleet.reduce((s,h) => s + h.soc, 0) / CFG.NUM_HOMES;
 
-  // — Arbitrage income = 7-day rolling average daily profit ——————————————————
-  // Window sums can go negative when a charge-heavy window hasn't discharged yet.
-  // 7-day avg is far more representative and never negative in normal operation.
+  // — Arbitrage income — use 12-month backtest daily avg when available (most stable/representative).
+  // Falls back to live rolling avg only if backtest hasn't loaded yet.
+  // Raw 24hr window sums are intentionally excluded — too volatile and can go negative mid-cycle.
   const today48 = get48Window();
-  const daily24hr = window24hrProfit(today48);   // kept for sub-line context only
-  const rolling7  = rolling7DayAvg();
+  const backtestDailyAvg = histResultsCache ? (histResultsCache.total / 365) : null;
+  const rolling7 = rolling7DayAvg();
+  const displayProfit = backtestDailyAvg !== null ? backtestDailyAvg : rolling7;
+  const profitSrc = backtestDailyAvg !== null ? '12-month backtest avg/day' : `${Math.min(7, historyData.length / SLOT_WINDOW).toFixed(1)}-day live avg`;
 
   const profitEl = document.getElementById('fleet-profit');
-  profitEl.textContent = fmt_gbp(rolling7);
-  profitEl.className   = 'stat-value ' + (rolling7 >= 0 ? 'green' : 'red');
+  profitEl.textContent = fmt_gbp(displayProfit);
+  profitEl.className   = 'stat-value ' + (displayProfit >= 0 ? 'green' : 'red');
   const lbl = document.getElementById('profit-card-label');
-  if (lbl) lbl.textContent = '7-DAY AVG DAILY PROFIT';
+  if (lbl) lbl.textContent = 'AVG DAILY PROFIT';
 
-  // Sub-line: how many days of data + today's raw 24hr window for context
-  const days7 = Math.min(7, historyData.length / SLOT_WINDOW);
-  const sign24 = daily24hr >= 0 ? '+' : '';
-  let subText = `${today48.length} slots · ${days7.toFixed(1)}d avg · today 24hr: ${sign24}£${daily24hr.toFixed(4)}`;
-  document.getElementById('profit-sub').textContent = subText;
+  document.getElementById('profit-sub').textContent = profitSrc;
 
   // — Import price (price is per kWh — not fleet/home, stays same) —
   const cpEl = document.getElementById('current-price');
@@ -2581,6 +2643,7 @@ function renderStats() {
   if (priceCard && priceCard.classList.contains('drilled')) populatePriceDrill();
 
   calculateProjections();
+  updatePerfCalibration();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2676,6 +2739,89 @@ function calculateProjections() {
     const lel = document.querySelector(`[id="proj-${id}"]`)?.closest('.proj-cell')?.querySelector('.proj-lbl');
     if (lel) lel.textContent = txt;
   });
+}
+
+// ══════════════════════════════════════════════════════════════
+// PERFORMANCE CALIBRATION
+// Compares live operational profit (history.csv) against the
+// 12-month backtest daily average. Needs ≥7 days of live data
+// before the ratio is meaningful. Updates the adjusted annual
+// projection accordingly.
+// ══════════════════════════════════════════════════════════════
+function updatePerfCalibration() {
+  const liveDays       = historyData.length / SLOT_WINDOW;
+  const backtestDaily  = histResultsCache ? (histResultsCache.total / 365) : null;
+  const MIN_DAYS       = 7;
+
+  // Badge always shows how many live days exist
+  const badge = document.getElementById('pc-days-badge');
+  if (badge) badge.textContent = `${liveDays.toFixed(1)} days live`;
+
+  const pending = document.getElementById('pc-pending');
+  const active  = document.getElementById('pc-active');
+
+  if (!backtestDaily || liveDays < MIN_DAYS) {
+    // Not enough data — show progress bar
+    if (pending) pending.style.display = 'block';
+    if (active)  active.style.display  = 'none';
+
+    const daysEl = document.getElementById('pc-days-count');
+    if (daysEl) daysEl.textContent = liveDays.toFixed(1);
+
+    const pct = Math.min(100, (liveDays / MIN_DAYS) * 100);
+    const bar = document.getElementById('pc-progress-bar');
+    if (bar) bar.style.width = pct.toFixed(1) + '%';
+
+    const preview = document.getElementById('pc-backtest-preview');
+    if (preview) preview.textContent = backtestDaily ? fmt_gbp(backtestDaily) : '—';
+    return;
+  }
+
+  // ≥7 days live — show calibration
+  if (pending) pending.style.display = 'none';
+  if (active)  active.style.display  = 'block';
+
+  const actualDaily   = rolling7DayAvg();
+  const perfRatio     = actualDaily / backtestDaily;        // e.g. 0.82 = 82%
+  const perfPct       = perfRatio * 100;
+  const deltaDaily    = actualDaily - backtestDaily;
+  const adjAnnual     = actualDaily * 365;
+  const backtestAnn   = histResultsCache.total;
+  const annualDelta   = adjAnnual - backtestAnn;
+
+  // Colour: green = on/above target, amber = moderately below, red = significantly below.
+  // >100% is entirely expected when recent spreads beat the 12-month average — show it green.
+  const perfColor = perfPct >= 80 ? 'var(--green)' : perfPct >= 60 ? 'var(--amber)' : 'var(--red)';
+  const deltaSign = deltaDaily >= 0 ? '+' : '';
+  const annSign   = annualDelta >= 0 ? '+' : '';
+
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  const setStyle = (id, prop, val) => { const el = document.getElementById(id); if (el) el.style[prop] = val; };
+
+  set('pc-predicted',    fmt_gbp(backtestDaily));
+  set('pc-actual',       fmt_gbp(actualDaily));
+  setStyle('pc-actual',  'color', perfColor);
+  set('pc-actual-sub',   `${Math.min(7, liveDays).toFixed(1)}-day live avg (${historyData.length} slots)`);
+  set('pc-pct',          perfPct.toFixed(1) + '%');
+  setStyle('pc-pct',     'color', perfColor);
+  set('pc-delta',        `${deltaSign}${fmt_gbp(deltaDaily)}/day vs backtest`);
+  setStyle('pc-delta',   'color', perfColor);
+
+  set('pc-adj-annual',   '£' + Math.round(adjAnnual));
+  setStyle('pc-adj-annual', 'color', perfColor);
+  set('pc-backtest-annual', '£' + Math.round(backtestAnn));
+  set('pc-annual-delta', `${annSign}£${Math.abs(Math.round(annualDelta))} vs backtest annual`);
+  setStyle('pc-annual-delta', 'color', perfColor);
+
+  // Caveat: >100% is normal — backtest is the 12-month average, any 7-day window can beat it
+  const caveat = perfPct > 100
+    ? `✓ Outperforming backtest — recent Agile spreads above the 12-month average (+${(perfPct - 100).toFixed(1)}%)`
+    : perfPct >= 80
+    ? `✓ Within normal range — Agile spread variability accounts for most of this vs 12-month avg`
+    : perfPct >= 60
+    ? `⚠ Below backtest avg — check if recent prices are genuinely low or investigate G99 cap / efficiency`
+    : `⚠ Significant underperformance — check config, inverter comms, and G99 export cap`;
+  set('pc-caveat', caveat);
 }
 
 function renderFleetGrid() {
@@ -3550,6 +3696,9 @@ function populateRevenueBreakdown(res) {
   if (cbE) cbE.textContent = '£' + energyValYr.toFixed(0);
   if (cbS) cbS.textContent = '−£' + subValYr;
   if (cbT) cbT.textContent = '£' + netBenYr.toFixed(0);
+
+  // Backtest data just loaded — refresh calibration section now that histResultsCache is set
+  updatePerfCalibration();
 }
 
 // ══════════════════════════════════════════════════════════════
