@@ -786,7 +786,7 @@
   <div id="settings-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.6);align-items:center;justify-content:center">
     <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:24px 28px;width:360px;max-width:90vw">
       <div style="font-size:15px;font-weight:bold;letter-spacing:0.5px;margin-bottom:4px">⚙ SYSTEM SETTINGS</div>
-      <div style="font-size:11px;color:#8b949e;margin-bottom:18px">G98 (current live connection) operating limits. G99 comparison stays fixed at the real 50A DNO figure — it models a different grid connection, not a tunable setting.</div>
+      <div style="font-size:11px;color:#8b949e;margin-bottom:18px">Live operating limits. G99 confirmed at 5.5kW export (SSEN ref 260420-000198/FJJ907/1). All values read from node3_config.json — changes take effect on next simulate.py run and immediately for backtest/plan endpoints.</div>
 
       <label style="display:block;font-size:11px;color:#8b949e;margin-bottom:3px">Battery capacity (kWh)</label>
       <input type="number" id="set-battery-kwh" step="0.1" min="0.1" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;margin-bottom:12px;font-size:13px">
@@ -827,8 +827,7 @@
   <div class="tab-nav" id="main-tab-nav">
     <button class="tab-btn active" id="tbn-live"       onclick="switchTab('live')"       title="Live prices, stats & forward schedule">⚡ LIVE</button>
     <button class="tab-btn"        id="tbn-historical"  onclick="switchTab('historical')"  title="12-month historical backtest results">📈 HISTORICAL</button>
-    <button class="tab-btn"        id="tbn-g98"         onclick="switchTab('g98')"         title="G98 current 32A cap scenario">G98</button>
-    <button class="tab-btn"        id="tbn-g99"         onclick="switchTab('g99')"         title="G99 upgrade 50A scenario & upgrade value">G99</button>
+    <!-- G98/G99 comparison tabs removed — G99 5.5kW is the confirmed live cap (SSEN ref 260420-000198) -->
     <button class="tab-btn"        id="tbn-schematic"   onclick="switchTab('schematic')"   title="Full electrical schematic">⚡ SCHEMATIC</button>
     <button class="tab-btn"        id="tbn-overlay"     onclick="switchTab('overlay')"     title="Bench wiring photo overlay">📸 WIRING</button>
     <button class="tab-btn"        id="tbn-hardware"    onclick="switchTab('hardware')"    title="Live pack telemetry &amp; FoxESS hardware bridge status">🔋 PACK STATUS</button>
@@ -937,10 +936,10 @@
       </div>
     </div>
     <div class="stat-card blue has-drill" id="soc-card" onclick="toggleDrill('soc-card')"
-         data-tip="Battery State of Charge. 72kWh nominal (3× Nissan eNV200). 10% minimum reserve always maintained.">
+         data-tip="Battery State of Charge. 64kWh actual (3× Nissan e-NV200). 5% min SOC floor (3.2kWh). Values from live config.">
       <div class="stat-label">Battery SOC</div>
       <div class="stat-value blue" id="avg-soc">--kWh</div>
-      <div class="stat-sub" id="soc-sub">of 72kWh nominal · 57.6kWh usable (10–90% DoD)</div>
+      <div class="stat-sub" id="soc-sub">of 64kWh · 60.8kWh usable (5–100% DoD)</div>
       <div class="drill-panel" id="drill-soc-card">
         <div id="drill-soc-list"><span style="color:var(--muted)">loading…</span></div>
       </div>
@@ -1024,20 +1023,20 @@
   </div>
 
   <!-- CHARTS -->
-  <!-- G99 vs G98 comparison banner -->
+  <!-- G99 live performance banner -->
   <div id="g99-upgrade-badge" style="
     background:linear-gradient(135deg,#1a1230 0%,#1e1535 100%);
     border:1px solid rgba(163,113,247,0.35);
     border-radius:8px;padding:10px 16px;margin:8px 0;
     min-height:52px;
   ">
-    <span style="color:var(--muted);font-size:12px">G99 upgrade data loading…</span>
+    <span style="color:var(--muted);font-size:12px">G99 live data loading…</span>
   </div>
 
   <div class="charts-row">
     <div class="chart-card">
       <div class="chart-title">
-        G98 vs G99 PROFIT PER SLOT
+        SLOT PROFIT (G99 confirmed · 5.5kW · 2.75 kWh/slot)
         <span id="chart-span">last -- slots</span>
       </div>
       <canvas id="profit-chart" height="140"></canvas>
@@ -1230,87 +1229,27 @@
     </div>
   </div>
 
-  <!-- ══ LP BACKTEST COMPARISON — G98 vs G99 vs Greedy ══════════════════ -->
-  <div style="margin-top:16px">
-    <div class="chart-card" style="margin-bottom:10px">
-      <div class="chart-title" style="flex-direction:column;align-items:flex-start;gap:4px">
-        LP BACKTEST — G98 vs G99 vs GREEDY (12 MONTHS)
-        <span style="color:var(--muted);font-size:10px;font-weight:normal" id="lp-bt-rates-line">Rates: configurable — see ⚙ SETTINGS · LP = scipy HiGHS globally optimal</span>
-      </div>
-    </div>
-    <button class="hist-btn" id="lp-bt-btn" onclick="loadLpBacktest()">🔬 LOAD LP BACKTEST (G98 + G99 vs GREEDY)</button>
-    <div id="lp-bt-progress" class="hist-progress" style="display:none"><div id="lp-bt-bar" class="hist-bar" style="width:0%"></div></div>
-    <div id="lp-bt-error" class="hist-error"></div>
-    <div id="lp-bt-results" style="display:none">
-      <!-- Three-way comparison banner -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
-        <div style="background:rgba(63,185,80,0.08);border:2px solid rgba(63,185,80,0.5);border-radius:8px;padding:14px;text-align:center">
-          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">G98 LP (ACTUAL)</div>
-          <div style="font-size:26px;font-weight:800;color:var(--green)" id="lp-bt-g98">—</div>
-          <div style="font-size:11px;color:var(--muted)">12-month total · LP optimal</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:4px" id="lp-bt-g98-rates">charge — · export — kWh/slot</div>
-        </div>
-        <div style="background:rgba(163,113,247,0.08);border:2px solid rgba(163,113,247,0.5);border-radius:8px;padding:14px;text-align:center">
-          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">G99 LP (PROJECTED)</div>
-          <div style="font-size:26px;font-weight:800;color:var(--purple)" id="lp-bt-g99">—</div>
-          <div style="font-size:11px;color:var(--muted)">12-month projected · pending SSEN OA</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:4px" id="lp-bt-g99-rates">charge — · export — kWh/slot</div>
-        </div>
-        <div style="background:rgba(255,193,7,0.08);border:2px solid rgba(255,193,7,0.3);border-radius:8px;padding:14px;text-align:center">
-          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">G99 UPLIFT vs G98</div>
-          <div style="font-size:26px;font-weight:800;color:var(--amber)" id="lp-bt-g99-delta">—</div>
-          <div style="font-size:11px;color:var(--muted)">extra per year from G99 approval</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:4px" id="lp-bt-g99-pct">—</div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-        <div style="background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.3);border-radius:6px;padding:10px 14px;text-align:center">
-          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">GREEDY (OLD ALGORITHM)</div>
-          <div style="font-size:20px;font-weight:700;color:var(--amber)" id="lp-bt-greedy">—</div>
-          <div style="font-size:11px;color:var(--muted)">percentile-threshold heuristic</div>
-        </div>
-        <div style="background:rgba(63,185,80,0.06);border:1px solid rgba(63,185,80,0.3);border-radius:6px;padding:10px 14px;text-align:center">
-          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">LP vs GREEDY UPLIFT</div>
-          <div style="font-size:20px;font-weight:700;color:var(--green)" id="lp-bt-uplift">—</div>
-          <div style="font-size:11px;color:var(--muted)" id="lp-bt-uplift-pct">—</div>
-        </div>
-      </div>
-      <!-- Monthly comparison table -->
-      <div class="chart-card" style="overflow-x:auto">
-        <div class="chart-title">MONTHLY LP COMPARISON — G98 vs G99 vs GREEDY</div>
-        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px">
-          <thead>
-            <tr style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)">
-              <th style="padding:6px 8px;text-align:left">Month</th>
-              <th style="padding:6px 8px;text-align:right;color:var(--green)">G98 LP</th>
-              <th style="padding:6px 8px;text-align:right;color:var(--purple)">G99 LP</th>
-              <th style="padding:6px 8px;text-align:right;color:var(--amber)">Greedy</th>
-              <th style="padding:6px 8px;text-align:right;color:var(--green)">LP/Greedy uplift</th>
-              <th style="padding:6px 8px;text-align:right;color:var(--purple)">G99/G98 uplift</th>
-            </tr>
-          </thead>
-          <tbody id="lp-bt-tbody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+  <!-- G98/G99 comparison section removed — G99 5.5kW is the live confirmed cap.
+       12-month backtest above already uses live config (5.5kW export, 10.5kW charge,
+       64kWh battery, baseload_kw from settings). Use ⚙ SETTINGS to change parameters
+       and click FORCE REFRESH above to rerun the backtest with updated values. -->
 
   </div><!-- /tab-historical -->
 
-  <!-- ══ TAB: G98 ══════════════════════════════════════════════ -->
-  <div class="tab-panel" id="tab-g98">
+  <!-- ══ TAB: G98 — REMOVED: G99 5.5kW is the confirmed live cap ══════════ -->
+  <div class="tab-panel" id="tab-g98" style="display:none">
     <div class="chart-card" style="margin-bottom:16px">
       <div class="chart-title" style="flex-direction:column;align-items:flex-start;gap:4px">
-        G98 — CURRENT OPERATING SCENARIO (32A / 3.68kWh PER SLOT)
-        <span style="color:var(--muted);font-size:10px;font-weight:normal">DNO connection standard G98 — maximum export 32A × 230V × 0.5h = 3.68kWh per half-hour slot · This is the live operating cap pending G99 approval</span>
+        G99 CONFIRMED LIVE — 5.5kW / 2.75kWh PER SLOT
+        <span style="color:var(--muted);font-size:10px;font-weight:normal">SSEN confirmed G99 at 5.5kW (ref 260420-000198/FJJ907/1). G98/G99 comparison removed — this IS the live cap.</span>
       </div>
     </div>
     <div class="scenario-compare">
       <div class="scenario-card g98">
-        <div class="scenario-title g98">⚡ G98 Live Stats</div>
-        <div class="scenario-metric"><span class="sm-lbl">Export cap / slot</span><span class="sm-val" style="color:var(--green)">3.68 kWh</span></div>
-        <div class="scenario-metric"><span class="sm-lbl">Max export rate</span><span class="sm-val" style="color:var(--green)">32A / 7.36kW</span></div>
-        <div class="scenario-metric"><span class="sm-lbl">DNO standard</span><span class="sm-val" style="color:var(--text)">G98</span></div>
+        <div class="scenario-title g98">📊 G99 Backtest (Live Config)</div>
+        <div class="scenario-metric"><span class="sm-lbl">Export cap / slot</span><span class="sm-val" style="color:var(--green)">2.75 kWh</span></div>
+        <div class="scenario-metric"><span class="sm-lbl">Max export rate</span><span class="sm-val" style="color:var(--green)">5.5kW (G99 confirmed)</span></div>
+        <div class="scenario-metric"><span class="sm-lbl">DNO standard</span><span class="sm-val" style="color:var(--text)">G99</span></div>
         <div class="scenario-metric"><span class="sm-lbl">Current profit (window)</span><span class="sm-val" style="color:var(--green)" id="g98-current-profit">—</span></div>
         <div class="scenario-metric"><span class="sm-lbl">Annualised (extrapolated)</span><span class="sm-val" style="color:var(--green)" id="g98-annual">—</span></div>
         <div class="scenario-metric"><span class="sm-lbl">Last action</span><span class="sm-val" style="color:var(--purple)" id="g98-last-action">—</span></div>
@@ -1327,12 +1266,12 @@
     </div>
   </div><!-- /tab-g98 -->
 
-  <!-- ══ TAB: G99 ══════════════════════════════════════════════ -->
-  <div class="tab-panel" id="tab-g99">
+  <!-- ══ TAB: G99 — REMOVED: G99 5.5kW is the confirmed live cap ══════════ -->
+  <div class="tab-panel" id="tab-g99" style="display:none">
     <div class="chart-card" style="margin-bottom:16px">
       <div class="chart-title" style="flex-direction:column;align-items:flex-start;gap:4px">
-        G99 — UPGRADE TARGET SCENARIO (50A / 5.75kWh PER SLOT)
-        <span style="color:var(--muted);font-size:10px;font-weight:normal">SSEN G99 application ref 260420-000198 · 50A × 230V × 0.5h = 5.75kWh per half-hour slot · FoxESS KH10.5 inverter operating at full 10.5kW capacity</span>
+        G99 CONFIRMED — 5.5kW / 2.75kWh PER SLOT (LIVE)
+        <span style="color:var(--muted);font-size:10px;font-weight:normal">SSEN confirmed G99 5.5kW secure limit (ref 260420-000198/FJJ907/1). This IS the live export cap. G98/G99 upgrade comparison removed.</span>
       </div>
     </div>
 
@@ -1342,15 +1281,15 @@
       border:2px solid rgba(163,113,247,0.5);
       border-radius:10px;padding:18px 24px;margin-bottom:16px;
     ">
-      <div style="font-size:11px;color:var(--muted);letter-spacing:1.5px;margin-bottom:8px">G99 UPGRADE VALUE — FINANCIAL CASE</div>
+      <div style="font-size:11px;color:var(--muted);letter-spacing:1.5px;margin-bottom:8px">G99 LIVE — 5.5kW CONFIRMED · SSEN REF 260420-000198/FJJ907/1</div>
       <div id="g99-tab-badge-inner" style="color:var(--muted);font-size:12px">Live data loading… load window data then check back.</div>
     </div>
 
     <div class="scenario-compare">
       <div class="scenario-card g99">
-        <div class="scenario-title g99">🚀 G99 Target Stats</div>
-        <div class="scenario-metric"><span class="sm-lbl">Export cap / slot</span><span class="sm-val" style="color:var(--purple)">5.75 kWh</span></div>
-        <div class="scenario-metric"><span class="sm-lbl">Max export rate</span><span class="sm-val" style="color:var(--purple)">50A / 11.5kW</span></div>
+        <div class="scenario-title g99">⚡ G99 Live Stats (Confirmed)</div>
+        <div class="scenario-metric"><span class="sm-lbl">Export cap / slot</span><span class="sm-val" style="color:var(--purple)">2.75 kWh</span></div>
+        <div class="scenario-metric"><span class="sm-lbl">Max export rate</span><span class="sm-val" style="color:var(--purple)">5.5kW (G99 confirmed)</span></div>
         <div class="scenario-metric"><span class="sm-lbl">DNO standard</span><span class="sm-val" style="color:var(--text)">G99</span></div>
         <div class="scenario-metric"><span class="sm-lbl">SSEN ref</span><span class="sm-val" style="color:var(--muted)">260420-000198</span></div>
         <div class="scenario-metric"><span class="sm-lbl">Current profit (window)</span><span class="sm-val" style="color:var(--purple)" id="g99-current-profit">—</span></div>
@@ -1370,7 +1309,7 @@
     </div>
 
     <div class="chart-card">
-      <div class="chart-title">G98 vs G99 PROFIT COMPARISON <span id="g99-chart-span">last -- slots</span></div>
+      <div class="chart-title">G99 SLOT PROFIT (5.5kW confirmed) <span id="g99-chart-span">last -- slots</span></div>
       <canvas id="g99-compare-chart" height="150"></canvas>
     </div>
   </div><!-- /tab-g99 -->
@@ -1559,14 +1498,14 @@
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
       <div style="text-align:center">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Year (G98 projection)</div>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Year (charge dispatch only)</div>
         <div style="font-size:17px;font-weight:bold;color:var(--purple)">~£700</div>
         <div style="font-size:10px;color:var(--muted)">10.5kW × £70k/MW/yr (Modo Energy 2025)</div>
       </div>
       <div style="text-align:center">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Year (G99 projection)</div>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Year (G99 confirmed — full dispatch)</div>
         <div style="font-size:17px;font-weight:bold;color:var(--purple)">~£1,000</div>
-        <div style="font-size:10px;color:var(--muted)">50A upgrade → full inverter capacity dispatch</div>
+        <div style="font-size:10px;color:var(--muted)">5.5kW confirmed G99 · full 10.5kW inverter capacity</div>
       </div>
       <div style="text-align:center">
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">G99 + Agile combined</div>
@@ -1613,7 +1552,7 @@
   <div class="data-banner">
     Live data: <a href="https://octopus.energy/agile" target="_blank">Octopus Agile API</a> &nbsp;·&nbsp;
     Solar forecast: <a href="https://open-meteo.com" target="_blank">Open-Meteo</a> &nbsp;·&nbsp;
-    Strategy: LP greedy optimiser · context-adjusted thresholds · 7.2kWh reserve (10% DoD) &nbsp;·&nbsp;
+    Strategy: LP scipy HiGHS · 5.5kW export cap (G99 confirmed) · 3.2kWh min SOC (5%) &nbsp;·&nbsp;
     Refreshes every 30s
   </div>
 
@@ -1625,14 +1564,14 @@
 // ══════════════════════════════════════════════════════════════
 const CFG = {
   NUM_HOMES:      1,
-  BATTERY_KWH:    72.0,    // node3: 3× Nissan e-NV200 24kWh = 72kWh nominal; 10–90% DoD = 57.6kWh usable
-  MIN_SOC_KWH:    7.2,     // 10% absolute floor — Nissan pack protection (hardware limit)
-  RESERVE_SOC_KWH: 36.0,  // 50% operational reserve — routine trades stay above this
-  INITIAL_SOC:    36.0,    // 50% of 72kWh — starting assumption / target between sessions
-  CHARGE_KWH:     5.25,    // Inverter max: FoxESS KH10.5 @ 10.5kW × 0.5h — NOT export-capped
-                            // Charging rate is inverter-limited, same for G98 and G99.
-  EXPORT_KWH:     3.68,    // G98 DNO export cap: 32A × 230V × 0.5h (G99 target: 5.75 kWh/slot)
-  EXPORT_KWH_G99: 5.75,    // G99 DNO export cap: 50A × 230V × 0.5h (pending ref 260420-000198)
+  BATTERY_KWH:    64.0,    // node3: 3× Nissan e-NV200 packs — 64kWh actual (live config)
+  MIN_SOC_KWH:    3.2,     // 5% floor (min_soc_pct=5, 64×0.05=3.2kWh) — updated from /api/settings on load
+  RESERVE_SOC_KWH: 32.0,  // 50% operational reserve target
+  INITIAL_SOC:    32.0,    // 50% of 64kWh — starting assumption / target between sessions
+  CHARGE_KWH:     5.25,    // Inverter max: FoxESS KH10.5 @ 10.5kW × 0.5h — updated from /api/settings on load
+                            // Charging rate is inverter-limited.
+  EXPORT_KWH:     2.75,    // G99 confirmed: SSEN 5.5kW × 0.5h = 2.75kWh/slot (ref 260420-000198/FJJ907/1)
+  EXPORT_KWH_G99: 2.75,    // Same as EXPORT_KWH — G99 IS the live confirmed cap, not a future upgrade
   LOAD_PER_SLOT:  12/48,   // fallback flat: 12kWh/day ÷ 48 slots (overridden by HOME_LOAD_PROFILE below)
   SOLAR_KWP:      0.0,     // no solar — battery arbitrage only
   SOLAR_EFF:      0.18,
@@ -2479,12 +2418,12 @@ function renderSchedule(planData) {
   // P&L breakdown: show hosting cost split if server provided it
   const hostingLine = (hostingCost != null && houseLoadKwh != null)
     ? `<span style="color:var(--muted)">·</span>
-       <span style="font-size:11px;color:var(--muted)" title="House supply: ${houseLoadKwh.toFixed(1)}kWh drawn, first 10kWh/day free to homeowner. Excess above that billed back to homeowner at avg buy price +10%.">
+       <span style="font-size:11px;color:var(--muted)" title="House supply: ${houseLoadKwh.toFixed(1)}kWh drawn, first 12kWh/day free to homeowner (house_kwh_day). Excess billed back at avg buy price +10%.">
          🏠 hosting £${hostingCost.toFixed(3)}
        </span>
        <span style="color:var(--muted)">·</span>
        <span style="font-size:11px;color:${arbitrageNet>=0?'#3fb950':'#f85149'};font-weight:700"
-             title="Pure arbitrage profit: export revenue minus charge cost for exports only. Hosting cost (free 10kWh/day to homeowner, excess billed at buy price +10%) is separated out.">
+             title="Pure arbitrage profit: export revenue minus charge cost for exports only. Hosting cost (free 12kWh/day to homeowner per house_kwh_day config, excess billed at buy price +10%) is separated out.">
          arb: ${arbitrageNet>=0?'+':''}£${arbitrageNet.toFixed(3)}
        </span>`
     : '';
@@ -2621,7 +2560,7 @@ function renderStats() {
   // — SOC (always per-home average — label makes this clear) —
   document.getElementById('avg-soc').textContent = avgSoc.toFixed(1) + 'kWh';
   const socSub = document.getElementById('soc-sub');
-  if (socSub) socSub.textContent = '72kWh battery (node3) · 57.6kWh usable at 10–90% DoD';
+  if (socSub) socSub.textContent = `${(cfg.battery_kwh||64).toFixed(0)}kWh battery · ${((cfg.battery_kwh||64)*(1-cfg.min_soc_pct/100)).toFixed(1)}kWh usable at ${cfg.min_soc_pct||5}% min SOC`;
 
   // — Node-3 Status —
   const home0 = fleet.length ? fleet[0] : null;
@@ -2833,7 +2772,7 @@ function renderProfitChart() {
         }] : []),
         // Today's G98 — main bars
         {
-          label: 'G98 today (32A)',
+          label: 'G99 today (5.5kW confirmed)',
           data: g98Today,
           backgroundColor: g98Today.map(v => v > 0 ? 'rgba(63,185,80,0.75)' : v < 0 ? 'rgba(248,81,73,0.65)' : 'rgba(139,148,158,0.2)'),
           borderWidth: 0,
@@ -2844,7 +2783,7 @@ function renderProfitChart() {
         },
         // G99 line overlay
         ...(hasG99 ? [{
-          label: 'G99 today (50A)',
+          label: 'G99 confirmed (5.5kW)',
           data: g99Today,
           type: 'line',
           borderColor: 'rgba(163,113,247,0.9)',
@@ -2898,14 +2837,14 @@ function updateG99Badge() {
   const annualised = delta * 365;
   const sign = delta >= 0 ? '+' : '';
   el.innerHTML =
-    `<span style="color:var(--muted);font-size:11px;letter-spacing:1px">G99 UPGRADE VALUE — 24HR WINDOW (48 SLOTS)</span>` +
+    `<span style="color:var(--muted);font-size:11px;letter-spacing:1px">G99 LIVE — 5.5kW CONFIRMED · 24HR WINDOW (48 SLOTS)</span>` +
     `<div style="display:flex;gap:20px;align-items:baseline;margin-top:4px;flex-wrap:wrap">` +
-    `<div><span style="color:var(--muted);font-size:10px">G98 (32A) TODAY</span><br><span style="color:var(--green);font-size:17px;font-weight:700">£${g98daily.toFixed(4)}</span></div>` +
-    `<div><span style="color:var(--muted);font-size:10px">G99 (50A) TODAY</span><br><span style="color:var(--purple);font-size:17px;font-weight:700">£${g99daily.toFixed(4)}</span></div>` +
+    `<div><span style="color:var(--muted);font-size:10px">G99 TODAY</span><br><span style="color:var(--green);font-size:17px;font-weight:700">£${g98daily.toFixed(4)}</span></div>` +
+    `<div><span style="color:var(--muted);font-size:10px">PLAN OPTIMAL</span><br><span style="color:var(--purple);font-size:17px;font-weight:700">£${g99daily.toFixed(4)}</span></div>` +
     `<div><span style="color:var(--muted);font-size:10px">DAILY DELTA</span><br><span style="color:var(--purple);font-size:17px;font-weight:700">${sign}£${delta.toFixed(4)}</span></div>` +
-    `<div><span style="color:var(--muted);font-size:10px">ANNUALISED UPLIFT</span><br><span style="color:var(--purple);font-size:20px;font-weight:800">≈ £${Math.round(annualised)}/yr</span></div>` +
+    `<div><span style="color:var(--muted);font-size:10px">ANNUALISED</span><br><span style="color:var(--purple);font-size:20px;font-weight:800">≈ £${Math.round(annualised)}/yr</span></div>` +
     `</div>` +
-    `<div style="font-size:10px;color:var(--muted);margin-top:4px">50A vs 32A export cap · SSEN ref 260420-000198 · annualised = daily delta × 365</div>`;
+    `<div style="font-size:10px;color:var(--muted);margin-top:4px">G99 confirmed 5.5kW · SSEN ref 260420-000198/FJJ907/1 · 2.75 kWh/slot · annualised = daily × 365</div>`;
 }
 
 function renderPriceChart() {
@@ -3348,14 +3287,15 @@ function setDemoMode(on) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// LP BACKTEST — G98 vs G99 vs GREEDY
+// LP BACKTEST — REMOVED (G98 vs G99 comparison defunct)
+// Use /api/backtest for the 12-month LP backtest (live config,
+// accounts for baseload_kw and house_kwh_day correctly).
 // ══════════════════════════════════════════════════════════════
 async function loadLpBacktest(force) {
-  const btn  = document.getElementById('lp-bt-btn');
-  const prog = document.getElementById('lp-bt-progress');
-  const bar  = document.getElementById('lp-bt-bar');
-  const err  = document.getElementById('lp-bt-error');
-  const res  = document.getElementById('lp-bt-results');
+  // DOM elements removed — G98/G99 comparison panel no longer exists.
+  // G99 (5.5kW, SSEN ref 260420-000198/FJJ907/1) IS the live confirmed cap.
+  console.warn('[loadLpBacktest] Endpoint removed. Use /api/backtest for 12-month LP backtest.');
+  return;
 
   btn.disabled    = true;
   btn.textContent = 'RUNNING LP BACKTEST (G98 + G99)…';
@@ -4154,12 +4094,12 @@ function renderG99Tab() {
   if (badge) {
     badge.innerHTML =
       `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:6px">` +
-      `<div><div style="font-size:11px;color:var(--muted)">G98 TODAY (48 SLOTS)</div><div style="font-size:22px;font-weight:700;color:var(--green)">£${g98daily.toFixed(4)}</div></div>` +
-      `<div><div style="font-size:11px;color:var(--muted)">G99 TODAY (48 SLOTS)</div><div style="font-size:22px;font-weight:700;color:var(--purple)">£${g99daily.toFixed(4)}</div></div>` +
-      `<div><div style="font-size:11px;color:var(--muted)">ANNUAL UPGRADE VALUE</div><div style="font-size:22px;font-weight:700;color:var(--purple)">${delta>=0?'+':''}£${Math.round(annDelta)}/yr</div></div>` +
+      `<div><div style="font-size:11px;color:var(--muted)">TODAY (48 SLOTS · G99 LIVE)</div><div style="font-size:22px;font-weight:700;color:var(--green)">£${g98daily.toFixed(4)}</div></div>` +
+      `<div><div style="font-size:11px;color:var(--muted)">ANNUALISED (365 DAYS)</div><div style="font-size:22px;font-weight:700;color:var(--purple)">£${Math.round(annG99)}/yr</div></div>` +
+      `<div><div style="font-size:11px;color:var(--muted)">24HR SLOT DELTA</div><div style="font-size:22px;font-weight:700;color:var(--purple)">${delta>=0?'+':''}£${delta.toFixed(4)}</div></div>` +
       `</div>` +
       `<div style="font-size:11px;color:var(--muted);margin-top:10px;border-top:1px solid rgba(163,113,247,0.2);padding-top:8px">` +
-      `32A → 50A export upgrade · SSEN ref 260420-000198 · annualised = 24hr delta × 365 · FoxESS KH10.5` +
+      `G99 confirmed 5.5kW · SSEN ref 260420-000198/FJJ907/1 · 2.75 kWh/slot · FoxESS KH10.5` +
       `</div>`;
   }
 
@@ -4188,13 +4128,13 @@ function renderG99Tab() {
       labels,
       datasets: [
         {
-          label: 'G98 (32A)',
+          label: 'Actual (this slot)',
           data: g98vals,
           backgroundColor: g98vals.map(v => v > 0 ? 'rgba(63,185,80,0.6)' : v < 0 ? 'rgba(248,81,73,0.5)' : 'rgba(139,148,158,0.2)'),
           borderWidth: 0, borderRadius: 2, order: 2,
         },
         ...(hasG99 ? [{
-          label: 'G99 (50A)',
+          label: 'G99 (5.5kW confirmed)',
           data: g99vals,
           type: 'line',
           borderColor: 'rgba(163,113,247,0.9)',

@@ -10,7 +10,7 @@ Public-facing landing page and real-time battery arbitrage operator portal for D
 
 ## What it is
 
-Node-3 is a real, physical installation: a 72 kWh battery (3× Nissan e-NV200 packs) managed by a FoxESS 10.5 kW HV inverter, exporting to grid under a G98 single-phase DNO connection in Southern England (Region H). It runs on Octopus Agile — variable half-hourly electricity prices published up to 24 hours ahead.
+Node-3 is a real, physical installation: a 64 kWh battery (3× Nissan e-NV200 packs, 72 kWh nominal) managed by a FoxESS 10.5 kW HV inverter, exporting to grid under a G99 DNO connection (5.5 kW confirmed, SSEN ref 260420-000198/FJJ907/1) in Southern England (Region H). It runs on Octopus Agile — variable half-hourly electricity prices published up to 24 hours ahead.
 
 This portal tracks the live arbitrage operation: charge when prices are cheap, export to grid when prices are high, using Octopus Agile Outgoing as the export tariff.
 
@@ -29,17 +29,17 @@ The battery also serves the home's 12 kWh/day consumption from those same charge
 
 ## Algorithm
 
-**LP‑optimal dispatch** – the live system (and the 12‑month back‑test) uses a linear‑programming model (SciPy’s `linprog` with HiGHS) to globally optimise charge/discharge over the full 48‑slot look‑ahead, maximising export revenue minus charge cost while respecting SOC limits, inverter charge rate, and DNO export caps (G98/G99).
+**LP‑optimal dispatch** – the live system (and the 12‑month back‑test) uses a linear‑programming model (SciPy’s `linprog` with HiGHS) to globally optimise charge/discharge over the full 48‑slot look‑ahead, maximising export revenue minus charge cost while respecting SOC limits, inverter charge rate, and the G99 DNO export cap (5.5 kW confirmed, SSEN ref 260420-000198/FJJ907/1).
 **Fallback** – if SciPy/HiGHS is unavailable, the system falls back to the original percentile‑threshold heuristic (BUY_PCT = 35 %, SELL_PCT = 60 %).
 ## Hardware
 
 | Component | Spec |
 |-----------|------|
-| Battery | 72 kWh nominal (3× Nissan e-NV200 packs) |
+| Battery | 64 kWh actual (3× Nissan e-NV200 packs, 72 kWh nominal) |
 | Inverter | FoxESS KH10.5 HV |
-| Export cap | 3.0 kWh/slot G98 (configurable ≤ 3.68 kWh/slot, 32A legal max) |
-| Charge rate | 5.0 kWh/slot (10 kW × 0.5h, configurable) |
-| Min SOC reserve | 7.2 kWh (10%) |
+| Export cap | 2.75 kWh/slot G99 confirmed (5.5 kW · SSEN ref 260420-000198/FJJ907/1) |
+| Charge rate | 5.25 kWh/slot (10.5 kW × 0.5h, configurable) |
+| Min SOC reserve | 3.2 kWh (5% of 64 kWh) |
 | Solar | None modelled (pure arbitrage) |
 | Location | Southern England, Region H |
 | BMS comms | LilyGo T-2CAN CAN-B (native) ← LEAF BMS Pack 1 |
@@ -97,7 +97,7 @@ hardware_bridge.py   ★ MASTER CONTROL ★ — sends actual commands to FoxESS.
                      Reads dispatch_plan.json → sends Modbus RTU via USB-RS485 dongle
                      (/dev/ttyUSB1, 9600 baud) → FoxESS RS485 control port.
                      Work mode register 0x09D0 (ForceChg/ForceDischg/SelfUse).
-                     Export limit register 0x09D2 (Watts, G98/G99 cap enforced).
+                     Export limit register 0x09D2 (Watts, G99 5.5kW cap enforced).
                      Falls back: Modbus TCP → FoxESS cloud API → MQTT.
                      Modes: pre_commissioning (safe/no commands) | self_consumption | full_export
 
@@ -106,8 +106,7 @@ server.py            Flask REST API + backtest engine (port 8585).
   /api/prices        Last 48h of Agile import prices
   /api/history       Recent slot-by-slot history (up to 200 rows)
   /api/backtest      12-month historical backtest (Python LP, cached 24h)
-  /api/backtest-lp   LP vs greedy comparison, day-by-day
-  /api/plan          Forward dispatch plan with SOC trace and G98/G99 P&L
+  /api/plan          Forward dispatch plan with SOC trace and P&L
   /api/trigger       Manually trigger simulate.py (GET=single, POST?mode=backfill)
   /api/status        Server health + data freshness
   /api/hardware-status  Hardware bridge status: mode, last command, control paths
@@ -116,7 +115,7 @@ server.py            Flask REST API + backtest engine (port 8585).
   /api/settings      GET/POST configurable params (battery_kwh, import_kw, export_kw)
   /api/reset         Clear state + history (requires NODE3_API_KEY)
 
-node3_config.py      Single source of truth for physical parameters (72kWh/10kW/6kW).
+node3_config.py      Single source of truth for physical parameters (64kWh/10.5kW/5.5kW).
                      Persisted to node3_config.json. Editable via /api/settings.
 
 index.html           Public-facing landing page (dovecoteltd.co.uk).
@@ -131,8 +130,7 @@ GET  /api/node              Current state: SOC, profit, last action
 GET  /api/prices            Agile import prices (last 48h, 96 slots)
 GET  /api/history           Slot history CSV as JSON (limit=N)
 GET  /api/backtest          12-month LP backtest results (cached 24h; ?force=1 to re-run)
-GET  /api/backtest-lp       LP vs greedy day-by-day comparison (cached 24h)
-GET  /api/plan              Forward dispatch plan with SOC trace + G98/G99 P&L
+GET  /api/plan              Forward dispatch plan with SOC trace + P&L
 GET  /api/status            Server health + data freshness
 GET  /api/hardware-status   Hardware bridge: mode, last Modbus command, control paths
 GET  /api/alerts            Active alerts: SOC low, expensive import, baseload

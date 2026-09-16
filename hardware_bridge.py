@@ -92,7 +92,10 @@ MODBUS_WM = {"SelfUse": 0, "ForceChg": 6, "ForceDischg": 7}
 # Real DNO legal continuous power maxima (hard safety ceiling — NEVER send
 # more than this regardless of what node3_config's export_kw is set to):
 _G98_LEGAL_MAX_W = 7360    # 32A x 230V single-phase
-_G99_LEGAL_MAX_W = 11500   # 50A x 230V single-phase (pending ref 260420-000198)
+_G99_LEGAL_MAX_W = 5500    # SSEN-confirmed G99 secure limit ref 260420-000198 / FJJ907/1
+                            # 5.5kW x 0.5h = 2.75 kWh/slot. NOT the theoretical 50A (11.5kW)
+                            # limit — SSEN engineering confirmed 5.5kW as the network-secure
+                            # figure for this connection.
 
 
 def get_export_w():

@@ -51,8 +51,7 @@ except ImportError as _scipy_err:
 # ---------------------------------------------
 # Battery capacity, import (charge) rate and export (discharge) rate are now
 # operator-configurable — see node3_config.py / node3_config.json, editable via
-# /api/settings + the dashboard SETTINGS panel. Defaults set 19 Aug 2026 per
-# Matt's explicit instruction: 72kWh / 10kW import / 6kW export.
+# /api/settings + the dashboard SETTINGS panel. Live config: 64kWh / 10.5kW import / 5.5kW export (G99 confirmed).
 #
 # NOTE ON ASYMMETRIC RATES: an earlier standing instruction ("symmetric rates
 # hard rule") required charge == export, added after a genuine bug where the
@@ -66,14 +65,14 @@ except ImportError as _scipy_err:
 # import/export caps were directly tested and confirmed safe — the LP simply
 # never schedules a charge it can't profitably use, for any starting SOC from
 # empty to full. Matt has since explicitly asked for independently configurable
-# import/export rates (10kW / 6kW), so asymmetric-by-design is intentional
+# import/export rates (10.5kW / 5.5kW), so asymmetric-by-design is intentional
 # here, not a regression of the old bug.
 import node3_config as _cfg
 _CFG = _cfg.load_config()
 
-BATTERY_KWH        = _CFG["battery_kwh"]    # 3x Nissan e-NV200 packs, default 72kWh
-MIN_SOC_KWH        = BATTERY_KWH * (_CFG["min_soc_pct"] / 100.0)   # default 10% floor
-RESERVE_SOC_KWH    = 36.0    # 50% operational reserve — maintain this between sessions
+BATTERY_KWH        = _CFG["battery_kwh"]    # 3x Nissan e-NV200 packs, 64kWh actual (72kWh nominal)
+MIN_SOC_KWH        = BATTERY_KWH * (_CFG["min_soc_pct"] / 100.0)   # 5% floor = 3.2kWh
+RESERVE_SOC_KWH    = BATTERY_KWH * 0.5   # 50% operational reserve (32kWh at 64kWh)
                               # Regular trades only use capacity ABOVE this floor.
                               # VLP events (>=40p) may draw into the reserve down to MIN_SOC.
                               # Purpose: battery must always be ready to capitalise on
@@ -91,15 +90,13 @@ SOLAR_EFFICIENCY   = 0.18    # panel efficiency
 ROUND_TRIP_EFF     = 0.88    # FoxESS + Nissan cell round-trip efficiency
 
 # ── Export caps ────────────────────────────────────────────────────────────
-# G98 (Matt's actual current DNO connection) uses the configurable export_kw
-# setting (default 6kW / 3.0 kWh-per-slot) — a self-imposed operating limit,
-# safely below the real G98 legal maximum (32A = 7.36kW = 3.68 kWh/slot).
-# G99 stays a FIXED, real DNO-defined figure (50A = 11.5kW = 5.75 kWh/slot):
-# it represents a hypothetical upgraded grid connection for the comparison
-# tabs, not a tunable operating choice, so it is intentionally NOT wired to
-# node3_config.
-EXPORT_KWH_G98     = _CFG["export_kw"] * 0.5   # configurable, default 3.0 kWh/slot (6kW)
-EXPORT_KWH_G99     = 5.75    # 50A × 230V × 0.5h — fixed G99 target (ref 260420-000198)
+# G99 IS the live confirmed cap: 5.5kW, SSEN ref 260420-000198/FJJ907/1.
+# export_kw in node3_config.json = 5.5 → 2.75 kWh/slot.
+# EXPORT_KWH_G99 is pinned at 2.75 (the DNO-confirmed figure) for the shadow
+# simulation — identical to EXPORT_KWH_G98 in normal operation since both
+# read from the same confirmed 5.5kW export_kw config value.
+EXPORT_KWH_G98     = _CFG["export_kw"] * 0.5   # configurable — live G99 rate (5.5kW → 2.75 kWh/slot)
+EXPORT_KWH_G99     = 2.75    # G99 confirmed: 5.5kW × 0.5h (SSEN ref 260420-000198/FJJ907/1)
 EXPORT_KWH         = EXPORT_KWH_G98   # current active export cap
 
 # ── Charge rate — configurable import limit, independent of export cap ─────
@@ -130,12 +127,9 @@ LON = float(os.environ.get("LONGITUDE", "-1.4"))
 BASE_DIR            = os.path.dirname(os.path.abspath(__file__))
 STATE_FILE          = os.path.join(BASE_DIR, "fleet_state.json")
 STATE_FILE_G99      = os.path.join(BASE_DIR, "fleet_state_g99.json")
-# ^ G99 (50A target) is a shadow simulation run alongside the real G98 (32A)
-# system purely for comparison. It MUST persist to its own file — previously
-# it was re-loaded from fleet_state.json (the G98/real state) every run and
-# never saved anywhere, so its SOC/profit silently reset to G98's numbers on
-# every single run instead of accumulating its own trajectory. Fixed 19 Aug
-# 2026 — this was corrupting the G98 vs G99 comparison tab.
+# ^ Shadow state file — kept for data continuity. G99 IS the live confirmed cap
+# (5.5kW, SSEN ref 260420-000198/FJJ907/1), so EXPORT_KWH_G99 = EXPORT_KWH_G98 = 2.75.
+# Must persist to its own file to avoid silently resetting each run.
 PRICES_FILE         = os.path.join(BASE_DIR, "prices.json")
 EXPORT_PRICES_FILE  = os.path.join(BASE_DIR, "export_prices.json")
 WEATHER_FILE        = os.path.join(BASE_DIR, "weather.json")
@@ -1062,13 +1056,13 @@ def run_backfill():
     # Fetch 12-month historical stats for intelligent thresholds
     hist_stats = get_or_refresh_historical_stats(product_code)
 
-    # Run dual dispatch plans: G98 (32A current) and G99 (50A target)
-    print("[PLAN] --- G98 (32A, 3.68kWh/slot) ---")
+    # Run dual dispatch plans: live G99 (5.5kW confirmed) + shadow
+    print("[PLAN] --- G99 confirmed (5.5kW, 2.75kWh/slot) ---")
     dispatch_plan = plan_optimal_dispatch(prices, INITIAL_SOC_KWH,
                                           historical_stats=hist_stats,
                                           export_kwh_cap=EXPORT_KWH_G98)
     save_dispatch_plan(dispatch_plan)
-    print("[PLAN] --- G99 (50A, 5.75kWh/slot) ---")
+    print("[PLAN] --- G99 shadow (5.5kW, 2.75kWh/slot — same as live) ---")
     dispatch_plan_g99 = plan_optimal_dispatch(prices, INITIAL_SOC_KWH,
                                               historical_stats=hist_stats,
                                               export_kwh_cap=EXPORT_KWH_G99)
@@ -1087,13 +1081,13 @@ def run_backfill():
         planned       = dispatch_plan.get(price_slot['valid_from'], None)
         planned_g99   = dispatch_plan_g99.get(price_slot['valid_from'], None)
 
-        # G98 simulation (current, 32A cap)
+        # Live simulation (G99 confirmed 5.5kW / 2.75 kWh/slot)
         slot_profit = simulate_slot(state, price_p, slot_dt, weather,
                                     buy_thr, sell_thr,
                                     export_prices=export_prices,
                                     planned_action=planned,
                                     export_kwh_cap=EXPORT_KWH_G98)
-        # G99 simulation (target, 50A cap)
+        # G99 shadow simulation (same cap — both 2.75 kWh/slot, kept for data continuity)
         g99_profit = simulate_slot(state_g99, price_p, slot_dt, weather,
                                    buy_thr, sell_thr,
                                    export_prices=export_prices,
@@ -1123,10 +1117,10 @@ def run_backfill():
     g98_final  = history_rows[-1]['profit_gbp']     if history_rows else 0
 
     print("[DONE] Backfill complete.")
-    print("       G98 Profit: GBP " + str(round(state['profit_gbp'], 4))
-          + "  (32A current)")
-    print("       G99 Profit: GBP " + str(round(state_g99['profit_gbp'], 4))
-          + "  (50A upgrade)  +" + str(round(state_g99['profit_gbp'] - state['profit_gbp'], 4)) + " delta")
+    print("       G99 Profit: GBP " + str(round(state['profit_gbp'], 4))
+          + "  (5.5kW confirmed · 2.75 kWh/slot)")
+    print("       Shadow:     GBP " + str(round(state_g99['profit_gbp'], 4))
+          + "  (shadow sim · delta=" + str(round(state_g99['profit_gbp'] - state['profit_gbp'], 4)) + ")")
     print("       Slots:      " + str(state['slots_simulated']))
     print("       Charged:    " + str(charged) + "/" + str(total)
           + " slots (" + str(round(100*charged/total)) + "%)")
@@ -1253,7 +1247,7 @@ def run_single():
     # ── Fetch 12-month historical stats for intelligent thresholds ────────────
     hist_stats = get_or_refresh_historical_stats(product_code if not offline_mode else None)
 
-    # Dual dispatch plans: G98 and G99
+    # Dual dispatch plans: live G99 (5.5kW) + shadow
     dispatch_plan     = plan_optimal_dispatch(prices, state['soc_kwh'],
                                               historical_stats=hist_stats,
                                               export_kwh_cap=EXPORT_KWH_G98)
@@ -1307,11 +1301,11 @@ def run_single():
     save_state(state)
     save_state_g99(state_g99)
     delta = state_g99['profit_gbp'] - state['profit_gbp']
-    print('[DONE] G98: ' + state['last_action']
+    print('[DONE] G99: ' + state['last_action']
           + '  ' + str(round(state['last_price_p'], 2)) + 'p'
           + '  SOC ' + str(round(state['soc_kwh'], 1)) + 'kWh'
           + '  £' + str(round(state['profit_gbp'], 4)))
-    print('       G99: ' + state_g99['last_action']
+    print('       shadow: ' + state_g99['last_action']
           + '  SOC ' + str(round(state_g99['soc_kwh'], 1)) + 'kWh'
           + '  £' + str(round(state_g99['profit_gbp'], 4))
           + '  (delta +£' + str(round(delta, 4)) + ')')

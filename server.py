@@ -201,7 +201,7 @@ def normalize_state(state):
             "sell_threshold_p": state.get("sell_threshold_p", 0),
             "last_updated":     state.get("last_updated"),
             "slots_simulated":  state.get("slots_simulated", 0),
-            "battery_kwh":      h.get("battery_kwh", 72.0),
+            "battery_kwh":      h.get("battery_kwh", 64.0),
             "solar_kwp":        h.get("solar_kwp", 0.0),
             "daily_load_kwh":   h.get("daily_load_kwh", 12.0),
         }
@@ -587,7 +587,7 @@ def api_settings():
     Operator-configurable physical parameters — battery capacity, import
     (charge) rate, export (discharge) rate, min SOC floor. Single source of
     truth (node3_config.py / node3_config.json) read by simulate.py and every
-    dispatch/backtest engine in this file. Defaults: 72kWh / 10kW / 6kW.
+    dispatch/backtest engine in this file. Defaults: 64kWh / 10.5kW / 5.5kW.
 
     GET  -> current settings
     POST -> JSON body with any subset of {battery_kwh, import_kw, export_kw,
@@ -819,27 +819,27 @@ def api_plan():
     # (single source of truth — see node3_config.py) instead of a hardcoded
     # copy that had drifted to CHARGE_KWH=5.25 regardless of the active export
     # cap, a repeat of a bug Matt had already ordered fixed once before.
-    # G98 (Matt's actual live connection) uses the configurable import/export
-    # settings. G99 stays a fixed, real DNO-defined figure (50A/5.75kWh per
-    # slot) for the comparison scenario — it's a different physical grid
-    # connection, not a tunable operating choice.
+    # The configurable export rate (export_kw in node3_config.json) IS the live G99
+    # cap: 5.5kW confirmed by SSEN (ref 260420-000198/FJJ907/1), giving 2.75 kWh/slot.
+    # EXPORT_KWH_G99 is pinned at 2.75 as the fixed DNO-confirmed figure; since
+    # export_kw=5.5 in config, both will be equal in normal operation.
     _plan_cfg       = _cfg.load_config()
     BAT_KWH         = _plan_cfg["battery_kwh"]
     MIN_SOC         = BAT_KWH * (_plan_cfg["min_soc_pct"] / 100.0)
     CHARGE_KWH      = _plan_cfg["import_kw"] * 0.5    # configurable charge rate
     EXPORT_KWH_G98  = _plan_cfg["export_kw"] * 0.5    # configurable export rate
-    EXPORT_KWH_G99  = 5.75   # fixed — G99 DNO export cap (pending ref 260420-000198)
+    EXPORT_KWH_G99  = 2.75   # fixed — SSEN-confirmed G99 secure limit: 5.5kW x 0.5h
+                              # ref 260420-000198 / FJJ907/1. Not the theoretical 50A figure.
     RTE             = 0.88
     # DAILY_LOAD_KWH is the assumed PHYSICAL home consumption (drains the
-    # battery every slot in the SOC trace below) — separate from the BILLING
-    # free allowance (FREE_ALLOWANCE_KWH). These used to be the same number
-    # (12.0) by coincidence, which meant excess_kwh below was ALWAYS zero —
-    # the free allowance exactly matched modelled consumption, so nothing
-    # ever fell into the "billed at cost" bracket. Matt's tariff design
-    # (19 Aug): homeowner gets 10 kWh/day free from the battery; anything
-    # the house draws above that, Dovecote bills back at avg buy price +10%.
-    DAILY_LOAD_KWH      = 12.0   # modelled physical home consumption (kWh/day)
-    FREE_ALLOWANCE_KWH  = 10.0   # homeowner's free-from-battery allowance (kWh/day)
+    # battery every slot in the SOC trace below). FREE_ALLOWANCE_KWH is the
+    # billing free allowance: homeowner gets this many kWh/day free from the
+    # battery; anything above that, Dovecote bills back at avg buy price +10%.
+    # Both are set to 12.0 — the PC1 Elexon profile household load (12kWh/day)
+    # is fully covered by the free allowance, so excess_kwh = 0 in normal
+    # operation: the homeowner pays nothing for electricity.
+    DAILY_LOAD_KWH      = 12.0   # modelled physical home consumption (kWh/day, Elexon PC1)
+    FREE_ALLOWANCE_KWH  = 12.0   # homeowner's free-from-battery allowance (kWh/day)
     EXCESS_MARKUP        = 1.10  # excess billed at avg buy price × this (10% margin)
     LOAD_PER_SLOT   = DAILY_LOAD_KWH / 48.0
 
@@ -879,17 +879,13 @@ def api_plan():
 
         s["planSoc"] = round(soc, 2)
 
-    # House load within the free 10 kWh/day allowance → Dovecote absorbs it.
-    # Anything the house draws above that allowance → homeowner pays it back
-    # at avg buy price + 10% (Dovecote's margin on the excess), not at cost.
+    # House load within the free 12 kWh/day allowance → Dovecote absorbs it.
+    # FREE_ALLOWANCE_KWH matches DAILY_LOAD_KWH (both 12.0), so excess_kwh
+    # is zero in normal operation — homeowner pays nothing for electricity.
     house_load_kwh_total  = LOAD_PER_SLOT * n_slots
     house_days            = n_slots / 48.0
-    free_allowance_kwh    = FREE_ALLOWANCE_KWH * house_days      # e.g. 1.3125 days = 13.125 kWh
+    free_allowance_kwh    = FREE_ALLOWANCE_KWH * house_days      # e.g. 1.3125 days = 15.75 kWh
     excess_kwh            = max(0.0, house_load_kwh_total - free_allowance_kwh)
-    # Modelled consumption (DAILY_LOAD_KWH=12) now sits above the free
-    # allowance (FREE_ALLOWANCE_KWH=10) by design, so excess_kwh is
-    # genuinely >0 (≈2kWh/day) rather than always zero as it was when both
-    # constants were the same number.
     avg_import_p          = (total_charge_cost / (len(ch_slots) * CHARGE_KWH)
                              if ch_slots else sum(s["importP"] for s in slots) / n_slots)
     house_recovery         = excess_kwh * avg_import_p * EXCESS_MARKUP / 100  # homeowner pays this back, +10% margin
@@ -905,7 +901,7 @@ def api_plan():
 
     # ── G99 net — independent SOC simulation with G99 export cap, same charge rate ──
     # Charge rate is unchanged (configurable import rate, default 5.0 kWh/slot).
-    # Only export cap increases: configurable G98 export → fixed 5.75 kWh/slot (G99).
+    # Only export cap increases: configurable G98 export → fixed 2.75 kWh/slot G99 (5.5kW SSEN-confirmed).
     soc_g99        = float(state.get("soc_kwh", BAT_KWH * 0.5))
     total_rev_g99  = 0.0
     total_cost_g99 = 0.0
@@ -1001,18 +997,19 @@ def api_backtest():
 
 @app.route("/api/backtest-lp")
 def api_backtest_lp():
+    """REMOVED — use /api/backtest instead (reads live config, accounts for baseload_kw and house_kwh_day correctly)."""
+    return jsonify({
+        "error": "Endpoint removed. Use /api/backtest for the 12-month LP backtest with your live config.",
+        "use": "/api/backtest?force=1"
+    }), 410
+
+
+@app.route("/api/_backtest_lp_old")
+def api_backtest_lp_old():
     """
-    12-month LP-optimal backtest vs greedy, day-by-day.
-
-    Fetches 12 months of real Octopus Agile import prices, groups by UTC calendar
-    day, and for each day runs:
-      - LP:    scipy HiGHS linear programme — globally optimal for the known 48-slot window
-      - Greedy: percentile-threshold heuristic — matches the old algorithm
-
-    Rates sourced from node3_config (single source of truth) — default 72kWh /
-    10kW import / 6kW export for G98; G99 export stays fixed at the real DNO
-    figure (50A/5.75kWh per slot) since it models a different grid connection.
-    Results cached 24h in backtest_lp_cache.json.  Add ?force=1 to rerun.
+    ARCHIVED — 12-month LP-optimal backtest vs greedy, day-by-day.
+    Kept for reference only. Does NOT account for baseload_kw or house_kwh_day from config.
+    Use /api/backtest instead.
     """
     cache_path = os.path.join(BASE_DIR, "backtest_lp_cache.json")
     force      = request.args.get('force', '').lower() in ('1', 'true', 'yes')
@@ -1042,7 +1039,7 @@ def api_backtest_lp():
     MIN_SOC        = BATTERY * (_lp_cfg["min_soc_pct"] / 100.0)
     CHARGE_KWH     = _lp_cfg["import_kw"] * 0.5   # configurable, both G98 & G99 (same inverter)
     EXPORT_G98     = _lp_cfg["export_kw"] * 0.5   # configurable G98 export rate
-    EXPORT_G99     = 5.75    # fixed — G99 DNO export cap: 50A × 230V × 0.5h (pending)
+    EXPORT_G99     = 2.75    # fixed — SSEN-confirmed G99 limit: 5.5kW × 0.5h (ref 260420-000198)
     RTE            = 0.88
     VLP_P          = 40.0
     LOAD_DAY       = 12.0
