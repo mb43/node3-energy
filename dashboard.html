@@ -884,7 +884,7 @@
          free energy (12kWh/day × 365 × 25p SVT) + subscription (£29/mo × 12) -->
     <div class="revenue-section" style="border-left:3px solid var(--amber)"
          data-tip="Full annual value delivered to the consumer: free energy from the battery at SVT reference price (25p/kWh) plus the monthly subscription cost. This is the total package value — what it would cost them to get the same from the grid plus a fixed service.">
-      <div class="revenue-title" style="color:var(--amber)">Total Consumer Benefit / yr</div>
+      <div class="revenue-title" style="color:var(--green)">Net Consumer Saving / yr</div>
       <div id="cb-workings" style="font-size:10px;color:var(--muted);line-height:1.7;margin-bottom:10px">
         — loading…
       </div>
@@ -894,12 +894,12 @@
           <div class="revenue-cell-value" style="color:var(--amber)" id="cb-energy-yr">—</div>
         </div>
         <div class="revenue-cell">
-          <div class="revenue-cell-label">Subscription</div>
-          <div class="revenue-cell-value" style="color:var(--amber)" id="cb-sub-yr">—</div>
+          <div class="revenue-cell-label">Less Subscription</div>
+          <div class="revenue-cell-value" style="color:var(--muted)" id="cb-sub-yr">—</div>
         </div>
         <div class="revenue-cell">
-          <div class="revenue-cell-label" style="color:var(--amber);font-weight:bold;letter-spacing:1px">TOTAL</div>
-          <div class="revenue-cell-value" style="color:var(--amber);font-size:20px;font-weight:900" id="cb-total-yr">—</div>
+          <div class="revenue-cell-label" style="color:var(--green);font-weight:bold;letter-spacing:1px">NET SAVING</div>
+          <div class="revenue-cell-value" style="color:var(--green);font-size:20px;font-weight:900" id="cb-total-yr">—</div>
         </div>
       </div>
     </div>
@@ -3545,20 +3545,20 @@ function populateRevenueBreakdown(res) {
   const totalKwhYr = houseKwhPd * 365;
   const energyValYr = totalKwhYr * SVT_PPU;
   const subValYr    = SUB_PCM * 12;
-  const totalBenYr  = energyValYr + subValYr;
+  const netBenYr   = energyValYr - subValYr;   // what consumer actually saves after paying sub
 
   const workEl = document.getElementById('cb-workings');
   if (workEl) workEl.innerHTML =
     `${houseKwhPd}kWh/day × 365 = <b style="color:var(--text)">${totalKwhYr.toLocaleString()}kWh/yr</b><br>` +
-    `${totalKwhYr.toLocaleString()}kWh × 25p SVT = <b style="color:var(--amber)">£${energyValYr.toFixed(0)}/yr</b> energy value<br>` +
-    `+ £${SUB_PCM}/mo subscription × 12 = <b style="color:var(--amber)">£${subValYr}/yr</b>`;
+    `${totalKwhYr.toLocaleString()}kWh × 25p SVT = <b style="color:var(--amber)">£${energyValYr.toFixed(0)}/yr</b> free energy<br>` +
+    `less £${SUB_PCM}/mo × 12 = <b style="color:var(--muted)">−£${subValYr}/yr</b> subscription`;
 
   const cbE = document.getElementById('cb-energy-yr');
   const cbS = document.getElementById('cb-sub-yr');
   const cbT = document.getElementById('cb-total-yr');
   if (cbE) cbE.textContent = '£' + energyValYr.toFixed(0);
-  if (cbS) cbS.textContent = '£' + subValYr;
-  if (cbT) cbT.textContent = '£' + totalBenYr.toFixed(0);
+  if (cbS) cbS.textContent = '−£' + subValYr;
+  if (cbT) cbT.textContent = '£' + netBenYr.toFixed(0);
 }
 
 // ══════════════════════════════════════════════════════════════
