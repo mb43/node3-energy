@@ -1276,21 +1276,21 @@
     <div class="hist-table">
       <div class="chart-title" style="margin-bottom:4px">MONTHLY BREAKDOWN</div>
       <div style="font-size:10px;color:var(--muted);margin-bottom:12px;letter-spacing:0.5px">
-        GRID P&amp;L = real bank cash (export income − charge cost) · Octopus pays/charges Dovecote &nbsp;·&nbsp;
-        CONSUMER SAVING = guaranteed 12kWh/day × 25p SVT × days (contractual benefit to homeowner) &nbsp;·&nbsp;
-        NET VALUE = Grid P&amp;L + Consumer Saving = total annual household benefit
+        DOVECOTE P&amp;L = grid arbitrage (export − charge) + £29/mo subscription · Octopus pays/charges Dovecote &nbsp;·&nbsp;
+        CONSUMER SAVING = guaranteed 12kWh/day × 25p SVT × days − £29 subscription = net homeowner saving &nbsp;·&nbsp;
+        NET VALUE = Dovecote P&amp;L + Consumer Saving = total combined benefit (unchanged)
       </div>
       <table class="hist-tbl" id="hist-table">
         <thead>
           <tr>
             <th>Month</th>
-            <th data-tip="Grid exports minus ALL grid imports (includes home load recharging) — negative = net electricity buyer, see NET VALUE for the full picture" style="color:var(--muted)">Grid P&amp;L (£)</th>
+            <th data-tip="Grid arbitrage (export − charge) + £29/mo subscription = full Dovecote Technology Ltd P&L. Negative grid arbitrage still common — subscription pulls total positive." style="color:var(--green)">Dovecote P&amp;L (£)</th>
             <th>Slots</th>
             <th data-tip="Average price paid across all charge slots">Avg Buy (p)</th>
             <th data-tip="Average Agile Outgoing export rate received when discharging to grid">Avg Export (p)</th>
             <th data-tip="Avg sell ÷ avg buy — only valid when avg buy &gt; 0. Shows N/A when being paid to charge.">Ratio ×</th>
             <th data-tip="Avg export price minus avg buy price — always valid, even when buy price is negative (being paid to charge)">Spread (p)</th>
-            <th data-tip="Guaranteed 12kWh/day × 25p SVT × days-in-month. This is the contractual consumer benefit — Node-3 always delivers 12kWh/day free to the homeowner regardless of market conditions." style="color:var(--cyan)">Consumer Saving (£)</th>
+            <th data-tip="Net saving to homeowner: 12kWh/day × 25p SVT × days − £29 subscription. This is what the consumer actually keeps after paying their monthly fee." style="color:var(--cyan)">Consumer Saving (£)</th>
             <th data-tip="Grid P&amp;L (real bank cash) + Home Energy value (indicative) = total annual household benefit" style="color:var(--green)">Net Value (£)</th>
             <th>Charge Slots</th>
             <th>Sell Slots</th>
@@ -3818,7 +3818,12 @@ function renderHistoricalResults(res) {
     const [y, mn] = m.split('-');
     return _gKwhDay * 0.25 * new Date(+y, +mn, 0).getDate();
   });
-  const netPerMonth = displayProfits.map((p, i) => p + homeSavedPerMonth[i]);
+  const HIST_SUB_PCM = 29;  // £29/mo subscription — Dovecote income, not consumer saving
+  // consumerNetPerMonth = energy value minus subscription (what homeowner actually keeps)
+  const consumerNetPerMonth = homeSavedPerMonth.map(hs => hs - HIST_SUB_PCM);
+  // dovecoteProfitPerMonth = grid arbitrage + subscription received
+  const dovecoteProfitPerMonth = displayProfits.map(dp => dp + HIST_SUB_PCM);
+  const netPerMonth = displayProfits.map((p, i) => p + homeSavedPerMonth[i]); // unchanged total
   // bestIdx/worstIdx based on NET VALUE (total benefit), not raw grid P&L
   const bestIdx  = netPerMonth.indexOf(Math.max(...netPerMonth));
   const worstIdx = netPerMonth.indexOf(Math.min(...netPerMonth));
@@ -4078,16 +4083,19 @@ function renderHistoricalResults(res) {
     const daysInMonth = new Date(+y, +mn, 0).getDate();
     const kwhBoughtPerDay = (mo.chargeKwh / daysInMonth).toFixed(2);
     const kwhSoldPerDay = (mo.dischargeKwh / daysInMonth).toFixed(2);
+    const dovePL = dovecoteProfitPerMonth[i];
+    const conNet = consumerNetPerMonth[i];
+    const dovePCls = dovePL >= 0 ? 'pos' : 'neg';
     tbody.innerHTML += `<tr class="${cls}">
       <td>${label}</td>
-      <td class="${pCls}" data-tip="Grid exports − all imports (incl. home load recharging). Negative = net electricity buyer. Add Home Energy to get true value.">£${dp.toFixed(2)}</td>
+      <td class="${dovePCls}" data-tip="Grid arbitrage (export − charge) + £29 subscription = full Dovecote P&L this month">£${dovePL.toFixed(2)}</td>
       <td>${mo.slots.toLocaleString()}</td>
       <td style="color:var(--blue)">${avgBuy}p</td>
       <td style="color:var(--amber)">${avgSell}p</td>
       <td style="${marginColor};font-weight:bold">${margin}</td>
       <td style="${spreadColor};font-weight:bold">${spreadStr}</td>
-      <td style="color:var(--cyan)" data-tip="Guaranteed 12kWh/day × 25p SVT × days this month — contractual consumer benefit">£${hs.toFixed(2)}</td>
-      <td style="color:var(--green);font-weight:bold" data-tip="Grid P&L + guaranteed consumer saving (12kWh/day × 25p) = total household benefit">£${net.toFixed(2)}</td>
+      <td style="color:var(--cyan)" data-tip="12kWh/day × 25p SVT × days − £29 subscription = net saving to homeowner after paying their monthly fee">£${conNet.toFixed(2)}</td>
+      <td style="color:var(--green);font-weight:bold" data-tip="Dovecote P&L + net consumer saving = total household benefit">£${net.toFixed(2)}</td>
       <td>${mo.chargeSlots}</td>
       <td>${mo.sellSlots}</td>
       <td style="color:var(--muted)" data-tip="PC1-profile home load this month">${mo.homeKwh.toFixed(1)}</td>
@@ -4121,15 +4129,18 @@ function renderHistoricalResults(res) {
   const totalDays = months.length * 30; // approximate (could use actual days per month)
   const avgKwhBoughtPerDay = (totalChargeKwhCalc / totalDays).toFixed(2);
   const avgKwhSoldPerDay = (totalDischargeKwhCalc / totalDays).toFixed(2);
+  const totalSubYr = months.length * HIST_SUB_PCM;
+  const totalDovePL = scaleTotal + totalSubYr;
+  const totalConNet = totalHomeSaved - totalSubYr;
   tbody.innerHTML += `<tr style="border-top:2px solid var(--border);font-weight:bold">
     <td>TOTAL / AVG (1 HOME)</td>
-    <td class="${scaleTotal>=0?'pos':'neg'}">£${scaleTotal.toFixed(2)}</td>
+    <td class="${totalDovePL>=0?'pos':'neg'}">£${totalDovePL.toFixed(2)}</td>
     <td>${totalSlots.toLocaleString()}</td>
     <td style="color:var(--blue)">${overallAvgBuy}p</td>
     <td style="color:var(--amber)">${overallAvgSell}p</td>
     <td style="color:var(--muted);font-weight:bold">${overallMargin}</td>
     <td style="color:${overallSpreadCol};font-weight:bold">${overallSpread}</td>
-    <td style="color:var(--cyan)">£${totalHomeSaved.toFixed(2)}</td>
+    <td style="color:var(--cyan)">£${totalConNet.toFixed(2)}</td>
     <td style="color:var(--green);font-weight:bold">£${totalNetVal.toFixed(2)}</td>
     <td>${totalCharge.toLocaleString()}</td>
     <td>${totalSell.toLocaleString()}</td>
