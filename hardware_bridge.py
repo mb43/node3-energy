@@ -44,10 +44,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 import node3_config as _cfg
 
-BASE_DIR           = Path(__file__).parent
-DISPATCH_PLAN_FILE = BASE_DIR / "dispatch_plan.json"
-MODE_FILE          = BASE_DIR / "node3_mode.json"
-HW_LOG_FILE        = BASE_DIR / "hardware_log.json"
+BASE_DIR             = Path(__file__).parent
+DISPATCH_PLAN_FILE   = BASE_DIR / "dispatch_plan.json"
+MODE_FILE            = BASE_DIR / "node3_mode.json"
+HW_LOG_FILE          = BASE_DIR / "hardware_log.json"
+FORCE_CHARGE_FILE    = BASE_DIR / "force_charge.json"
 
 # ── Modbus RTU — PRIMARY ──────────────────────────────────────────────────────
 FOXESS_RS485_PORT  = os.environ.get("FOXESS_RS485_PORT", "")
@@ -195,6 +196,44 @@ def get_current_slot_action():
     return "idle"
 
 
+# ── Force Charge mode ────────────────────────────────────────────────────────
+# Overrides the LP dispatch plan — commands FoxESS ForceChg at max import rate
+# until SOC reaches target_soc. Arbitrage is suspended while active.
+# State persists in force_charge.json so it survives a server restart.
+
+def get_force_charge_state():
+    """Return the force_charge.json dict, or None if not present/active."""
+    try:
+        if FORCE_CHARGE_FILE.exists():
+            return json.loads(FORCE_CHARGE_FILE.read_text())
+    except Exception:
+        pass
+    return None
+
+def is_force_charge_active():
+    s = get_force_charge_state()
+    return bool(s and s.get("active"))
+
+def start_force_charge(target_soc=99):
+    state = {
+        "active": True,
+        "started": datetime.now(timezone.utc).isoformat(),
+        "target_soc": int(target_soc),
+    }
+    FORCE_CHARGE_FILE.write_text(json.dumps(state, indent=2))
+    log.info(f"Force charge STARTED — target SOC {target_soc}%")
+    return state
+
+def stop_force_charge(reason="manual"):
+    state = get_force_charge_state() or {}
+    state["active"]      = False
+    state["stopped"]     = datetime.now(timezone.utc).isoformat()
+    state["stop_reason"] = reason
+    FORCE_CHARGE_FILE.write_text(json.dumps(state, indent=2))
+    log.info(f"Force charge STOPPED — reason: {reason}")
+    return state
+
+
 # ── Command resolution ────────────────────────────────────────────────────────
 def resolve_command(action, mode, g99):
     export_w = get_export_w()   # re-read live so a settings change takes effect immediately
@@ -327,8 +366,22 @@ def send_current_command():
     mode   = cfg.get("operational_mode", "pre_commissioning")
     g99    = cfg.get("g99_active", False)
     ts     = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    action = get_current_slot_action()
-    cmd    = resolve_command(action, mode, g99)
+
+    # Force charge overrides all dispatch logic
+    if is_force_charge_active():
+        fc    = get_force_charge_state()
+        tgt   = fc.get("target_soc", 99)
+        action = "force_charge"
+        cmd = {
+            "work_mode":      "ForceChg",
+            "export_limit_w": 0,
+            "send":           mode != "pre_commissioning",
+            "reason":         f"FORCE CHARGE active — target {tgt}% SOC",
+        }
+        log.info(f"Force charge override: ForceChg until {tgt}% SOC")
+    else:
+        action = get_current_slot_action()
+        cmd    = resolve_command(action, mode, g99)
 
     result = {"ts": ts, "mode": mode, "lp_action": action,
               "work_mode": cmd["work_mode"], "export_limit_w": cmd["export_limit_w"],
@@ -407,10 +460,22 @@ if __name__ == "__main__":
     p.add_argument("--status", action="store_true")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--mode", choices=["pre_commissioning","self_consumption","full_export"])
+    p.add_argument("--force-charge", action="store_true", help="Start force-charge mode (target 99%% SOC)")
+    p.add_argument("--force-charge-target", type=int, default=99, help="Target SOC %% for force charge (default 99)")
+    p.add_argument("--stop-force-charge", action="store_true", help="Stop force-charge mode")
+    p.add_argument("--force-charge-status", action="store_true", help="Show force charge state")
     a = p.parse_args()
 
+    if a.force_charge_status:
+        print(json.dumps(get_force_charge_state() or {"active": False}, indent=2)); raise SystemExit(0)
+    if a.force_charge:
+        print(json.dumps(start_force_charge(a.force_charge_target), indent=2)); raise SystemExit(0)
+    if a.stop_force_charge:
+        print(json.dumps(stop_force_charge("manual"), indent=2)); raise SystemExit(0)
     if a.status:
-        print(json.dumps(get_status(), indent=2)); raise SystemExit(0)
+        s = get_status()
+        s["force_charge"] = get_force_charge_state() or {"active": False}
+        print(json.dumps(s, indent=2)); raise SystemExit(0)
     if a.set_mode:
         print(json.dumps(set_mode(a.set_mode, g99_active=a.g99 or None), indent=2)); raise SystemExit(0)
     if a.mode:

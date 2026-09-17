@@ -720,6 +720,95 @@
     .scenario-metric:last-child { border-bottom: none; }
     .scenario-metric .sm-lbl { color: var(--muted); }
     .scenario-metric .sm-val { font-weight: bold; }
+
+    /* ── Battery Detail section ─────────────────────────────────── */
+    .bd-pack {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .bd-pack-header {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      color: var(--cyan);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .bd-src {
+      font-size: 9px;
+      font-weight: 400;
+      color: var(--muted);
+      letter-spacing: 0;
+    }
+    .bd-kpi-row {
+      display: grid;
+      grid-template-columns: repeat(6,1fr);
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .bd-kpi {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: var(--bg);
+      border-radius: 4px;
+      padding: 4px 2px;
+    }
+    .bd-kpi-val {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--fg);
+      line-height: 1.1;
+    }
+    .bd-kpi-lbl {
+      font-size: 8px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    /* Cell voltage grid: 12 cols × 8 rows = 96 cells */
+    .bd-cell-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 2px;
+    }
+    .bd-cell {
+      height: 14px;
+      border-radius: 2px;
+      background: #333;
+      cursor: default;
+      position: relative;
+    }
+    .bd-cell.good  { background: #166534; }
+    .bd-cell.warn  { background: #92400e; }
+    .bd-cell.bad   { background: #7f1d1d; }
+    .bd-cell:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #000;
+      color: #fff;
+      font-size: 9px;
+      padding: 2px 5px;
+      border-radius: 3px;
+      white-space: nowrap;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .bd-err {
+      font-size: 10px;
+      color: var(--red);
+      margin-top: 6px;
+    }
+    @media (max-width: 900px) {
+      #batt-pack-grid { grid-template-columns: 1fr !important; }
+      .bd-kpi-row { grid-template-columns: repeat(3,1fr); }
+    }
   </style>
 </head>
 <body>
@@ -1407,6 +1496,25 @@
   <!-- ══ TAB: PACK STATUS ══════════════════════════════════════ -->
   <div class="tab-panel" id="tab-hardware">
 
+    <!-- Force Charge banner — hidden when inactive -->
+    <div id="fc-banner" style="display:none;background:linear-gradient(135deg,#7c2d12,#9a3412);border:1px solid #c2410c;border-radius:8px;padding:14px 18px;margin-bottom:16px;display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#fed7aa;letter-spacing:.06em">⚡ FORCE CHARGE ACTIVE — arbitrage suspended</div>
+          <div style="font-size:11px;color:#fdba74;margin-top:3px" id="fc-banner-detail">Charging to —% · started —</div>
+        </div>
+        <button onclick="stopForceCharge()" style="background:#c2410c;border:1px solid #ea580c;color:#fff;border-radius:6px;padding:7px 16px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.05em">STOP FORCE CHARGE</button>
+      </div>
+      <div style="margin-top:10px;height:6px;background:rgba(0,0,0,.4);border-radius:3px">
+        <div id="fc-progress-bar" style="height:6px;background:#fb923c;border-radius:3px;width:0%;transition:width .5s"></div>
+      </div>
+    </div>
+
+    <!-- Force Charge button — shown when inactive -->
+    <div id="fc-idle-btn" style="margin-bottom:16px;text-align:right">
+      <button onclick="startForceCharge()" style="background:transparent;border:1px solid var(--amber);color:var(--amber);border-radius:6px;padding:7px 18px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.05em">⚡ FORCE CHARGE ALL PACKS</button>
+    </div>
+
     <div class="chart-card" style="margin-bottom:16px">
       <div class="chart-title" style="margin-bottom:10px">LIVE PACK TELEMETRY</div>
       <div class="homeowner-savings-grid">
@@ -1445,6 +1553,72 @@
         Fed by the MQTT listener in server.py, subscribed to the Battery-Emulator (DALA/LilyGo) telemetry topic. Shows "SIMULATED" until the LilyGo is wired and publishing.
       </div>
     </div>
+
+    <!-- ══ BATTERY DETAIL — cell-level all 3 packs ══ -->
+    <div class="chart-card" style="margin-bottom:16px" id="batt-detail-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div class="chart-title" style="margin-bottom:0">BATTERY DETAIL</div>
+        <span id="batt-detail-age" style="font-size:10px;color:var(--muted)">loading…</span>
+      </div>
+
+      <!-- 3-pack column layout -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px" id="batt-pack-grid">
+
+        <!-- Pack 1 -->
+        <div class="bd-pack" id="bd-pack1">
+          <div class="bd-pack-header">PACK 1 <span class="bd-src" id="bd-src-1">—</span></div>
+          <div class="bd-kpi-row">
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-soc-1">—</span><span class="bd-kpi-lbl">SOC</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-v-1">—</span><span class="bd-kpi-lbl">V</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-a-1">—</span><span class="bd-kpi-lbl">A</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-t-1">—</span><span class="bd-kpi-lbl">°C</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-soh-1">—</span><span class="bd-kpi-lbl">SoH</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-spr-1">—</span><span class="bd-kpi-lbl">Δmv</span></div>
+          </div>
+          <div class="bd-cell-grid" id="bd-cells-1"></div>
+          <div class="bd-err" id="bd-err-1"></div>
+        </div>
+
+        <!-- Pack 2 -->
+        <div class="bd-pack" id="bd-pack2">
+          <div class="bd-pack-header">PACK 2 <span class="bd-src" id="bd-src-2">—</span></div>
+          <div class="bd-kpi-row">
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-soc-2">—</span><span class="bd-kpi-lbl">SOC</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-v-2">—</span><span class="bd-kpi-lbl">V</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-a-2">—</span><span class="bd-kpi-lbl">A</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-t-2">—</span><span class="bd-kpi-lbl">°C</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-soh-2">—</span><span class="bd-kpi-lbl">SoH</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-spr-2">—</span><span class="bd-kpi-lbl">Δmv</span></div>
+          </div>
+          <div class="bd-cell-grid" id="bd-cells-2"></div>
+          <div class="bd-err" id="bd-err-2"></div>
+        </div>
+
+        <!-- Pack 3 -->
+        <div class="bd-pack" id="bd-pack3">
+          <div class="bd-pack-header">PACK 3 <span class="bd-src" id="bd-src-3">—</span></div>
+          <div class="bd-kpi-row">
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-soc-3">—</span><span class="bd-kpi-lbl">SOC</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-v-3">—</span><span class="bd-kpi-lbl">V</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-a-3">—</span><span class="bd-kpi-lbl">A</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-t-3">—</span><span class="bd-kpi-lbl">°C</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-soh-3">—</span><span class="bd-kpi-lbl">SoH</span></div>
+            <div class="bd-kpi"><span class="bd-kpi-val" id="bd-spr-3">—</span><span class="bd-kpi-lbl">Δmv</span></div>
+          </div>
+          <div class="bd-cell-grid" id="bd-cells-3"></div>
+          <div class="bd-err" id="bd-err-3"></div>
+        </div>
+
+      </div><!-- /batt-pack-grid -->
+
+      <div style="margin-top:10px;font-size:10px;color:var(--muted)">
+        Cell colour: <span style="color:#22c55e">■</span> 3500–3900 mV
+        <span style="color:#f59e0b">■</span> 3200–3499 / 3901–4100 mV
+        <span style="color:#ef4444">■</span> &lt;3200 / &gt;4100 mV
+        <span style="color:#666">■</span> no data.
+        Pack 1 via DALA HTTP · Packs 2/3 via Waveshare CAN HAT (can0/can1).
+      </div>
+    </div><!-- /batt-detail-card -->
 
     <div class="chart-card">
       <div class="chart-title" style="margin-bottom:10px">HARDWARE BRIDGE — FoxESS CONTROL</div>
@@ -4504,6 +4678,9 @@ function renderHardwareTab() {
     ? 'Live MQTT feed from Battery-Emulator'
     : 'No MQTT data received yet — showing simulated SOC';
 
+  // Expose SOC to force charge progress bar
+  window._hwSoc = hwState.socPct != null ? Number(hwState.socPct) : null;
+
   const socEl = document.getElementById('hw-real-soc');
   if (socEl) socEl.textContent = hwState.socPct != null ? Number(hwState.socPct).toFixed(1) + '%' : '—';
   const socUpdEl = document.getElementById('hw-soc-updated');
@@ -4526,6 +4703,12 @@ function renderHardwareTab() {
 
   const sohEl = document.getElementById('hw-soh');
   if (sohEl) sohEl.textContent = hwState.sohPct != null ? Number(hwState.sohPct).toFixed(1) + '%' : '—';
+
+  // Force charge banner state
+  fetchForceChargeState();
+
+  // Fetch cell-level battery detail for all 3 packs
+  fetchBatteryDetail();
 
   // Hardware bridge status — this endpoint spawns a subprocess server-side, so only
   // poll it while the Pack Status tab is actually open (called from switchTab and
@@ -4560,6 +4743,146 @@ function renderHardwareTab() {
       const errEl = document.getElementById('hw-bridge-error');
       if (errEl) errEl.textContent = '⚠ Could not reach /api/hardware-status: ' + e.message;
     });
+}
+
+// ── Force Charge controls ──────────────────────────────────────────────────────
+function fetchForceChargeState() {
+  fetch('/api/force-charge', { signal: AbortSignal.timeout(4000) })
+    .then(r => r.json())
+    .then(fc => {
+      const banner   = document.getElementById('fc-banner');
+      const idleBtn  = document.getElementById('fc-idle-btn');
+      const detail   = document.getElementById('fc-banner-detail');
+      const progBar  = document.getElementById('fc-progress-bar');
+      const soc      = window._hwSoc || null;
+
+      if (fc && fc.active) {
+        if (banner)  { banner.style.display  = 'block'; }
+        if (idleBtn) { idleBtn.style.display = 'none'; }
+        const tgt     = fc.target_soc || 99;
+        const started = fc.started ? timeAgo(fc.started) : '—';
+        if (detail)  detail.textContent = `Charging to ${tgt}% · started ${started}`;
+        if (progBar && soc != null) {
+          const pct = Math.min(100, Math.round((soc / tgt) * 100));
+          progBar.style.width = pct + '%';
+        }
+      } else {
+        if (banner)  { banner.style.display  = 'none'; }
+        if (idleBtn) { idleBtn.style.display = 'block'; }
+      }
+    })
+    .catch(() => {});
+}
+
+function startForceCharge() {
+  if (!confirm('Start FORCE CHARGE? This will suspend arbitrage and command the FoxESS to charge at max rate until SOC reaches 99%. Continue?')) return;
+  fetch('/api/force-charge', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({target_soc: 99}) })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { alert('Error: ' + d.error); return; }
+      fetchForceChargeState();
+    })
+    .catch(e => alert('Error: ' + e.message));
+}
+
+function stopForceCharge() {
+  if (!confirm('Stop force charge and resume normal arbitrage?')) return;
+  fetch('/api/force-charge', { method: 'DELETE' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { alert('Error: ' + d.error); return; }
+      fetchForceChargeState();
+    })
+    .catch(e => alert('Error: ' + e.message));
+}
+
+// ── Battery Detail — cell-level data for all 3 packs ─────────────────────────
+function fetchBatteryDetail() {
+  fetch('/api/battery-detail', { signal: AbortSignal.timeout(6000) })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        // Server returned 503 — monitor not ready yet
+        ['1','2','3'].forEach(n => {
+          const e = document.getElementById('bd-err-' + n);
+          if (e) e.textContent = data.error;
+        });
+        return;
+      }
+      const packs = data.packs || {};
+      const ageEl = document.getElementById('batt-detail-age');
+      if (ageEl && data.updated) ageEl.textContent = 'updated ' + timeAgo(data.updated);
+
+      renderPackDetail('1', packs.pack1);
+      renderPackDetail('2', packs.pack2);
+      renderPackDetail('3', packs.pack3);
+    })
+    .catch(e => {
+      ['1','2','3'].forEach(n => {
+        const errEl = document.getElementById('bd-err-' + n);
+        if (errEl) errEl.textContent = '⚠ ' + e.message;
+      });
+    });
+}
+
+function renderPackDetail(n, pack) {
+  const errEl  = document.getElementById('bd-err-' + n);
+  const srcEl  = document.getElementById('bd-src-' + n);
+  const socEl  = document.getElementById('bd-soc-' + n);
+  const vEl    = document.getElementById('bd-v-' + n);
+  const aEl    = document.getElementById('bd-a-' + n);
+  const tEl    = document.getElementById('bd-t-' + n);
+  const sohEl  = document.getElementById('bd-soh-' + n);
+  const sprEl  = document.getElementById('bd-spr-' + n);
+  const cellEl = document.getElementById('bd-cells-' + n);
+
+  if (!pack) return;
+
+  if (pack.error) {
+    if (errEl) errEl.textContent = '⚠ ' + pack.error + (pack.hint ? ' — ' + pack.hint : '');
+    if (srcEl) srcEl.textContent = pack.source || '—';
+    return;
+  }
+
+  if (errEl)  errEl.textContent  = '';
+  if (srcEl)  srcEl.textContent  = pack.source || '—';
+  if (socEl)  socEl.textContent  = pack.soc_pct != null ? pack.soc_pct.toFixed(0) + '%' : '—';
+  if (vEl)    vEl.textContent    = pack.voltage_v != null ? Number(pack.voltage_v).toFixed(1) + 'V' : '—';
+  if (aEl)    aEl.textContent    = pack.current_a != null ? Number(pack.current_a).toFixed(1) : '—';
+  if (sohEl)  sohEl.textContent  = pack.soh_pct != null ? Number(pack.soh_pct).toFixed(0) + '%' : '—';
+  if (sprEl)  sprEl.textContent  = pack.cell_mv_spread != null ? pack.cell_mv_spread + 'mV' : '—';
+
+  // Temperature — pick first available, or average
+  const temps = pack.temps_c || (pack.temp_c != null ? [pack.temp_c] : []);
+  if (tEl) {
+    if (temps.length > 0) {
+      const avg = (temps.reduce((a,b) => a+b, 0) / temps.length).toFixed(1);
+      tEl.textContent = avg + '°C';
+      tEl.style.color = (parseFloat(avg) >= 45) ? 'var(--red)' : '';
+    } else {
+      tEl.textContent = '—';
+    }
+  }
+
+  // Cell voltage grid
+  if (!cellEl) return;
+  const cells = pack.cell_mv || [];
+  if (cells.length === 0) {
+    cellEl.innerHTML = '<div style="font-size:10px;color:var(--muted);grid-column:1/-1;padding:4px">No cell data</div>';
+    return;
+  }
+  // Always show 96 cells (pad with nulls if fewer)
+  const target = 96;
+  const padded = cells.slice();
+  while (padded.length < target) padded.push(null);
+
+  cellEl.innerHTML = padded.map((mv, i) => {
+    if (mv == null) return `<div class="bd-cell" title="Cell ${i+1}: no data"></div>`;
+    const cls = mv >= 3500 && mv <= 3900 ? 'good'
+              : mv > 2999 && mv < 4200   ? 'warn'
+              :                            'bad';
+    return `<div class="bd-cell ${cls}" data-tip="C${i+1}: ${mv}mV"></div>`;
+  }).join('');
 }
 
 // Called after each full refresh cycle — updates whichever secondary tab is active

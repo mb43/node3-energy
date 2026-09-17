@@ -1374,6 +1374,9 @@ def _simulation_loop():
         print(f"[NODE-3 scheduler] Next slot boundary in {delay:.0f}s", flush=True)
         time.sleep(max(5, delay))
         try:
+            # Auto-stop force charge if target SOC reached
+            _check_force_charge_autostop()
+
             print("[NODE-3 scheduler] Running simulate.py …", flush=True)
             rc, err = _run_simulate()
             if rc == 0:
@@ -1383,6 +1386,35 @@ def _simulation_loop():
                 print(f"[NODE-3 scheduler] simulate.py error: {err[:200]}", flush=True)
         except Exception as exc:
             print(f"[NODE-3 scheduler] Exception: {exc}", flush=True)
+
+
+def _check_force_charge_autostop():
+    """Auto-stop force charge when target SOC is reached. Called each slot."""
+    fc_path = os.path.join(BASE_DIR, "force_charge.json")
+    if not os.path.exists(fc_path):
+        return
+    try:
+        fc = json.loads(open(fc_path).read())
+        if not fc.get("active"):
+            return
+        target = fc.get("target_soc", 99)
+        # Read current SOC from fleet_state.json
+        state_path = os.path.join(BASE_DIR, "fleet_state.json")
+        with _real_soc_lock:
+            try:
+                state = json.loads(open(state_path).read())
+            except Exception:
+                return
+        soc = state.get("soc_pct")
+        if soc is not None and float(soc) >= target:
+            # Stop force charge via hardware_bridge
+            result = subprocess.run(
+                [sys.executable, os.path.join(BASE_DIR, "hardware_bridge.py"), "--stop-force-charge"],
+                timeout=10, capture_output=True, text=True
+            )
+            print(f"[FC-AUTO] SOC {soc:.1f}% >= target {target}% — force charge auto-stopped", flush=True)
+    except Exception as e:
+        print(f"[FC-AUTO] check error: {e}", flush=True)
 
 
 # ─────────────────────────────────────────────
@@ -1425,6 +1457,75 @@ def api_set_mode():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/force-charge", methods=["GET", "POST", "DELETE"])
+def api_force_charge():
+    """
+    GET    — return current force charge state
+    POST   — start force charge. Body: {"target_soc": 99}  (optional)
+    DELETE — stop force charge
+    Requires NODE3_API_KEY header for POST/DELETE.
+    """
+    fc_path = os.path.join(BASE_DIR, "force_charge.json")
+
+    if request.method == "GET":
+        try:
+            if os.path.exists(fc_path):
+                return jsonify(json.loads(open(fc_path).read()))
+            return jsonify({"active": False})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    if not _check_api_key():
+        return jsonify({"error": "Unauthorised"}), 401
+
+    if request.method == "DELETE":
+        try:
+            result = subprocess.run(
+                [sys.executable, os.path.join(BASE_DIR, "hardware_bridge.py"), "--stop-force-charge"],
+                timeout=10, capture_output=True, text=True
+            )
+            return jsonify(json.loads(result.stdout) if result.returncode == 0 else {"error": result.stderr})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # POST — start force charge
+    try:
+        body   = request.get_json(force=True) or {}
+        target = int(body.get("target_soc", 99))
+        target = max(50, min(100, target))   # clamp 50–100%
+        result = subprocess.run(
+            [sys.executable, os.path.join(BASE_DIR, "hardware_bridge.py"),
+             "--force-charge", "--force-charge-target", str(target)],
+            timeout=10, capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            return jsonify(json.loads(result.stdout))
+        return jsonify({"error": result.stderr.strip()}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/battery-detail")
+def api_battery_detail():
+    """
+    Cell-level BMS data for all 3 packs.
+    Pack 1: DALA Battery-Emulator HTTP (LilyGo)
+    Packs 2/3: Waveshare CAN HAT (can0/can1) Nissan LEAF Gen2 frames
+    Returns bms_detail.json written by bms_monitor.run_loop().
+    """
+    path = os.path.join(BASE_DIR, "bms_detail.json")
+    try:
+        with open(path) as f:
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify({
+            "error": "bms_detail.json not yet written — BMS monitor may still be starting up",
+            "hint": "Check LILYGO_IP env var is set and Waveshare HAT is fitted for Packs 2/3"
+        }), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ─────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────
@@ -1447,5 +1548,14 @@ if __name__ == "__main__":
     # Start Battery-Emulator MQTT SOC listener (daemon — dies with server)
     mqtt_thread = threading.Thread(target=_start_mqtt_soc_listener, daemon=True, name="mqtt-soc")
     mqtt_thread.start()
+
+    # Start BMS cell-level monitor — DALA HTTP (Pack 1) + Waveshare CAN (Packs 2/3)
+    try:
+        import bms_monitor
+        bms_thread = threading.Thread(target=bms_monitor.run_loop, daemon=True, name="bms-monitor")
+        bms_thread.start()
+        print("[BMS-MON] Cell-level monitor started", flush=True)
+    except Exception as e:
+        print(f"[BMS-MON] Could not start: {e}", flush=True)
 
     app.run(host=args.host, port=args.port, debug=False, threaded=True)

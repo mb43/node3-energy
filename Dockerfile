@@ -11,6 +11,7 @@ COPY server.py .
 COPY simulate.py .
 COPY node3_config.py .
 COPY hardware_bridge.py .
+COPY bms_monitor.py .
 COPY dashboard.html .
 COPY index.html .
 
