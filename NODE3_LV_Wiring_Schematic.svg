@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1060" font-family="Inter, Arial, sans-serif" font-size="12">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1110" font-family="Inter, Arial, sans-serif" font-size="12">
   <style>
     .lv12   { stroke: #0066cc; stroke-width: 3; fill: none; }
     .lv12sw { stroke: #0066cc; stroke-width: 2.5; fill: none; stroke-dasharray: 7 4; }
@@ -26,7 +26,7 @@
 
   <!-- ============ TITLE ============ -->
   <text x="800" y="24" text-anchor="middle" class="ttl">NODE-3 — LV Control &amp; Comms Wiring (12V / CAN / GPIO only — HV busbar &amp; breakers NOT shown)</text>
-  <text x="800" y="41" text-anchor="middle" class="small">Source of truth: NODE3_DEFINITIVE.md §5–§7 · single-BMS-read mode · all 3 packs daisy-chained identically except CAN · CORRECTED 16 Sep 2026 · Pi + RS485 path added</text>
+  <text x="800" y="41" text-anchor="middle" class="small">Source of truth: NODE3_DEFINITIVE.md §5–§7 · single-BMS-read mode · all 3 packs daisy-chained identically except CAN · Yazaki pins/colours corrected 17 Sep 2026 · Pi + RS485 added</text>
 
   <!-- ============ LEGEND ============ -->
   <g transform="translate(20, 56)">
@@ -136,9 +136,9 @@
   <text x="720" y="358" class="small" text-anchor="middle">IN1/2/3 ← LilyGo GPIO (3.3V)</text>
   <text x="720" y="371" class="small" text-anchor="middle">IN-common = LV GND</text>
   <text x="720" y="384" class="small" text-anchor="middle">Load supply = 12V rail (tap left)</text>
-  <text x="720" y="399" class="small" text-anchor="middle" font-weight="700">OUT1 → Precharge coil bus [IO21]</text>
-  <text x="720" y="412" class="small" text-anchor="middle" font-weight="700">OUT2 → +Contactor coil bus [IO48]</text>
-  <text x="720" y="425" class="small" text-anchor="middle" font-weight="700">OUT3 → −Contactor coil bus [IO17]</text>
+  <text x="720" y="399" class="small" text-anchor="middle" font-weight="700">OUT1 → Pin 7 CT_PRE+ Cyan [IO21]</text>
+  <text x="720" y="412" class="small" text-anchor="middle" font-weight="700">OUT2 → Pin 15 CT_POS+ Purple [IO48]</text>
+  <text x="720" y="425" class="small" text-anchor="middle" font-weight="700">OUT3 → Pin 18 CT_NEG+ Orange [IO17]</text>
   <text x="720" y="438" class="small" text-anchor="middle">CH4 = spare (E-stop LED / fan)</text>
 
   <!-- SSR outputs down to buses -->
@@ -179,103 +179,119 @@
   <path d="M 1270 318 L 1270 288" class="rs485"/>
   <text x="1276" y="307" class="small" fill="#996633">RS485 A+/B−</text>
 
-  <!-- ============ FIVE HORIZONTAL DAISY BUSES ============ -->
+  <!-- ============ DAISY BUSES — corrected Yazaki pin/colour mapping Sep 2026 ============ -->
   <line x1="150" y1="500" x2="1470" y2="500" class="lv12sw"/>
-  <text x="1476" y="504" class="legend" fill="#0066cc">PIN1 BUS (12V, via E-stop)</text>
+  <text x="1476" y="504" class="legend" fill="#0066cc">PIN1/IGN BUS — Pin 1 [Red,BAT] + Pin 2 [Yel/Grn,IGN] both via E-stop · 12V switched</text>
 
   <line x1="150" y1="525" x2="1350" y2="525" class="gnd"/>
-  <text x="1356" y="529" class="legend">GND BUS (Yazaki Pin 2)</text>
+  <text x="1356" y="529" class="legend">GND BUS — Yazaki Pins 8[Blue] 10/11[Black] 16[Green] 19[White] → chassis GND</text>
 
   <line x1="150" y1="550" x2="1350" y2="550" class="lv12sw"/>
-  <text x="1356" y="554" class="legend" fill="#0066cc">PRECHARGE COIL BUS (OUT1, IO21)</text>
+  <text x="1356" y="554" class="legend" fill="#0066cc">PRECHARGE BUS — Pin 7 CT_PRE+ [Cyan] ← SSR Ch1 OUT [IO21]</text>
 
   <line x1="150" y1="575" x2="1350" y2="575" class="lv12sw"/>
-  <text x="1356" y="579" class="legend" fill="#0066cc">+CONTACTOR COIL BUS (OUT2, IO48)</text>
+  <text x="1356" y="579" class="legend" fill="#0066cc">+CONT BUS — Pin 15 CT_POS+ [Purple] ← SSR Ch2 OUT [IO48]</text>
 
   <line x1="150" y1="600" x2="1350" y2="600" class="lv12sw"/>
-  <text x="1356" y="604" class="legend" fill="#0066cc">−CONTACTOR COIL BUS (OUT3, IO17)</text>
+  <text x="1356" y="604" class="legend" fill="#0066cc">−CONT BUS — Pin 18 CT_NEG+ [Orange] ← SSR Ch3 OUT [IO17]</text>
 
-  <!-- ============ 3 PACKS with Yazaki mini pin table ============ -->
+  <!-- ============ 3 PACKS — corrected Yazaki pin/colour mapping (physical cable doc, Sep 2026) ============ -->
   <g>
     <!-- PACK 1 -->
-    <rect x="190" y="650" width="290" height="235" class="pack"/>
-    <text x="335" y="670" text-anchor="middle" class="ttl" font-size="12">PACK 1 — Nissan e-NV200</text>
-    <text x="335" y="685" text-anchor="middle" class="small">Yazaki 7287-1065-30, 36-pin</text>
+    <rect x="190" y="640" width="284" height="275" class="pack"/>
+    <text x="332" y="657" text-anchor="middle" class="ttl" font-size="12">PACK 1 — Nissan e-NV200</text>
+    <text x="332" y="671" text-anchor="middle" class="small">Yazaki 7287-1065-30, 36-pin (wire-side numbering)</text>
     <g font-family="monospace">
-      <rect x="206" y="694" width="258" height="18" class="pin"/><text x="214" y="707" class="small">Pin 1  BAT+IGN (12V wake)  ← PIN1 BUS</text>
-      <rect x="206" y="714" width="258" height="18" class="pin"/><text x="214" y="727" class="small">Pin 2  GND                ← GND BUS</text>
-      <rect x="206" y="734" width="258" height="18" fill="#ede8ff" stroke="#7a2ec2"/><text x="214" y="747" class="small" fill="#7a2ec2" font-weight="700">Pin 3  CAN-H → LilyGo CAN-B H (ONLY here)</text>
-      <rect x="206" y="754" width="258" height="18" fill="#ede8ff" stroke="#7a2ec2"/><text x="214" y="767" class="small" fill="#7a2ec2" font-weight="700">Pin 4  CAN-L → LilyGo CAN-B L (ONLY here)</text>
-      <rect x="206" y="774" width="258" height="18" class="pin"/><text x="214" y="787" class="small">Precharge coil  ← PRECHARGE BUS</text>
-      <rect x="206" y="794" width="258" height="18" class="pin"/><text x="214" y="807" class="small">+Cont. coil     ← +CONT BUS</text>
-      <rect x="206" y="814" width="258" height="18" class="pin"/><text x="214" y="827" class="small">−Cont. coil     ← −CONT BUS</text>
-      <rect x="206" y="834" width="258" height="18" fill="#ffe8e8" stroke="#aa0000"/><text x="335" y="847" text-anchor="middle" class="small" fill="#aa0000" font-weight="700">Pins 5–36: cell taps/NTC — DO NOT CONNECT</text>
+      <rect x="206" y="679" width="262" height="17" class="pin"/><text x="214" y="691" class="small">Pin 1   BAT +12V [Red]   ← PIN1/IGN BUS</text>
+      <rect x="206" y="697" width="262" height="17" class="pin"/><text x="214" y="709" class="small">Pin 2   IGN +12V [Yel/Grn] ← PIN1/IGN BUS</text>
+      <rect x="206" y="715" width="262" height="17" fill="#ede8ff" stroke="#7a2ec2"/><text x="214" y="727" class="small" fill="#7a2ec2" font-weight="700">Pin 4   CANL [Grey]  → LilyGo CAN-B L (P1)</text>
+      <rect x="206" y="733" width="262" height="17" fill="#ede8ff" stroke="#7a2ec2"/><text x="214" y="745" class="small" fill="#7a2ec2" font-weight="700">Pin 5   CANH [Brown] → LilyGo CAN-B H (P1)</text>
+      <rect x="206" y="751" width="262" height="17" class="pin"/><text x="214" y="763" class="small">Pin 7   CT_PRE+ [Cyan] ← PRECHARGE BUS</text>
+      <rect x="206" y="769" width="262" height="17" class="pin"/><text x="214" y="781" class="small">Pin 8   CT_PRE− [Blue]  → GND BUS</text>
+      <rect x="206" y="787" width="262" height="17" class="pin"/><text x="214" y="799" class="small">Pins 10/11 GND [Black]  → GND BUS</text>
+      <rect x="206" y="805" width="262" height="17" class="pin"/><text x="214" y="817" class="small">Pin 15  CT_POS+ [Purple] ← +CONT BUS</text>
+      <rect x="206" y="823" width="262" height="17" class="pin"/><text x="214" y="835" class="small">Pin 16  CT_POS− [Green]  → GND BUS</text>
+      <rect x="206" y="841" width="262" height="17" class="pin"/><text x="214" y="853" class="small">Pin 18  CT_NEG+ [Orange] ← −CONT BUS</text>
+      <rect x="206" y="859" width="262" height="17" class="pin"/><text x="214" y="871" class="small">Pin 19  CT_NEG− [White]  → GND BUS</text>
+      <rect x="206" y="877" width="262" height="17" fill="#ffe8e8" stroke="#aa0000"/><text x="332" y="889" text-anchor="middle" class="small" fill="#aa0000" font-weight="700">All others — leave open / DO NOT CONNECT</text>
     </g>
-    <text x="335" y="866" text-anchor="middle" class="small">Exact coil pin numbers: DALA wiki "Nissan LEAF / e-NV200"</text>
+    <text x="332" y="907" text-anchor="middle" class="small">Pin nos. from custom cable physical map (Sep 2026)</text>
 
     <!-- PACK 2 -->
-    <rect x="510" y="650" width="290" height="235" class="pack"/>
-    <text x="655" y="670" text-anchor="middle" class="ttl" font-size="12">PACK 2 — Nissan e-NV200</text>
-    <text x="655" y="685" text-anchor="middle" class="small">Yazaki 7287-1065-30, 36-pin</text>
+    <rect x="510" y="640" width="284" height="275" class="pack"/>
+    <text x="652" y="657" text-anchor="middle" class="ttl" font-size="12">PACK 2 — Nissan e-NV200</text>
+    <text x="652" y="671" text-anchor="middle" class="small">Yazaki 7287-1065-30, 36-pin (wire-side numbering)</text>
     <g font-family="monospace">
-      <rect x="526" y="694" width="258" height="18" class="pin"/><text x="534" y="707" class="small">Pin 1  BAT+IGN (12V wake)  ← PIN1 BUS</text>
-      <rect x="526" y="714" width="258" height="18" class="pin"/><text x="534" y="727" class="small">Pin 2  GND                ← GND BUS</text>
-      <rect x="526" y="734" width="258" height="18" fill="#f2f2f2" stroke="#999"/><text x="534" y="747" class="small">Pin 3  CAN-H — leave open (not wired)</text>
-      <rect x="526" y="754" width="258" height="18" fill="#f2f2f2" stroke="#999"/><text x="534" y="767" class="small">Pin 4  CAN-L — leave open (not wired)</text>
-      <rect x="526" y="774" width="258" height="18" class="pin"/><text x="534" y="787" class="small">Precharge coil  ← PRECHARGE BUS</text>
-      <rect x="526" y="794" width="258" height="18" class="pin"/><text x="534" y="807" class="small">+Cont. coil     ← +CONT BUS</text>
-      <rect x="526" y="814" width="258" height="18" class="pin"/><text x="534" y="827" class="small">−Cont. coil     ← −CONT BUS</text>
-      <rect x="526" y="834" width="258" height="18" fill="#ffe8e8" stroke="#aa0000"/><text x="655" y="847" text-anchor="middle" class="small" fill="#aa0000" font-weight="700">Pins 5–36: cell taps/NTC — DO NOT CONNECT</text>
+      <rect x="526" y="679" width="262" height="17" class="pin"/><text x="534" y="691" class="small">Pin 1   BAT +12V [Red]   ← PIN1/IGN BUS</text>
+      <rect x="526" y="697" width="262" height="17" class="pin"/><text x="534" y="709" class="small">Pin 2   IGN +12V [Yel/Grn] ← PIN1/IGN BUS</text>
+      <rect x="526" y="715" width="262" height="17" fill="#f2f2f2" stroke="#999"/><text x="534" y="727" class="small" fill="#999">Pin 4   CANL — leave open (opt: Pi Waveshare)</text>
+      <rect x="526" y="733" width="262" height="17" fill="#f2f2f2" stroke="#999"/><text x="534" y="745" class="small" fill="#999">Pin 5   CANH — leave open (opt: Pi Waveshare)</text>
+      <rect x="526" y="751" width="262" height="17" class="pin"/><text x="534" y="763" class="small">Pin 7   CT_PRE+ [Cyan] ← PRECHARGE BUS</text>
+      <rect x="526" y="769" width="262" height="17" class="pin"/><text x="534" y="781" class="small">Pin 8   CT_PRE− [Blue]  → GND BUS</text>
+      <rect x="526" y="787" width="262" height="17" class="pin"/><text x="534" y="799" class="small">Pins 10/11 GND [Black]  → GND BUS</text>
+      <rect x="526" y="805" width="262" height="17" class="pin"/><text x="534" y="817" class="small">Pin 15  CT_POS+ [Purple] ← +CONT BUS</text>
+      <rect x="526" y="823" width="262" height="17" class="pin"/><text x="534" y="835" class="small">Pin 16  CT_POS− [Green]  → GND BUS</text>
+      <rect x="526" y="841" width="262" height="17" class="pin"/><text x="534" y="853" class="small">Pin 18  CT_NEG+ [Orange] ← −CONT BUS</text>
+      <rect x="526" y="859" width="262" height="17" class="pin"/><text x="534" y="871" class="small">Pin 19  CT_NEG− [White]  → GND BUS</text>
+      <rect x="526" y="877" width="262" height="17" fill="#ffe8e8" stroke="#aa0000"/><text x="652" y="889" text-anchor="middle" class="small" fill="#aa0000" font-weight="700">All others — leave open / DO NOT CONNECT</text>
     </g>
-    <text x="655" y="866" text-anchor="middle" class="small">Own internal BMS runs OEM protection unattended</text>
+    <text x="652" y="907" text-anchor="middle" class="small">Own BMS handles OEM protection unattended</text>
 
     <!-- PACK 3 -->
-    <rect x="830" y="650" width="290" height="235" class="pack"/>
-    <text x="975" y="670" text-anchor="middle" class="ttl" font-size="12">PACK 3 — Nissan e-NV200</text>
-    <text x="975" y="685" text-anchor="middle" class="small">Yazaki 7287-1065-30, 36-pin</text>
+    <rect x="830" y="640" width="284" height="275" class="pack"/>
+    <text x="972" y="657" text-anchor="middle" class="ttl" font-size="12">PACK 3 — Nissan e-NV200</text>
+    <text x="972" y="671" text-anchor="middle" class="small">Yazaki 7287-1065-30, 36-pin (wire-side numbering)</text>
     <g font-family="monospace">
-      <rect x="846" y="694" width="258" height="18" class="pin"/><text x="854" y="707" class="small">Pin 1  BAT+IGN (12V wake)  ← PIN1 BUS</text>
-      <rect x="846" y="714" width="258" height="18" class="pin"/><text x="854" y="727" class="small">Pin 2  GND                ← GND BUS</text>
-      <rect x="846" y="734" width="258" height="18" fill="#f2f2f2" stroke="#999"/><text x="854" y="747" class="small">Pin 3  CAN-H — leave open (not wired)</text>
-      <rect x="846" y="754" width="258" height="18" fill="#f2f2f2" stroke="#999"/><text x="854" y="767" class="small">Pin 4  CAN-L — leave open (not wired)</text>
-      <rect x="846" y="774" width="258" height="18" class="pin"/><text x="854" y="787" class="small">Precharge coil  ← PRECHARGE BUS</text>
-      <rect x="846" y="794" width="258" height="18" class="pin"/><text x="854" y="807" class="small">+Cont. coil     ← +CONT BUS</text>
-      <rect x="846" y="814" width="258" height="18" class="pin"/><text x="854" y="827" class="small">−Cont. coil     ← −CONT BUS</text>
-      <rect x="846" y="834" width="258" height="18" fill="#ffe8e8" stroke="#aa0000"/><text x="975" y="847" text-anchor="middle" class="small" fill="#aa0000" font-weight="700">Pins 5–36: cell taps/NTC — DO NOT CONNECT</text>
+      <rect x="846" y="679" width="262" height="17" class="pin"/><text x="854" y="691" class="small">Pin 1   BAT +12V [Red]   ← PIN1/IGN BUS</text>
+      <rect x="846" y="697" width="262" height="17" class="pin"/><text x="854" y="709" class="small">Pin 2   IGN +12V [Yel/Grn] ← PIN1/IGN BUS</text>
+      <rect x="846" y="715" width="262" height="17" fill="#f2f2f2" stroke="#999"/><text x="854" y="727" class="small" fill="#999">Pin 4   CANL — leave open (opt: Pi Waveshare)</text>
+      <rect x="846" y="733" width="262" height="17" fill="#f2f2f2" stroke="#999"/><text x="854" y="745" class="small" fill="#999">Pin 5   CANH — leave open (opt: Pi Waveshare)</text>
+      <rect x="846" y="751" width="262" height="17" class="pin"/><text x="854" y="763" class="small">Pin 7   CT_PRE+ [Cyan] ← PRECHARGE BUS</text>
+      <rect x="846" y="769" width="262" height="17" class="pin"/><text x="854" y="781" class="small">Pin 8   CT_PRE− [Blue]  → GND BUS</text>
+      <rect x="846" y="787" width="262" height="17" class="pin"/><text x="854" y="799" class="small">Pins 10/11 GND [Black]  → GND BUS</text>
+      <rect x="846" y="805" width="262" height="17" class="pin"/><text x="854" y="817" class="small">Pin 15  CT_POS+ [Purple] ← +CONT BUS</text>
+      <rect x="846" y="823" width="262" height="17" class="pin"/><text x="854" y="835" class="small">Pin 16  CT_POS− [Green]  → GND BUS</text>
+      <rect x="846" y="841" width="262" height="17" class="pin"/><text x="854" y="853" class="small">Pin 18  CT_NEG+ [Orange] ← −CONT BUS</text>
+      <rect x="846" y="859" width="262" height="17" class="pin"/><text x="854" y="871" class="small">Pin 19  CT_NEG− [White]  → GND BUS</text>
+      <rect x="846" y="877" width="262" height="17" fill="#ffe8e8" stroke="#aa0000"/><text x="972" y="889" text-anchor="middle" class="small" fill="#aa0000" font-weight="700">All others — leave open / DO NOT CONNECT</text>
     </g>
-    <text x="975" y="866" text-anchor="middle" class="small">Own internal BMS runs OEM protection unattended</text>
+    <text x="972" y="907" text-anchor="middle" class="small">Own BMS handles OEM protection unattended</text>
   </g>
 
-  <!-- vertical drops from buses into each pack's Yazaki block -->
+  <!-- vertical drops from buses to pack rows — updated for corrected pin positions -->
   <g>
-    <line x1="335" y1="500" x2="335" y2="694" class="lv12sw"/>
-    <line x1="347" y1="525" x2="347" y2="714" class="gnd"/>
-    <line x1="359" y1="550" x2="359" y2="774" class="lv12sw"/>
-    <line x1="371" y1="575" x2="371" y2="794" class="lv12sw"/>
-    <line x1="383" y1="600" x2="383" y2="814" class="lv12sw"/>
+    <!-- Pack 1: drops land on row 1 (PIN1), row 7 (GND), row 5 (PRE), row 8 (+CONT), row 10 (−CONT) -->
+    <line x1="332" y1="500" x2="332" y2="679" class="lv12sw"/>
+    <line x1="344" y1="525" x2="344" y2="787" class="gnd"/>
+    <line x1="356" y1="550" x2="356" y2="751" class="lv12sw"/>
+    <line x1="368" y1="575" x2="368" y2="805" class="lv12sw"/>
+    <line x1="380" y1="600" x2="380" y2="841" class="lv12sw"/>
 
-    <line x1="655" y1="500" x2="655" y2="694" class="lv12sw"/>
-    <line x1="667" y1="525" x2="667" y2="714" class="gnd"/>
-    <line x1="679" y1="550" x2="679" y2="774" class="lv12sw"/>
-    <line x1="691" y1="575" x2="691" y2="794" class="lv12sw"/>
-    <line x1="703" y1="600" x2="703" y2="814" class="lv12sw"/>
+    <!-- Pack 2 -->
+    <line x1="652" y1="500" x2="652" y2="679" class="lv12sw"/>
+    <line x1="664" y1="525" x2="664" y2="787" class="gnd"/>
+    <line x1="676" y1="550" x2="676" y2="751" class="lv12sw"/>
+    <line x1="688" y1="575" x2="688" y2="805" class="lv12sw"/>
+    <line x1="700" y1="600" x2="700" y2="841" class="lv12sw"/>
 
-    <line x1="975" y1="500" x2="975" y2="694" class="lv12sw"/>
-    <line x1="987" y1="525" x2="987" y2="714" class="gnd"/>
-    <line x1="999" y1="550" x2="999" y2="774" class="lv12sw"/>
-    <line x1="1011" y1="575" x2="1011" y2="794" class="lv12sw"/>
-    <line x1="1023" y1="600" x2="1023" y2="814" class="lv12sw"/>
+    <!-- Pack 3 -->
+    <line x1="972" y1="500" x2="972" y2="679" class="lv12sw"/>
+    <line x1="984" y1="525" x2="984" y2="787" class="gnd"/>
+    <line x1="996" y1="550" x2="996" y2="751" class="lv12sw"/>
+    <line x1="1008" y1="575" x2="1008" y2="805" class="lv12sw"/>
+    <line x1="1020" y1="600" x2="1020" y2="841" class="lv12sw"/>
   </g>
 
   <!-- ============ NOTES ============ -->
-  <rect x="20" y="915" width="1560" height="138" fill="#fffbe0" stroke="#aa8800" stroke-width="1"/>
-  <text x="32" y="932" class="lblw">Key rules for LV wiring (verified against NODE3_DEFINITIVE.md §5–§7, 16 Sep 2026):</text>
-  <text x="32" y="947" class="lbl">• CAN-A (green) = MCP2515 chip → FoxESS KH10.5 BAT CAN port DIRECT. CAN-B (purple) = native ESP32-S3 (GPIO 6/7) → Pack 1 BMS only (Yazaki pins 3/4).</text>
-  <text x="32" y="962" class="lbl">• No Waveshare CAN HAT needed — T-2CAN is galvanically isolated on BOTH channels natively. Do NOT fit the Waveshare HAT in the main DALA data path.</text>
-  <text x="32" y="977" class="lbl">• CAN-B (Pack 1 BMS side): 1× 120Ω at LilyGo end only (pack self-terminates at BMS end). CAN-A (FoxESS side): 120Ω at LilyGo end AND 120Ω at FoxESS BAT CAN port end. 3 resistors total.</text>
-  <text x="32" y="992" class="lbl">• GPIO IO21 (Row 10) = precharge → SSR Ch1. IO48 (Row 9) = +contactor → SSR Ch2. IO17 (Row 11) = −contactor → SSR Ch3. GND = Row 12. All on underside 26-pin 2.54mm header, right column.</text>
-  <text x="32" y="1007" class="lbl">• E-stop is wired in series with the Pin1 (BAT+IGN) feed ONLY. Daisy chain the 5 LV signals (Pin1, GND, Precharge, +Cont, −Cont) identically on all 3 Yazaki connectors.</text>
-  <text x="32" y="1022" class="lbl">• Bench-test LV side fully (LilyGo web UI shows Pack 1 BMS data, SSR outputs measured with DMM) BEFORE inserting any Service Disconnect Plug. See NODE3_DEFINITIVE.md §8 commissioning sequence.</text>
-  <text x="32" y="1037" class="lbl">• Pi 4B comms: JZK USB-RS485 adapter (blue USB dongle) → /dev/ttyUSB0 in Docker → FoxESS RS485 COM port. Modbus RTU only — supervisor reads registers and sends control. Completely separate from LilyGo CAN-A BAT CAN path.</text>
-  <text x="32" y="1052" class="lbl">• LilyGo and Pi are independent controllers. LilyGo emulates the Nissan Leaf BMS (CAN). Pi supervises the inverter (RS485 Modbus). Both talk to FoxESS simultaneously on different ports.</text>
+  <rect x="20" y="922" width="1560" height="168" fill="#fffbe0" stroke="#aa8800" stroke-width="1"/>
+  <text x="32" y="938" class="lblw">Key rules — Yazaki cable map verified Sep 2026 + NODE3_DEFINITIVE.md §5–§7:</text>
+  <text x="32" y="953" class="lbl">• CAN-B (purple) Pack 1 ONLY: Pin 4 CANL [Grey] → LilyGo CAN-B L · Pin 5 CANH [Brown] → LilyGo CAN-B H. CAN-A (green, MCP2515) → FoxESS BAT CAN direct.</text>
+  <text x="32" y="968" class="lbl">• Pin 2 is IGN +12V [Yel/Grn] — NOT GND. Both Pin 1 [Red,BAT] AND Pin 2 [Yel/Grn,IGN] must be powered for BMS to wake and close contactors. Wire BOTH from PIN1/IGN BUS via E-stop.</text>
+  <text x="32" y="983" class="lbl">• GND = Yazaki Pins 10/11 [Black]. Also to GND BUS: Pin 8 [Blue]=CT_PRE−, Pin 16 [Green]=CT_POS−, Pin 19 [White]=CT_NEG−. Use matching wire colours throughout.</text>
+  <text x="32" y="998" class="lbl">• Precharge: Pin 7 CT_PRE+ [Cyan] ← SSR Ch1 [IO21]. +Cont: Pin 15 CT_POS+ [Purple] ← SSR Ch2 [IO48]. −Cont: Pin 18 CT_NEG+ [Orange] ← SSR Ch3 [IO17]. Identical all 3 packs.</text>
+  <text x="32" y="1013" class="lbl">• Waveshare 2-CH CAN HAT on Pi GPIO (OPTIONAL monitoring only): Pack 2 Pins 4/5 → Waveshare Ch1 · Pack 3 Pins 4/5 → Waveshare Ch2. 120Ω at Pi end each channel. NOT in DALA path.</text>
+  <text x="32" y="1028" class="lbl">• No Waveshare in DALA path. T-2CAN galvanically isolated on both channels natively. CAN-B: 1× 120Ω at LilyGo (BMS self-terminates). CAN-A: 120Ω LilyGo + 120Ω FoxESS. 3 total.</text>
+  <text x="32" y="1043" class="lbl">• GPIO: IO21(Row10)→SSR Ch1/precharge · IO48(Row9)→SSR Ch2/+cont · IO17(Row11)→SSR Ch3/−cont · GND(Row12). Underside 26-pin 2.54mm header right column.</text>
+  <text x="32" y="1058" class="lbl">• Pi 4B: JZK USB-RS485 → /dev/ttyUSB0 → FoxESS RS485 COM port (Modbus RTU). Separate from BAT CAN. Pi and LilyGo are independent — both talk to FoxESS simultaneously.</text>
+  <text x="32" y="1073" class="lbl">• Bench-test: 12V on Pins 1 AND 2, SSR OUTs with DMM, LilyGo web UI shows Pack 1 BMS data (CAN-B active). Do this BEFORE inserting any SDP. See NODE3_DEFINITIVE.md §8.</text>
 </svg>

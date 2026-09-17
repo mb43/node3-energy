@@ -118,7 +118,7 @@
     <text x="290" y="603" text-anchor="middle" class="small">Internal BMS</text>
     <text x="290" y="617" text-anchor="middle" class="small">Internal precharge resistor</text>
     <text x="290" y="631" text-anchor="middle" class="small">Internal +/− main contactors</text>
-    <text x="290" y="648" text-anchor="middle" class="small" fill="#7a2ec2">CAN-B H/L → LilyGo (Pack 1 only, pins 3/4)</text>
+    <text x="290" y="648" text-anchor="middle" class="small" fill="#7a2ec2">CAN-B H/L → LilyGo (Pack 1 only · Pin 4 CANL [Grey] / Pin 5 CANH [Brown])</text>
     <text x="290" y="662" text-anchor="middle" class="small">Yazaki 36-pin</text>
 
     <rect x="500" y="540" width="180" height="130" class="pack"/>
@@ -149,7 +149,7 @@
   <line x1="290" y1="670" x2="290" y2="720" class="lv"/>
   <line x1="590" y1="670" x2="590" y2="720" class="lv"/>
   <line x1="890" y1="670" x2="890" y2="720" class="lv"/>
-  <text x="600" y="735" text-anchor="middle" class="small" fill="#0066cc">LV daisy chain — Pin 1 (BAT+IGN 12V), Pin 2 (GND), Precharge coil, +Cont coil, −Cont coil — same wires to all 3 Yazakis</text>
+  <text x="600" y="735" text-anchor="middle" class="small" fill="#0066cc">LV daisy chain — Pin 1 [Red,BAT 12V] + Pin 2 [Yel/Grn,IGN 12V] via E-stop · Pins 10/11 [Black,GND] · Pin 7 CT_PRE+ · Pin 15 CT_POS+ · Pin 18 CT_NEG+ — all 3 Yazakis identical</text>
 
   <!-- CAN-B from Pack 1 to LilyGo (native ESP32-S3 controller) -->
   <path d="M 290 670 Q 130 670 130 800" class="canb"/>
@@ -227,7 +227,7 @@
   <rect x="20" y="970" width="1160" height="100" fill="#fffbe0" stroke="#aa8800" stroke-width="1"/>
   <text x="30" y="988" class="small" font-weight="700">Key invariants (verified NODE3_DEFINITIVE.md §5–§7, 16 Sep 2026):</text>
   <text x="30" y="1002" class="small">• Albright NOT present — pack-internal contactors do the work.</text>
-  <text x="30" y="1014" class="small">• CAN-B (purple, native ESP32-S3 GPIO 6/7) → Pack 1 BMS Yazaki pins 3/4 ONLY. CAN-A (green, MCP2515 chip) → FoxESS BAT CAN port DIRECT.</text>
+  <text x="30" y="1014" class="small">• CAN-B (purple, native ESP32-S3 GPIO 6/7) → Pack 1 BMS: Pin 4 CANL [Grey] / Pin 5 CANH [Brown] ONLY. CAN-A (green, MCP2515 chip) → FoxESS BAT CAN port DIRECT.</text>
   <text x="30" y="1026" class="small">• T-2CAN is galvanically isolated on BOTH channels natively. DO NOT fit the Waveshare 2-CH CAN HAT — it is not needed and must not be in the data path.</text>
   <text x="30" y="1038" class="small">• GPIO: IO21(Row10)→SSR Ch1/precharge · IO48(Row9)→SSR Ch2/+cont · IO17(Row11)→SSR Ch3/−cont. All underside 26-pin 2.54mm header right column.</text>
   <text x="30" y="1050" class="small">• Pi 4B (server.py/hardware_bridge.py, Docker) → JZK USB-RS485 adapter → FoxESS RS485 COM port (Modbus RTU). Separate from BAT CAN. /dev/ttyUSB0.</text>

@@ -103,19 +103,23 @@
 
 <div id="panel-table" class="tab-panel">
   <h2 class="section-h">Yazaki 7287-1065-30 (36-pin) — pins actually wired, per pack</h2>
-  <p class="note">The 5 LV signals below are wired IDENTICALLY on all 3 packs (same wires daisy-chain pack→pack→pack). CAN-H/CAN-L (pins 3/4) are the one exception — Pack 1 only.</p>
+  <p class="note">All pins below wired identically on all 3 packs (daisy-chain) except CAN (Pin 4/5) which is Pack 1 only. Pin nos. verified from physical custom cable map Sep 2026. <b>Pin 2 is IGN +12V — NOT GND.</b></p>
   <table class="wire-table">
     <tr><th>Pin</th><th>Signal</th><th class="mono">Pack 1</th><th class="mono">Pack 2</th><th class="mono">Pack 3</th></tr>
-    <tr><td>1</td><td>BAT+IGN (12V wake)</td><td>✅ from 12V rail via E-stop NC + 1A fuse</td><td>✅ same rail (daisy)</td><td>✅ same rail (daisy)</td></tr>
-    <tr><td>2</td><td>GND</td><td>✅ to common LV GND</td><td>✅</td><td>✅</td></tr>
-    <tr class="only1"><td>3</td><td>CAN-H</td><td>✅ to LilyGo CAN-B H (native ESP32-S3)</td><td>❌ leave open</td><td>❌ leave open</td></tr>
-    <tr class="only1"><td>4</td><td>CAN-L</td><td>✅ to LilyGo CAN-B L (native ESP32-S3)</td><td>❌ leave open</td><td>❌ leave open</td></tr>
-    <tr><td>—</td><td>Precharge coil</td><td>✅ from SSR-04 OUT1 (12V switched)</td><td>✅ daisy</td><td>✅ daisy</td></tr>
-    <tr><td>—</td><td>+Contactor coil</td><td>✅ from SSR-04 OUT2</td><td>✅ daisy</td><td>✅ daisy</td></tr>
-    <tr><td>—</td><td>−Contactor coil</td><td>✅ from SSR-04 OUT3</td><td>✅ daisy</td><td>✅ daisy</td></tr>
-    <tr class="noconnect"><td>5–36</td><td>Cell taps + NTCs</td><td colspan="3">🚫 DO NOT CONNECT — leave isolated in heatshrink, label "do not touch"</td></tr>
+    <tr><td>1</td><td>BAT +12V <b style="color:#cc0000">[Red]</b></td><td>✅ PIN1/IGN BUS via E-stop + 1A fuse</td><td>✅ same bus (daisy)</td><td>✅ same bus (daisy)</td></tr>
+    <tr><td>2</td><td>IGN +12V <b style="color:#888800">[Yel/Grn]</b></td><td>✅ PIN1/IGN BUS (same as Pin 1, via E-stop) — NOT GND</td><td>✅ same bus (daisy)</td><td>✅ same bus (daisy)</td></tr>
+    <tr class="only1"><td>4</td><td>CANL <b>[Grey]</b></td><td>✅ to LilyGo CAN-B L (native ESP32-S3)</td><td>❌ leave open (opt: Pi Waveshare Ch1)</td><td>❌ leave open (opt: Pi Waveshare Ch2)</td></tr>
+    <tr class="only1"><td>5</td><td>CANH <b>[Brown]</b></td><td>✅ to LilyGo CAN-B H (native ESP32-S3)</td><td>❌ leave open</td><td>❌ leave open</td></tr>
+    <tr><td>7</td><td>CT_PRE+ <b style="color:#009999">[Cyan]</b></td><td colspan="3">✅ ← SSR-04 OUT1 [IO21] — all 3 packs (daisy)</td></tr>
+    <tr><td>8</td><td>CT_PRE− <b style="color:#0055cc">[Blue]</b></td><td colspan="3">✅ → GND BUS — all 3 packs (daisy)</td></tr>
+    <tr><td>10/11</td><td>GND <b>[Black]</b></td><td colspan="3">✅ → GND BUS — all 3 packs (daisy)</td></tr>
+    <tr><td>15</td><td>CT_POS+ <b style="color:#7a2ec2">[Purple]</b></td><td colspan="3">✅ ← SSR-04 OUT2 [IO48] — all 3 packs (daisy)</td></tr>
+    <tr><td>16</td><td>CT_POS− <b style="color:#006633">[Green]</b></td><td colspan="3">✅ → GND BUS — all 3 packs (daisy)</td></tr>
+    <tr><td>18</td><td>CT_NEG+ <b style="color:#cc6600">[Orange]</b></td><td colspan="3">✅ ← SSR-04 OUT3 [IO17] — all 3 packs (daisy)</td></tr>
+    <tr><td>19</td><td>CT_NEG− <b>[White]</b></td><td colspan="3">✅ → GND BUS — all 3 packs (daisy)</td></tr>
+    <tr class="noconnect"><td>all others</td><td>Cell taps + NTCs</td><td colspan="3">🚫 DO NOT CONNECT — leave isolated in heatshrink, label "do not touch"</td></tr>
   </table>
-  <p class="note">Exact coil pin numbers for Precharge / +Cont / −Cont: read off the DALA "Detailed connection diagram, with automatic contactor control via SSR" image on the <a href="https://github.com/dalathegreat/Battery-Emulator/wiki/Battery:-Nissan-LEAF---e%E2%80%90NV200#wiring-diagram" style="color:var(--blue)" target="_blank" rel="noopener">DALA Battery-Emulator wiki (Nissan LEAF / e-NV200)</a>. Nissan's wiring sets these — once known they apply identically to all 3 packs. Pack 1's CAN bus needs a 120Ω termination resistor across CAN-H/L at the LilyGo end (the pack itself already terminates at the BMS end).</p>
+  <p class="note">Pins 4/5 CAN: Pack 1 → LilyGo CAN-B H/L. Packs 2/3: optionally connect to Pi Waveshare 2-CH CAN HAT (monitoring only, NOT in DALA path). Fit 120Ω terminator at LilyGo end of CAN-B (pack self-terminates). Waveshare channels: 120Ω at Pi end. SSR coil polarity: CT_PRE+/CT_POS+/CT_NEG+ receive switched 12V from SSR OUT; CT_PRE−/CT_POS−/CT_NEG− go to GND. Source: physical custom cable map, Sep 2026.</p>
 
   <h2 class="section-h">LilyGo T-2CAN — GPIO usage</h2>
   <table class="wire-table">
@@ -124,30 +128,30 @@
     <tr><td class="mono">IO48 (row 9)</td><td>+Contactor SSR drive (3.3V)</td><td>SSR-04 channel 2 IN+ — underside 26-pin header R.col</td></tr>
     <tr><td class="mono">IO17 (row 11)</td><td>−Contactor SSR drive (3.3V)</td><td>SSR-04 channel 3 IN+ — underside 26-pin header R.col</td></tr>
     <tr><td class="mono">GND (row 12)</td><td>Common return</td><td>SSR-04 IN− common — underside 26-pin header R.col</td></tr>
-    <tr><td class="mono">CAN-B (native GPIO 6/7)</td><td>Pack 1 BMS read</td><td>Yazaki Pack 1 pins 3 / 4 (CAN-H / CAN-L)</td></tr>
+    <tr><td class="mono">CAN-B (native GPIO 6/7)</td><td>Pack 1 BMS read</td><td>Yazaki Pack 1: Pin 4 CANL [Grey] / Pin 5 CANH [Brown]</td></tr>
     <tr><td class="mono">CAN-A (MCP2515 chip)</td><td>FoxESS BAT CAN comms</td><td>FoxESS KH10.5 BAT CAN port — DIRECT (T-2CAN galv. isolated, no external HAT needed)</td></tr>
     <tr><td class="mono">5V / VIN</td><td>Module power</td><td>DROK 12V→5V buck output</td></tr>
   </table>
-  <p class="note"><strong>CAN-B (native ESP32-S3, GPIO 6/7)</strong> reads the LEAF BMS. <strong>CAN-A (MCP2515 chip)</strong> talks to FoxESS BAT CAN — wired DIRECT, no external isolator. Both channels on the T-2CAN are galvanically isolated on-board by the MCP2515/TJA1051 transceivers. Do NOT fit the Waveshare 2-CH CAN HAT in the main DALA data path (it is a "DO NOT BUY" item — DALA wiki confirms "FoxESS cannot fry the T-2CAN"). Add 120Ω across CAN-B H/L at the LilyGo end (pack self-terminates at BMS end). Add 120Ω at LilyGo end AND FoxESS end of CAN-A (3 resistors total).</p>
+  <p class="note"><strong>CAN-B (native ESP32-S3, GPIO 6/7)</strong> reads Pack 1 BMS. <strong>CAN-A (MCP2515 chip)</strong> talks to FoxESS BAT CAN — wired DIRECT, no external isolator. Both channels are galvanically isolated on-board. Add 120Ω across CAN-B H/L at the LilyGo end (pack self-terminates at BMS). Add 120Ω at LilyGo end AND FoxESS end of CAN-A (3 resistors total). <strong>Waveshare 2-CH CAN HAT:</strong> do NOT put it in the DALA/LilyGo signal path. It CAN be used on the Pi GPIO header to monitor Packs 2/3 CAN independently (Pack 2 Pins 4/5 → Waveshare Ch1; Pack 3 Pins 4/5 → Waveshare Ch2; 120Ω at Pi end each channel) — optionally, for monitoring only.</p>
 
   <h2 class="section-h">SSR-04 channel allocation</h2>
   <table class="wire-table">
     <tr><th>Channel</th><th>IN−</th><th>IN+ from LilyGo</th><th>OUT (switches 12V to coil)</th></tr>
-    <tr><td>1</td><td>GND</td><td class="mono">IO21 (row 10)</td><td>Precharge coil pin — all 3 Yazakis (daisy-chained)</td></tr>
-    <tr><td>2</td><td>GND</td><td class="mono">IO48 (row 9)</td><td>+Contactor coil pin — all 3 Yazakis (daisy-chained)</td></tr>
-    <tr><td>3</td><td>GND</td><td class="mono">IO17 (row 11)</td><td>−Contactor coil pin — all 3 Yazakis (daisy-chained)</td></tr>
+    <tr><td>1</td><td>GND</td><td class="mono">IO21 (row 10)</td><td>Pin 7 CT_PRE+ [Cyan] / Pin 8 CT_PRE− [Blue]→GND — all 3 Yazakis (daisy)</td></tr>
+    <tr><td>2</td><td>GND</td><td class="mono">IO48 (row 9)</td><td>Pin 15 CT_POS+ [Purple] / Pin 16 CT_POS− [Green]→GND — all 3 Yazakis (daisy)</td></tr>
+    <tr><td>3</td><td>GND</td><td class="mono">IO17 (row 11)</td><td>Pin 18 CT_NEG+ [Orange] / Pin 19 CT_NEG− [White]→GND — all 3 Yazakis (daisy)</td></tr>
     <tr><td>4</td><td>—</td><td>—</td><td>Spare (E-stop status LED / fan)</td></tr>
   </table>
-  <p class="note">Each SSR-04 OUT switches 12V from the same rail that feeds Pin 1. Sequence (driven by LilyGo firmware): precharge ON → wait → +cont ON → −cont ON → precharge OFF. Each pack's internal BMS sees its own coil signal arrive and operates its own internal contactor accordingly.</p>
+  <p class="note">SSR-04 has NO shared OUT−. Each channel is a relay contact: terminal A = 12V+ from WAGO, terminal B = coil+ (Cyan/Purple/Orange wire). Coil− (Blue/Green/White wires, Yazaki Pins 8/16/19) go direct to GND bus — they do NOT pass through the SSR. IN− is shared across channels, goes to LilyGo GND. Sequence (driven by LilyGo firmware): precharge ON → wait → +cont ON → −cont ON → precharge OFF.</p>
 
   <h2 class="section-h">Safety chain — what opens the circuit</h2>
   <table class="wire-table">
     <tr><th>Fault</th><th>What happens</th></tr>
     <tr><td>Single cell overvoltage in any pack</td><td>That pack's own BMS opens its internal contactors. Other 2 packs stay live. In single-BMS-read mode, LilyGo won't directly see a Pack 2/3 fault — relies on that pack's own protection.</td></tr>
     <tr><td>LilyGo crash / firmware fault</td><td>SSR drive signals go LOW → coil voltage drops → all contactors open. Failsafe by design.</td></tr>
-    <tr><td>12V rail loss</td><td>Pin 1 BAT+IGN drops → BMSes go to sleep → contactors open.</td></tr>
+    <tr><td>12V rail loss</td><td>Pin 1 [Red,BAT] + Pin 2 [Yel/Grn,IGN] drop → BMSes go to sleep → contactors open.</td></tr>
     <tr><td>Mains AC loss</td><td>DR-60-12 has ~50ms hold-up, then 12V drops, then contactors open. Whole bus dies safely.</td></tr>
-    <tr><td>Person needs to disconnect NOW</td><td><b>E-stop</b> — drops Pin 1 across all 3 packs simultaneously, ~100ms.</td></tr>
+    <tr><td>Person needs to disconnect NOW</td><td><b>E-stop</b> — drops Pin 1 [Red,BAT] AND Pin 2 [Yel/Grn,IGN] across all 3 packs simultaneously, ~100ms. Both must drop — cutting only one leaves BMSes partially powered.</td></tr>
     <tr><td>Service work</td><td>Pull Service Disconnect Plugs (with HV gloves). Each SDP physically breaks the cell string.</td></tr>
     <tr><td>Branch fault on one pack</td><td>That pack's TOMZN branch breaker trips. Other 2 carry on.</td></tr>
     <tr><td>Inverter fault</td><td>Master TOMZN trips manually, or FoxESS opens its internal DC contactor.</td></tr>

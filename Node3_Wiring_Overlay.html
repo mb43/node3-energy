@@ -110,13 +110,6 @@ pre{font-size:9px;background:#0a0a1a;border:1px solid #1B4F72;padding:6px;overfl
 </g>
 </svg>
 </div>
-<div style="background:#5c0000;border:2px solid #ff0000;border-radius:6px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#fff;">
-⛔ <b>CORRECTIONS APPLIED 15 Sep 2026 — READ BEFORE WIRING</b><br><br>
-Three errors found in original document and corrected:<br>
-1. <b>CAN-A/B were swapped.</b> LEAF battery → CAN-B. FoxESS → CAN-A. (Previously had LEAF on CAN-A, FoxESS on CAN-B via Waveshare HAT — both wrong.)<br>
-2. <b>GPIO pins were wrong.</b> Correct: GPIO 21 = precharge, GPIO 17 = negative, GPIO 48 = positive. (Previously showed GPIO 25/32/33 — those are T-CAN485/DevKit pins, not T-2CAN.)<br>
-3. <b>Waveshare CAN HAT is NOT required.</b> T-2CAN is galvanically isolated on both channels natively. FoxESS connects directly to T-2CAN CAN-A. Source: DALA wiki.
-</div>
 <div class="conn-col"><div style="background:#0a2a0a;border:1px solid #27ae60;border-radius:4px;padding:6px 10px;margin-bottom:10px;font-size:9px;color:#7ed6a0;">
 <b>✔ Inventory confirmed 8 Sep 2026</b><br>
 Mean Well HDR-60-12 · SSR-04 · E-stop NC mushroom · TOMZN DC breakers · Pi 4B + Waveshare 2-CH CAN HAT (optional, not in main DALA path) · JZK USB-RS485 dongle · LilyGo T-2CAN · WAGO connectors · Yazaki 36-pin harness<br>
@@ -147,38 +140,47 @@ Mean Well HDR-60-12 · SSR-04 · E-stop NC mushroom · TOMZN DC breakers · Pi 4
 </tbody></table><hr class="d"/>
 <h2 id="sec-ssr">⑤ SSR-04 - contactor coil switching</h2>
 <table><thead><tr><th>Terminal</th><th>Wire</th><th>To</th></tr></thead><tbody>
-<tr><td>IN+ Ch1/2/3</td><td class="wire-o">Orange</td><td>LilyGo IO21(Ch1,precharge) / IO48(Ch2,+cont) / IO17(Ch3,−cont) — underside 26-pin R.col rows 10/9/11 (corrected: was GPIO 25/32/33)</td></tr>
-<tr><td>IN- shared</td><td class="wire-k">Black</td><td>LilyGo GND</td></tr>
-<tr><td>OUT+ common</td><td class="wire-r">Red</td><td>12V from WAGO</td></tr>
-<tr><td>OUT Ch1/2/3</td><td class="wire-o">Orange/Red/Blue</td><td>Yazaki coil wires</td></tr>
-<tr><td>OUT- shared</td><td class="wire-k">Black</td><td>WAGO GND bus</td></tr>
+<tr><td>IN+ Ch1 (precharge)</td><td class="wire-o">Orange</td><td>LilyGo IO21 — underside 26-pin R.col row 10</td></tr>
+<tr><td>IN+ Ch2 (+cont)</td><td class="wire-o">Orange</td><td>LilyGo IO48 — underside 26-pin R.col row 9</td></tr>
+<tr><td>IN+ Ch3 (−cont)</td><td class="wire-o">Orange</td><td>LilyGo IO17 — underside 26-pin R.col row 11</td></tr>
+<tr><td>IN− (shared)</td><td class="wire-k">Black</td><td>LilyGo GND — underside 26-pin R.col row 12</td></tr>
+<tr><td>OUT Ch1 terminal A</td><td class="wire-r">Red</td><td>12V+ from WAGO 12V bus</td></tr>
+<tr><td>OUT Ch1 terminal B</td><td style="background:#009999;color:#fff">Cyan</td><td>Pin 7 CT_PRE+ [Cyan] → all 3 Yazakis (daisy)</td></tr>
+<tr><td>OUT Ch2 terminal A</td><td class="wire-r">Red</td><td>12V+ from WAGO 12V bus</td></tr>
+<tr><td>OUT Ch2 terminal B</td><td style="background:#7a2ec2;color:#fff">Purple</td><td>Pin 15 CT_POS+ [Purple] → all 3 Yazakis (daisy)</td></tr>
+<tr><td>OUT Ch3 terminal A</td><td class="wire-r">Red</td><td>12V+ from WAGO 12V bus</td></tr>
+<tr><td>OUT Ch3 terminal B</td><td style="background:#cc6600;color:#fff">Orange</td><td>Pin 18 CT_NEG+ [Orange] → all 3 Yazakis (daisy)</td></tr>
 </tbody></table>
-<div class="danger">E-stop NC in series: WAGO 12V to Yazaki Pin1 (IGN/wake line)</div><hr class="d"/>
+<div class="ok">✔ No shared OUT−. Each channel is a relay contact: 12V on one terminal, coil+ on the other. Coil− (Pin 8 [Blue], Pin 16 [Green], Pin 19 [White]) go directly to GND bus — NOT through the SSR.</div>
+<div class="danger">E-stop NC in series: WAGO 12V → E-stop → PIN1/IGN BUS → Yazaki Pin 1 [Red,BAT] AND Pin 2 [Yel/Grn,IGN] on all 3 packs. Both must drop simultaneously.</div><hr class="d"/>
 <h2 id="sec-wago">⑦ WAGO 12V / GND distribution</h2>
 <div class="ok">✔ DROK 12V→5V buck — NOT FITTED. Pi powered by PoE injector; LilyGo by Pi USB 5V.</div>
 <table><thead><tr><th>Bus</th><th>Feeds</th></tr></thead><tbody>
-<tr><td class="wire-r">12V+</td><td>SSR OUT+ (coil supply), E-stop NC in → Yazaki Pin1 (IGN wake)</td></tr>
-<tr><td class="wire-k">GND</td><td>SSR OUT−, Yazaki Pin2 · GND bond (dashed) → LilyGo for PoE↔12V ground reference</td></tr>
+<tr><td class="wire-r">12V+</td><td>SSR OUT+ (coil supply) · E-stop NC out → PIN1/IGN BUS → Yazaki Pin 1 [Red,BAT] + Pin 2 [Yel/Grn,IGN] on all 3 packs</td></tr>
+<tr><td class="wire-k">GND</td><td>Yazaki Pin 8 [Blue] CT_PRE− · Pins 10/11 [Black] · Pin 16 [Green] CT_POS− · Pin 19 [White] CT_NEG− (all coil − wires go direct to GND — NOT through SSR) · GND bond → LilyGo for PoE↔12V ground reference. <strong>Pin 2 is NOT GND — it is IGN +12V.</strong></td></tr>
 </tbody></table><hr class="d"/>
 <h2 id="sec-yz">⑧ Yazaki 36-pin harness</h2>
 <table><thead><tr><th>Pin</th><th>Wire</th><th>Source</th><th>Packs</th></tr></thead><tbody>
-<tr><td>Pin 1 IGN 12V</td><td class="wire-r">Red</td><td>E-stop NC out</td><td>All 3</td></tr>
-<tr><td>Pin 2 GND</td><td class="wire-k">Black</td><td>WAGO GND</td><td>All 3</td></tr>
-<tr><td>Precharge coil</td><td class="wire-o">Orange</td><td>SSR Ch1 OUT</td><td>All 3</td></tr>
-<tr><td>+Cont coil</td><td class="wire-r">Red</td><td>SSR Ch2 OUT</td><td>All 3</td></tr>
-<tr><td>-Cont coil</td><td class="wire-b">Blue</td><td>SSR Ch3 OUT</td><td>All 3</td></tr>
-<tr><td>CAN-H</td><td class="wire-y">White</td><td>LilyGo CAN-B H (corrected: was CAN-A)</td><td>Pack 1</td></tr>
-<tr><td>CAN-L</td><td class="wire-b">Blue</td><td>LilyGo CAN-B L (corrected: was CAN-A)</td><td>Pack 1</td></tr>
+<tr><td>Pin 1 BAT +12V [Red]</td><td class="wire-r">Red</td><td>PIN1/IGN BUS via E-stop NC</td><td>All 3</td></tr>
+<tr><td>Pin 2 IGN +12V [Yel/Grn]</td><td style="background:#ddcc00;color:#000">Yel/Grn</td><td>PIN1/IGN BUS via E-stop NC (same as Pin 1) — <strong>NOT GND</strong></td><td>All 3</td></tr>
+<tr><td>Pin 7 CT_PRE+ [Cyan]</td><td style="background:#009999;color:#fff">Cyan</td><td>SSR Ch1 OUT [IO21]</td><td>All 3</td></tr>
+<tr><td>Pin 8 CT_PRE− [Blue]</td><td class="wire-b">Blue</td><td>WAGO GND bus</td><td>All 3</td></tr>
+<tr><td>Pins 10/11 GND [Black]</td><td class="wire-k">Black</td><td>WAGO GND bus</td><td>All 3</td></tr>
+<tr><td>Pin 15 CT_POS+ [Purple]</td><td style="background:#7a2ec2;color:#fff">Purple</td><td>SSR Ch2 OUT [IO48]</td><td>All 3</td></tr>
+<tr><td>Pin 16 CT_POS− [Green]</td><td style="background:#006633;color:#fff">Green</td><td>WAGO GND bus</td><td>All 3</td></tr>
+<tr><td>Pin 18 CT_NEG+ [Orange]</td><td style="background:#cc6600;color:#fff">Orange</td><td>SSR Ch3 OUT [IO17]</td><td>All 3</td></tr>
+<tr><td>Pin 19 CT_NEG− [White]</td><td style="background:#eee;color:#000;border:1px solid #999">White</td><td>WAGO GND bus</td><td>All 3</td></tr>
+<tr><td>Pin 4 CANL [Grey]</td><td style="background:#888;color:#fff">Grey</td><td>LilyGo CAN-B L</td><td>Pack 1 only</td></tr>
+<tr><td>Pin 5 CANH [Brown]</td><td style="background:#7b4f2e;color:#fff">Brown</td><td>LilyGo CAN-B H</td><td>Pack 1 only</td></tr>
 </tbody></table>
-<div class="warn">Exact coil pin numbers: DALA wiki Nissan LEAF Gen2 Yazaki diagram</div><hr class="d"/>
-<h2 id="sec-ws">① Pi 4B + ⑥ Waveshare 2-CH Isolated CAN HAT</h2>
-<div class="danger">⛔ CORRECTED: The Waveshare CAN HAT is NOT required for FoxESS isolation. The T-2CAN is galvanically isolated on both CAN channels — FoxESS cannot damage it. Source: DALA wiki (dalathegreat.github.io/Battery-Emulator-Wiki/inverter/foxess_h1_h3_ac1_kh). The topology below (Waveshare bridging T-2CAN CAN-B to FoxESS) was WRONG. T-2CAN CAN-A connects directly to FoxESS BAT CAN.</div>
+<div class="warn">All other pins: DO NOT CONNECT. Pins verified from physical custom cable map Sep 2026. Packs 2/3 CANL/CANH (Pins 4/5) may optionally connect to Pi Waveshare Ch1/Ch2 for monitoring — see section below.</div><hr class="d"/>
+<h2 id="sec-ws">① Pi 4B + ⑥ Waveshare 2-CH Isolated CAN HAT (optional Pack 2/3 monitor)</h2>
+<div class="ok">✔ Waveshare 2-CH Isolated CAN HAT: NOT in DALA path. Connects to Pi GPIO header only. Used to monitor Pack 2 and Pack 3 CAN independently — hardware_bridge.py parses raw BMS CAN frames. Waveshare is optocoupler-isolated so electrically safe.</div>
 <div class="ok">✔ Pi 4B powered via PoE injector → RJ45 ethernet (not from 12V bus)</div>
-<div class="warn">⚠ Two 120Ω CAN terminators required: CAN-A at LilyGo end, CAN-A at FoxESS end. CAN-B at LilyGo end, CAN-B at Yazaki pack end.</div>
-<div class="warn">Waveshare HAT may optionally be used for Pi CAN monitoring only — it is NOT in the main DALA data path</div>
+<div class="warn">⚠ CAN termination: LilyGo CAN-B 120Ω at LilyGo end. LilyGo CAN-A 120Ω at LilyGo end + 120Ω at FoxESS end. Waveshare Ch1/Ch2 120Ω at Pi end (each channel — BMS provides far end). Do NOT bridge Waveshare into LilyGo or FoxESS signal path.</div>
 <table><thead><tr><th>Channel</th><th>Wire</th><th>To</th><th>Note</th></tr></thead><tbody>
-<tr><td>CAN0 H/L (optional)</td><td class="wire-y">White/Blue</td><td>LilyGo CAN-B H/L (for monitoring only)</td><td>NOT needed for DALA operation</td></tr>
-<tr><td>CAN1 H/L (REMOVE)</td><td class="wire-y">White/Blue</td><td>Do NOT wire to FoxESS — T-2CAN CAN-A goes direct</td><td>Previous design was WRONG</td></tr>
+<tr><td>Ch1 (CAN0) H/L</td><td style="background:#888;color:#fff">Grey/Brown</td><td>Pack 2 Yazaki Pin 4 CANL [Grey] / Pin 5 CANH [Brown]</td><td>Optional — Pack 2 monitoring. 120Ω at Pi end.</td></tr>
+<tr><td>Ch2 (CAN1) H/L</td><td style="background:#888;color:#fff">Grey/Brown</td><td>Pack 3 Yazaki Pin 4 CANL [Grey] / Pin 5 CANH [Brown]</td><td>Optional — Pack 3 monitoring. 120Ω at Pi end.</td></tr>
 </tbody></table>
 <pre>dtoverlay=mcp2515-can0,oscillator=16000000,interrupt=25
 dtoverlay=mcp2515-can1,oscillator=16000000,interrupt=24
