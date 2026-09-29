@@ -556,7 +556,8 @@ def percentile(values, pct):
 
 def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
                           min_soc_kwh=MIN_SOC_KWH, historical_stats=None,
-                          export_kwh_cap=None, daily_load_kwh=None):
+                          export_kwh_cap=None, daily_load_kwh=None,
+                          export_prices=None):
     """
     Linear-programming optimal dispatch over the known Agile price window.
 
@@ -1060,7 +1061,8 @@ def run_backfill():
     print("[PLAN] --- G99 confirmed (5.5kW, 2.75kWh/slot) ---")
     dispatch_plan = plan_optimal_dispatch(prices, INITIAL_SOC_KWH,
                                           historical_stats=hist_stats,
-                                          export_kwh_cap=EXPORT_KWH_G98)
+                                          export_kwh_cap=EXPORT_KWH_G98,
+                                          export_prices=export_prices)
     save_dispatch_plan(dispatch_plan)
     print("[PLAN] --- G99 shadow (5.5kW, 2.75kWh/slot — same as live) ---")
     dispatch_plan_g99 = plan_optimal_dispatch(prices, INITIAL_SOC_KWH,
