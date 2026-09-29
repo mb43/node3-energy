@@ -1602,9 +1602,9 @@
           <div class="stat-sub">Nominal 360V DC</div>
         </div>
         <div class="stat-card purple">
-          <div class="stat-label">Pack Current</div>
+          <div class="stat-label">System Current <span style="font-size:9px;font-weight:400;color:var(--muted)">(3-pack)</span></div>
           <div class="stat-value purple" id="hw-current">—</div>
-          <div class="stat-sub">+ charging · − discharging</div>
+          <div class="stat-sub" id="hw-current-sub">+ charging · − discharging</div>
         </div>
         <div class="stat-card" id="hw-temp-card">
           <div class="stat-label">Pack Temperature</div>
@@ -4758,8 +4758,21 @@ function renderHardwareTab() {
   const vEl = document.getElementById('hw-voltage');
   if (vEl) vEl.textContent = hwState.voltageV != null ? Number(hwState.voltageV).toFixed(1) + 'V' : '—';
 
-  const iEl = document.getElementById('hw-current');
-  if (iEl) iEl.textContent = hwState.currentA != null ? Number(hwState.currentA).toFixed(1) + 'A' : '—';
+  const iEl    = document.getElementById('hw-current');
+  const iSubEl = document.getElementById('hw-current-sub');
+  if (iEl) {
+    if (hwState.currentA != null) {
+      // DALA/LilyGo reads Pack 1 CAN only — in a 3-pack parallel system each pack
+      // carries ~⅓ of total current. Multiply by 3 for true system current.
+      const sysCurrent = Number(hwState.currentA) * 3;
+      iEl.textContent = sysCurrent.toFixed(1) + 'A';
+      if (iSubEl) iSubEl.textContent =
+        `Pack 1 raw: ${Number(hwState.currentA).toFixed(1)}A × 3 packs = ${sysCurrent.toFixed(1)}A system`;
+    } else {
+      iEl.textContent = '—';
+      if (iSubEl) iSubEl.textContent = '+ charging · − discharging';
+    }
+  }
 
   const tEl   = document.getElementById('hw-temp');
   const tCard = document.getElementById('hw-temp-card');
