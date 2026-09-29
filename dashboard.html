@@ -5089,6 +5089,20 @@ function msToNextSlot() {
       set('fhq-total-mining', '+\u00a3' + miningData.gross_gbp_year.toFixed(0) + '/yr');
     }
     if (planData) {
+      if (planData._fromHistory) {
+        var arbYr = Math.round(planData.annualArb);
+        var scYr  = Math.round(planData.selfConYear);
+        if (planData.exportYr != null) set('fhq-export-yr', '+£' + planData.exportYr + '/yr');
+        if (planData.chargeYr != null) set('fhq-charge-yr', '-£' + Math.abs(planData.chargeYr) + '/yr');
+        set('fhq-arb-yr',    (arbYr>=0?'+':'')+'£'+arbYr+'/yr', arbYr>=0?'var(--green,#4caf50)':'#f44336');
+        set('fhq-total-arb', (arbYr>=0?'+':'')+'£'+arbYr+'/yr', arbYr>=0?'var(--green,#4caf50)':'#f44336');
+        set('fhq-selfcon-yr', '+£'+scYr+'/yr');
+        set('fhq-total-sc',   '+£'+scYr+'/yr');
+        var mYr = miningData && !miningData.error ? miningData.gross_gbp_year : 0;
+        var net = (arbYr||0)+(scYr||0)+(mYr||0);
+        set('fhq-net-total', (net>=0?'+':'')+'£'+Math.round(net)+'/yr', net>=0?'var(--green,#4caf50)':'#f44336');
+        return;
+      }
       var s = planData.summary || planData;
       var planDays   = s.plan_days || 1;
       var exportYr   = s.annual_g98 != null ? s.annual_g98 + (s.annual_charge_cost || 0) : null;
@@ -5133,27 +5147,20 @@ function msToNextSlot() {
     fetch('/api/mining').then(function(r){return r.json();}).then(function(d){
       miningData = d; updateFounderHQ();
     }).catch(function(){});
-    fetch('/api/history').then(function(r){return r.json();}).then(function(rows){
-      if (!rows || rows.length < 2) return;
-      // Sort by timestamp ascending
-      rows.sort(function(a,b){ return a.timestamp < b.timestamp ? -1 : 1; });
-      var first = rows[0], last = rows[rows.length-1];
-      var ms = new Date(last.timestamp) - new Date(first.timestamp);
-      var days = ms / 86400000;
-      if (days < 0.1) return;
-      var totalPnl = last.profit_gbp - first.profit_gbp;
-      var dailyArb = totalPnl / days;
-      var annualArb = dailyArb * 365;
-      // Avg import price for self-consumption calculation
-      var avgP = rows.reduce(function(s,r){ return s + r.price_p; }, 0) / rows.length;
-      var DAILY_LOAD_KWH = 48;
-      var selfConYear = DAILY_LOAD_KWH * (avgP / 100) * 365;
+    fetch('/api/backtest?mode=founder').then(function(r){return r.json();}).then(function(d){
+      if (!d || d.error) return;
+      var days = d.days || 365;
+      var exportYr = Math.round((d.totalExportIncome  || 0) / days * 365);
+      var chargeYr = Math.round((d.totalChargeCost    || 0) / days * 365);
+      var arbYr    = Math.round((d.total              || 0) / days * 365);
+      var scYr     = Math.round((d.totalHomeEnergySaved || 0) / days * 365);
       planData = {
         _fromHistory: true,
-        annualArb: annualArb,
-        selfConYear: selfConYear,
-        days: days,
-        avgImportP: avgP
+        annualArb:   arbYr,
+        selfConYear: scYr,
+        exportYr:    exportYr,
+        chargeYr:    chargeYr,
+        days:        days
       };
       updateFounderHQ();
     }).catch(function(){});

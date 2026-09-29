@@ -285,7 +285,7 @@ def _bt_discover(is_export=False):
     return products[0]['code']
 
 
-def _run_backtest(months=12):
+def _run_backtest(months=12, founder=False):
     """
     Fetch 12 months of Octopus Agile import + export prices and replay them
     through simulate.py's real LP-optimal plan_optimal_dispatch() (fixed 19
@@ -345,7 +345,7 @@ def _run_backtest(months=12):
     _BT_EXPORT_KWH      = _bt_cfg["export_kw"] * 0.5
     _BT_CHARGE_KWH_SLOT = _bt_cfg["import_kw"] * 0.5
     _bt_house_kwh       = _bt_cfg.get("house_kwh_day", 12.0)
-    _bt_baseload_kw     = _bt_cfg.get("baseload_kw", 0.0)
+    _bt_baseload_kw     = _bt_cfg.get("baseload_kw", 0.0) if founder else _bt_cfg.get("baseload_kw_consumer", 0.0)
     _bt_baseload_slot   = _bt_baseload_kw * 0.5        # kWh/slot (constant, flat)
     _bt_total_load_day  = _bt_house_kwh + _bt_baseload_kw * 24.0  # for LP planning
 
@@ -963,12 +963,10 @@ def api_plan():
 
 @app.route("/api/backtest")
 def api_backtest():
-    """
-    12-month historical backtest using the Python algorithm (single source of truth).
-    Results are cached in backtest_cache.json for 24 hours.
-    Add ?force=1 to bypass cache and re-run.
-    """
-    cache_path = os.path.join(BASE_DIR, "backtest_cache.json")
+    """12-month backtest. ?mode=founder uses baseload_kw; default uses baseload_kw_consumer."""
+    founder    = request.args.get('mode', '').lower() == 'founder'
+    cache_file = "backtest_cache_founder.json" if founder else "backtest_cache.json"
+    cache_path = os.path.join(BASE_DIR, cache_file)
     force      = request.args.get('force', '').lower() in ('1', 'true', 'yes')
 
     if not force and os.path.exists(cache_path):
@@ -990,7 +988,7 @@ def api_backtest():
             print(f'[BACKTEST] Cache read error: {e}')
 
     try:
-        data = _run_backtest()
+        data = _run_backtest(founder=founder)
         now_ts = time.time()
         try:
             with open(cache_path, 'w') as f:
