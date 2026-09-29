@@ -145,7 +145,7 @@ def load_json(filename):
     return None
 
 
-def load_history(max_rows=200):
+def load_history(max_rows=10000):
     path = os.path.join(BASE_DIR, "history.csv")
     if not os.path.exists(path):
         return []
@@ -462,11 +462,22 @@ def _run_backtest(months=12, founder=False):
         mo['profit'] += slot_profit
 
         # Home energy: Agile saving vs SVT (PC1-weighted per-slot)
-        home_val            = home_load * max(0.0, _BT_SVT_REF_P - price) / 100.0
+        home_val            = (home_load + _bt_baseload_slot) * max(0.0, _BT_SVT_REF_P - price) / 100.0
         mo['homeEnergySaved']  += home_val
         mo['homeEnergyAccum']  += home_val
         mo['homeKwh']          += home_load
         total_home_saved       += home_val
+
+    # ── True self-con: actual avg charge cost / RTE vs SVT ───────────────────
+    if total_charge_kwh > 0:
+        _avg_charge_p = total_charge_cost / total_charge_kwh * 100.0
+        _eff_cost_p   = _avg_charge_p / _BT_RTE
+    else:
+        _eff_cost_p   = _BT_SVT_REF_P * 0.40
+    _all_load_kwh             = _bt_total_load_day * (n / 48)
+    total_home_saved_true     = max(0.0, _BT_SVT_REF_P - _eff_cost_p) * _all_load_kwh / 100.0
+    total_home_saved_contract = _BT_SVT_REF_P * _all_load_kwh / 100.0
+    avg_charge_p_out = round(total_charge_cost / total_charge_kwh * 100.0, 2) if total_charge_kwh > 0 else 0.0
 
     # ── Post-process monthly averages ────────────────────────
     # buyThr/sellThr previously meant "percentile threshold" under the old
@@ -492,9 +503,13 @@ def _run_backtest(months=12, founder=False):
         'total':                round(net, 4),
         'monthly':              monthly,
         'totalSlots':           n,
+        'days':                 round(n / 48, 1),
         'buyThr':               round(avg_buy_thr,  4),
         'sellThr':              round(avg_sell_thr, 4),
-        'totalHomeEnergySaved': round(total_home_saved, 4),
+        'totalHomeEnergySaved':         round(total_home_saved, 4),
+        'totalHomeEnergySavedTrue':     round(total_home_saved_true, 4),
+        'totalHomeEnergySavedContract': round(total_home_saved_contract, 4),
+        'avgChargeP':                   avg_charge_p_out,
         'totalChargeCost':      round(total_charge_cost, 4),
         'totalExportIncome':    round(total_export_income, 4),
         'totalChargeKwh':       round(total_charge_kwh, 4),
@@ -606,7 +621,7 @@ def api_settings():
     updates = {}
     NON_NEGATIVE_KEYS = {"baseload_kw", "house_kwh_day"}
     for key in ("battery_kwh", "import_kw", "export_kw", "min_soc_pct",
-                "baseload_kw", "house_kwh_day"):
+                "baseload_kw", "house_kwh_day", "svt_ref_p", "subscription_pcm"):
         if key in body:
             try:
                 v = float(body[key])

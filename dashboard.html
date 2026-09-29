@@ -2841,7 +2841,7 @@ function renderStats() {
   // Falls back to live rolling avg only if backtest hasn't loaded yet.
   // Raw 24hr window sums are intentionally excluded — too volatile and can go negative mid-cycle.
   const today48 = get48Window();
-  const backtestDailyAvg = histResultsCache ? (histResultsCache.total / 365) : null;
+  const backtestDailyAvg = histResultsCache ? (histResultsCache.total / (histResultsCache.days || 365)) : null;
   const rolling7 = rolling7DayAvg();
   const displayProfit = backtestDailyAvg !== null ? backtestDailyAvg : rolling7;
   const profitSrc = backtestDailyAvg !== null ? '12-month backtest avg/day' : `${Math.min(7, historyData.length / SLOT_WINDOW).toFixed(1)}-day live avg`;
@@ -3004,7 +3004,7 @@ function calculateProjections() {
 // ══════════════════════════════════════════════════════════════
 function updatePerfCalibration() {
   const liveDays       = historyData.length / SLOT_WINDOW;
-  const backtestDaily  = histResultsCache ? (histResultsCache.total / 365) : null;
+  const backtestDaily  = histResultsCache ? (histResultsCache.total / (histResultsCache.days || 365)) : null;
   const MIN_DAYS       = 7;
 
   // Badge always shows how many live days exist
@@ -3819,7 +3819,9 @@ async function loadHistoricalData(force) {
   res.style.display  = 'none';
 
   try {
-    const url = '/api/backtest' + (force ? '?force=1' : '');
+    const _founderMode = (cfg.baseload_kw || 0) > 0;
+    const _btBase = '/api/backtest' + (_founderMode ? '?mode=founder' : '');
+    const url = _btBase + (force ? (_founderMode ? '&force=1' : '?force=1') : '');
     updateHistProg(0, 10, 'REQUESTING 12-MONTH PYTHON BACKTEST FROM SERVER…');
 
     const resp = await fetch(url, { signal: AbortSignal.timeout(180000) }); // 3 min max
@@ -3880,7 +3882,7 @@ function populateRevenueBreakdown(res) {
   const yearsCount = 1;
 
   // Dovecote revenue = export income - charge cost + subscription (full company P&L)
-  const DOVECOTE_SUB_PCM = 29;          // £29/month subscription per home
+  const DOVECOTE_SUB_PCM = cfg.subscription_pcm || 29;
   const dovecoteSubYr   = DOVECOTE_SUB_PCM * 12;   // £348/yr
   const dovecodeArbitrageYr = totalExportIncome - totalChargeCost;
   const dovecodeYearRev = dovecodeArbitrageYr + dovecoteSubYr;
@@ -3915,8 +3917,8 @@ function populateRevenueBreakdown(res) {
 
   // ── TOTAL CONSUMER BENEFIT ────────────────────────────────────────────────
   // Full annual value delivered: free energy at 25p SVT + £29/mo subscription.
-  const SVT_PPU    = 0.25;          // 25p/kWh SVT reference rate
-  const SUB_PCM    = 29;            // £29/month subscription
+  const SVT_PPU    = (cfg.svt_ref_p || 25) / 100;
+  const SUB_PCM    = cfg.subscription_pcm || 29;
   const houseKwhPd = cfg.house_kwh_day || 12;
   const totalKwhYr = houseKwhPd * 365;
   const energyValYr = totalKwhYr * SVT_PPU;
@@ -4027,9 +4029,10 @@ function renderHistoricalResults(res) {
   // Use guaranteed contractual formula (12kWh/day × 25p × actual days in each month)
   // NOT the simulation's totalHomeEnergySaved which uses Agile-tariff weighting
   const _gKwhDayScale = cfg.house_kwh_day || 12;
+  const _svtRef = (cfg.svt_ref_p || 25) / 100;
   const scaleHomeSaved = Object.keys(monthly).reduce((s, m) => {
     const [y, mn] = m.split('-');
-    return s + _gKwhDayScale * 0.25 * new Date(+y, +mn, 0).getDate();
+    return s + _gKwhDayScale * _svtRef * new Date(+y, +mn, 0).getDate();
   }, 0);
   // scaleNetTotal = true total value = arbitrage grid P&L + home energy value
   // The grid P&L alone is negative (charging covers home load + arbitrage, exports only cover arbitrage)
@@ -4058,9 +4061,9 @@ function renderHistoricalResults(res) {
   const _gKwhDay = cfg.house_kwh_day || 12;
   const homeSavedPerMonth = months.map(m => {
     const [y, mn] = m.split('-');
-    return _gKwhDay * 0.25 * new Date(+y, +mn, 0).getDate();
+    return _gKwhDay * _svtRef * new Date(+y, +mn, 0).getDate();
   });
-  const HIST_SUB_PCM = 29;  // £29/mo subscription — Dovecote income, not consumer saving
+  const HIST_SUB_PCM = cfg.subscription_pcm || 29;
   // consumerNetPerMonth = energy value minus subscription (what homeowner actually keeps)
   const consumerNetPerMonth = homeSavedPerMonth.map(hs => hs - HIST_SUB_PCM);
   // dovecoteProfitPerMonth = grid arbitrage + subscription received
@@ -4098,7 +4101,7 @@ function renderHistoricalResults(res) {
     const homeLbl = homeEl.closest('.stat-card')?.querySelector('.stat-label');
     if (homeLbl) homeLbl.textContent = 'Agile Tariff Saving vs SVT (1 home)';
     const homeSub = homeEl.closest('.stat-card')?.querySelector('.stat-sub');
-    if (homeSub) homeSub.textContent = '12kWh/day vs 25p SVT · £' + avgHomeSaved.toFixed(2) + '/mo avg';
+    if (homeSub) homeSub.textContent = '12kWh/day × SVT ref · contractual guarantee · £' + avgHomeSaved.toFixed(2) + '/mo avg';
   }
   // Net total card
   const netEl = document.getElementById('h-net-total');
@@ -4495,20 +4498,28 @@ function renderG98Tab() {
   // Monthly stats from histResultsCache
   const monthEl = document.getElementById('g98-monthly-stats');
   if (histResultsCache && monthEl) {
-    const { monthly, total, totalHomeEnergySaved = 0 } = histResultsCache;
+    const { monthly, total,
+      totalHomeEnergySaved = 0,
+      totalHomeEnergySavedTrue = 0,
+      totalHomeEnergySavedContract = 0,
+      avgChargeP = 0
+    } = histResultsCache;
     const months = Object.keys(monthly).sort();
     const profits = months.map(m => monthly[m].profit);
     const best = Math.max(...profits);
     const worst = Math.min(...profits);
     const avg = profits.reduce((s,v) => s+v, 0) / profits.length;
+    const scBest = totalHomeEnergySavedTrue > 0 ? totalHomeEnergySavedTrue : totalHomeEnergySaved;
     monthEl.innerHTML = `
-      <div class="scenario-metric"><span class="sm-lbl">Annual grid P&L (arb)</span><span class="sm-val" style="color:var(--green)">£${total.toFixed(2)}</span></div>
-      <div class="scenario-metric"><span class="sm-lbl">Home energy saving</span><span class="sm-val" style="color:var(--cyan)">£${totalHomeEnergySaved.toFixed(2)}</span></div>
-      <div class="scenario-metric"><span class="sm-lbl">Total annual value</span><span class="sm-val" style="color:var(--green);font-weight:bold">£${(total + totalHomeEnergySaved).toFixed(2)}</span></div>
-      <div class="scenario-metric"><span class="sm-lbl">Best month</span><span class="sm-val" style="color:var(--green)">£${best.toFixed(2)}</span></div>
-      <div class="scenario-metric"><span class="sm-lbl">Worst month</span><span class="sm-val" style="color:var(--amber)">£${worst.toFixed(2)}</span></div>
-      <div class="scenario-metric"><span class="sm-lbl">Monthly avg (net)</span><span class="sm-val">£${avg.toFixed(2)}</span></div>
-    `;
+      <div class="scenario-metric"><span class="sm-lbl">Annual grid P&L (arb)</span><span class="sm-val" style="color:var(--green)">£${total.toFixed(0)}</span></div>
+      <div class="scenario-metric" title="Conservative: counts only slots where Agile < SVT. Underestimates — ignores battery storage of cheap off-peak energy."><span class="sm-lbl">Self-con (min · spot basis)</span><span class="sm-val" style="color:var(--amber)">£${totalHomeEnergySaved.toFixed(0)}</span></div>
+      <div class="scenario-metric" title="Best estimate: avg charge cost ${avgChargeP.toFixed(1)}p/kWh paid ÷ 0.88 RTE vs 25p SVT. Most accurate."><span class="sm-lbl">Self-con (est. actual) ← use</span><span class="sm-val" style="color:var(--green);font-weight:bold">£${(totalHomeEnergySavedTrue||totalHomeEnergySaved).toFixed(0)}</span></div>
+      <div class="scenario-metric" title="Maximum: 100% load × 25p SVT, ignoring battery charge cost. Your contractual promise ceiling."><span class="sm-lbl">Self-con (max · contractual)</span><span class="sm-val" style="color:var(--cyan)">£${(totalHomeEnergySavedContract||totalHomeEnergySaved).toFixed(0)}</span></div>
+      <div class="scenario-metric"><span class="sm-lbl">Total value (arb + actual)</span><span class="sm-val" style="color:var(--green);font-weight:bold">£${(total + scBest).toFixed(0)}</span></div>
+      <div class="scenario-metric"><span class="sm-lbl">Best month P&L</span><span class="sm-val" style="color:var(--green)">£${best.toFixed(2)}</span></div>
+      <div class="scenario-metric"><span class="sm-lbl">Worst month P&L</span><span class="sm-val" style="color:var(--amber)">£${worst.toFixed(2)}</span></div>
+      <div class="scenario-metric"><span class="sm-lbl">Monthly avg P&L</span><span class="sm-val">£${avg.toFixed(2)}</span></div>
+    \`;
   } else if (monthEl && !histResultsCache) {
     monthEl.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:8px 0">Switch to Historical tab and load 12-month data to see backtest results here.</div>';
   }
@@ -5073,10 +5084,10 @@ function msToNextSlot() {
   const slotDelay = msToNextSlot();
   console.log(`[NODE-3] Next slot boundary in ${Math.round(slotDelay/1000)}s — scheduling historical auto-refresh`);
   setTimeout(() => {
-    loadHistoricalData(true);   // force=true: re-run backtest with new history data
+    loadHistoricalData(false);  // slot boundary: refresh history display only; backtest uses 24h cache
     setInterval(() => {
-      console.log('[NODE-3] Slot boundary — refreshing historical data (force)…');
-      loadHistoricalData(true); // force=true every slot boundary so cached result is never stale
+      console.log('[NODE-3] Slot boundary — refreshing live history display…');
+      loadHistoricalData(false); // 24h cache serves fresh backtest; no need to force every 30min
     }, 1800000); // every 30 minutes thereafter
   }, slotDelay);
 })();
@@ -5162,11 +5173,11 @@ function msToNextSlot() {
     }).catch(function(){});
     fetch('/api/backtest?mode=founder').then(function(r){return r.json();}).then(function(d){
       if (!d || d.error) return;
-      var days = d.days || 365;
+      var days = d.days || (d.totalSlots ? d.totalSlots / 48 : 365);
       var exportYr = Math.round((d.totalExportIncome  || 0) / days * 365);
       var chargeYr = Math.round((d.totalChargeCost    || 0) / days * 365);
       var arbYr    = Math.round((d.total              || 0) / days * 365);
-      var scYr     = Math.round((d.totalHomeEnergySaved || 0) / days * 365);
+      var scYr     = Math.round(((d.totalHomeEnergySavedTrue || d.totalHomeEnergySaved) || 0) / days * 365);
       planData = {
         _fromHistory: true,
         annualArb:   arbYr,

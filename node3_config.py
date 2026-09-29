@@ -41,6 +41,8 @@ DEFAULTS = {
                              # Affects LP planning and SOC drain every slot.
                              # Matt's site: 1.5 (Z15 draws ~1510W constant).
     "house_kwh_day": 12.0,  # profiled household consumption per day (Elexon PC1 shape)
+    "svt_ref_p":     25.0,  # Ofgem SVT reference (p/kWh)
+    "subscription_pcm": 29.0,  # monthly subscription per consumer site (£)
 }
 
 
