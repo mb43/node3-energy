@@ -899,6 +899,11 @@ def api_plan():
     net_g98        = total_revenue_g98 - total_charge_cost       # total Dovecote cash P&L
     arbitrage_net  = net_g98 - hosting_cost_absorbed             # Dovecote's share after hosting
 
+    # Site Total P&L: owner-operator view (self-consumption counted, no subscription)
+    # house_load_cost = value of load met from battery at slot import prices (avoided grid cost)
+    self_consumption_value = house_load_cost
+    site_total_pnl         = total_revenue_g98 + self_consumption_value - total_charge_cost
+
     # ── G99 net — independent SOC simulation with G99 export cap, same charge rate ──
     # Charge rate is unchanged (configurable import rate, default 5.0 kWh/slot).
     # Only export cap increases: configurable G98 export → fixed 2.75 kWh/slot G99 (5.5kW SSEN-confirmed).
@@ -922,7 +927,8 @@ def api_plan():
     plan_days      = n_slots / 48.0 if n_slots > 0 else 1.0
     annual_g98     = round(net_g98 / plan_days * 365, 2) if plan_days > 0 else 0
     annual_g99     = round(net_g99 / plan_days * 365, 2) if plan_days > 0 else 0
-    annual_delta   = round(annual_g99 - annual_g98, 2)
+    annual_delta      = round(annual_g99 - annual_g98, 2)
+    annual_site_total = round(site_total_pnl / plan_days * 365, 2) if plan_days > 0 else 0
 
     return jsonify({
         "slots":    slots,
@@ -947,6 +953,10 @@ def api_plan():
             "hosting_cost":          round(hosting_cost_absorbed, 4), # Dovecote's free-allowance cost
             # Pure arbitrage profit (hosting cost separated out)
             "arbitrage_net_g98":     round(arbitrage_net, 4),
+            # Owner-operator site view
+            "self_consumption_value": round(self_consumption_value, 4),
+            "site_total_pnl":         round(site_total_pnl, 4),
+            "annual_site_total":      annual_site_total,
         }
     })
 
@@ -1529,6 +1539,36 @@ def api_battery_detail():
 # ─────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────
+
+
+@app.route("/api/mining")
+def api_mining():
+    """Live Z15 NiceHash mining revenue — ZEC price from CoinGecko, no auth needed."""
+    try:
+        import urllib.request as _ur, json as _js
+        with _ur.urlopen(
+            "https://api.coinbase.com/v2/prices/ZEC-GBP/spot",
+            timeout=6) as r:
+            gbp_data = _js.loads(r.read())
+        with _ur.urlopen(
+            "https://api.coinbase.com/v2/prices/ZEC-USD/spot",
+            timeout=6) as r:
+            usd_data = _js.loads(r.read())
+        zec_gbp = float(gbp_data["data"]["amount"])
+        zec_usd = float(usd_data["data"]["amount"])
+        zec_per_day  = 0.0175 * 1.06          # Z15 yield × NiceHash 6% premium
+        gross_gbp_day = round(zec_per_day * zec_gbp, 2)
+        return jsonify({
+            "zec_per_day":    round(zec_per_day, 6),
+            "zec_price_gbp":  round(zec_gbp, 2),
+            "zec_price_usd":  round(zec_usd, 2),
+            "gross_gbp_day":  gross_gbp_day,
+            "gross_gbp_year": round(gross_gbp_day * 365, 2),
+            "note": "Gross revenue only — miner electricity already in battery charge cost"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="NODE-3 Arbitrage Portal Server")
     parser.add_argument("--port", type=int, default=8585, help="Port to listen on (default: 8585)")
