@@ -2591,6 +2591,30 @@ async function loadFromServer() {
 }
 
 
+async function fetchMining() {
+  try {
+    const d = await fetch('/api/mining').then(r => r.json());
+    if (d.error) return;
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    set('mining-zec-day',  d.zec_per_day.toFixed(4) + ' ZEC');
+    set('mining-gbp-day',  '£' + d.gross_gbp_day.toFixed(2));
+    set('mining-gbp-year', '£' + d.gross_gbp_year.toFixed(0));
+    set('mining-price',    '£' + d.zec_price_gbp.toFixed(0) + '/ZEC');
+  } catch(e) { console.warn('mining fetch failed', e); }
+}
+
+async function fetchMining() {
+  try {
+    const d = await fetch('/api/mining').then(r => r.json());
+    if (d.error) return;
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    set('mining-zec-day',  d.zec_per_day.toFixed(4) + ' ZEC');
+    set('mining-gbp-day',  '£' + d.gross_gbp_day.toFixed(2));
+    set('mining-gbp-year', '£' + d.gross_gbp_year.toFixed(0));
+    set('mining-price',    '£' + d.zec_price_gbp.toFixed(0) + '/ZEC');
+  } catch(e) { console.warn('mining fetch failed', e); }
+}
+
 /** Render the forward schedule from Python /api/plan — single source of truth */
 function renderSchedule(planData) {
   const container = document.getElementById('fwd-schedule');
@@ -2619,6 +2643,8 @@ function renderSchedule(planData) {
   const annualG98      = summary ? summary.annual_g98        : null;   // £/yr projected from this window
   const annualG99      = summary ? summary.annual_g99        : null;   // G99 projected annual
   const annualDelta    = summary ? summary.annual_delta      : null;   // G99 − G98 annual uplift
+const annualSiteTotal = summary ? summary.annual_site_total : null; // owner P&L incl self-consumption
+const annualSiteTotal = summary ? summary.annual_site_total : null; // owner P&L incl self-consumption
   const arbitrageNet   = summary ? summary.arbitrage_net_g98 : netG98;
   const hostingCost    = summary ? summary.hosting_cost      : null;
   const houseLoadKwh   = summary ? summary.house_load_kwh    : null;
@@ -2628,7 +2654,21 @@ function renderSchedule(planData) {
   const exKwh    = exSlots.length * CFG.EXPORT_KWH * 0.88;
 
   // Push projections into G98/G99 tab elements if present
-  if (annualG98 != null) {
+  if (annualSiteTotal != null) {
+  const elSite = document.getElementById('annual-site-total');
+  if (elSite) {
+    elSite.textContent = (annualSiteTotal >= 0 ? '+' : '') + '£' + Math.round(annualSiteTotal) + '/yr';
+    elSite.style.color = annualSiteTotal >= 0 ? 'var(--green)' : 'var(--red,#f44)';
+  }
+}
+if (annualSiteTotal != null) {
+  const elSite = document.getElementById('annual-site-total');
+  if (elSite) {
+    elSite.textContent = (annualSiteTotal >= 0 ? '+' : '') + '£' + Math.round(annualSiteTotal) + '/yr';
+    elSite.style.color = annualSiteTotal >= 0 ? 'var(--green)' : 'var(--red,#f44)';
+  }
+}
+if (annualG98 != null) {
     const el98 = document.getElementById('g98-current-profit');
     const el98a = document.getElementById('g98-annual');
     if (el98)  el98.textContent  = (netG98 >= 0 ? '+' : '') + '£' + netG98.toFixed(3);
@@ -3373,6 +3413,8 @@ async function refresh() {
     // FORWARD SCHEDULE — fetch Python-computed plan (single source of truth)
     try {
       const planResp = await fetch('/api/plan', { signal: AbortSignal.timeout(10000) });
+      fetchMining();
+      fetchMining();
       if (planResp.ok) {
         const planData = await planResp.json();
         // Cache current slot action so renderStats can use it for the status badge
