@@ -917,6 +917,7 @@
   <div class="tab-nav" id="main-tab-nav">
     <button class="tab-btn active" id="tbn-live"       onclick="switchTab('live')"       title="Live prices, stats & forward schedule">⚡ LIVE</button>
     <button class="tab-btn"        id="tbn-historical"  onclick="switchTab('historical')"  title="12-month historical backtest results">📈 HISTORICAL</button>
+    <button class="tab-btn"        id="tbn-founderhq"   onclick="switchTab('founderhq')"   title="Founder HQ — full site P&amp;L including mining &amp; self-consumption">🏭 FOUNDER HQ</button>
     <!-- G98/G99 comparison tabs removed — G99 5.5kW is the confirmed live cap (SSEN ref 260420-000198) -->
     <button class="tab-btn"        id="tbn-schematic"   onclick="switchTab('schematic')"   title="Full electrical schematic">⚡ SCHEMATIC</button>
     <button class="tab-btn"        id="tbn-overlay"     onclick="switchTab('overlay')"     title="Bench wiring photo overlay">📸 WIRING</button>
@@ -1219,6 +1220,73 @@
   <div style="display:none" id="fleet-grid"></div>
 
   </div><!-- /tab-live -->
+
+  <!-- ══ TAB: FOUNDER HQ ══════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-founderhq" style="padding:16px">
+
+    <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--muted);margin-bottom:16px">
+      DOVECOTE HQ — FULL SITE P&amp;L · NO SUBSCRIPTION · SELF-CONSUMPTION COUNTED
+    </div>
+
+    <!-- Baseload info -->
+    <div style="background:var(--card,#111);border:1px solid var(--border,#222);border-radius:8px;padding:14px;margin-bottom:12px;font-size:12px;color:var(--muted)">
+      ⚡ Baseload: <strong style="color:var(--text,#fff)">1.50 kW</strong> Z15 ASIC miner (36 kWh/day) +
+      <strong style="color:var(--text,#fff)">12 kWh/day</strong> house =
+      <strong style="color:var(--green,#4caf50)">48 kWh/day total</strong> ·
+      Battery covers all load — miner electricity is inside charge cost
+    </div>
+
+    <!-- P&L grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+
+      <div style="background:var(--card,#111);border:1px solid var(--border,#222);border-radius:8px;padding:14px">
+        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px">⛏ MINING REVENUE</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Daily yield</div>
+        <div id="fhq-zec-day" style="font-size:14px;color:#f0c040;font-weight:700;margin-bottom:8px">—</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">ZEC spot price</div>
+        <div id="fhq-zec-price" style="font-size:13px;color:var(--text,#fff);margin-bottom:8px">—</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Gross / day</div>
+        <div id="fhq-mining-day" style="font-size:22px;color:var(--green,#4caf50);font-weight:900;margin-bottom:4px">—</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Gross / year</div>
+        <div id="fhq-mining-year" style="font-size:22px;color:var(--green,#4caf50);font-weight:900">—</div>
+      </div>
+
+      <div style="background:var(--card,#111);border:1px solid var(--border,#222);border-radius:8px;padding:14px">
+        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px">🔋 BATTERY ARBITRAGE (12-mo backtest)</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Export income / yr</div>
+        <div id="fhq-export-yr" style="font-size:16px;color:var(--text,#fff);font-weight:700;margin-bottom:8px">—</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Charge cost / yr</div>
+        <div id="fhq-charge-yr" style="font-size:16px;color:#f44;font-weight:700;margin-bottom:8px">—</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Net arbitrage / yr</div>
+        <div id="fhq-arb-yr" style="font-size:18px;font-weight:900;margin-bottom:12px">—</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Self-consumption value / yr</div>
+        <div id="fhq-selfcon-yr" style="font-size:18px;color:var(--green,#4caf50);font-weight:900">—</div>
+      </div>
+
+      <div style="background:var(--card,#0a1a0a);border:2px solid var(--green,#4caf50);border-radius:8px;padding:14px">
+        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px">📊 TOTAL FOUNDER HQ P&amp;L</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Mining gross / yr</div>
+        <div id="fhq-total-mining" style="font-size:14px;color:var(--green,#4caf50);margin-bottom:6px">—</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Self-consumption value / yr</div>
+        <div id="fhq-total-sc" style="font-size:14px;color:var(--green,#4caf50);margin-bottom:6px">—</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Grid arbitrage / yr</div>
+        <div id="fhq-total-arb" style="font-size:14px;margin-bottom:12px">—</div>
+        <div style="border-top:1px solid var(--border,#333);padding-top:10px;margin-top:4px">
+          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);margin-bottom:6px">NET SITE P&amp;L / YR</div>
+          <div id="fhq-net-total" style="font-size:32px;font-weight:900;color:var(--green,#4caf50)">—</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="font-size:10px;color:var(--muted);padding:10px;border:1px solid var(--border,#222);border-radius:6px">
+      No subscription deducted — this is the Dovecote HQ site (owner-operator, not a managed home).
+      Mining revenue is gross; miner electricity is already accounted for inside battery charge cost.
+      Self-consumption value = load served from battery at prevailing import prices (avoided grid cost).
+    </div>
+
+  </div>
+  <!-- ══ end TAB: FOUNDER HQ ══════════════════════════════════════════ -->
 
   <!-- ══ TAB: HISTORICAL ════════════════════════════════════════ -->
   <div class="tab-panel" id="tab-historical">
@@ -2591,30 +2659,6 @@ async function loadFromServer() {
 }
 
 
-async function fetchMining() {
-  try {
-    const d = await fetch('/api/mining').then(r => r.json());
-    if (d.error) return;
-    const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
-    set('mining-zec-day',  d.zec_per_day.toFixed(4) + ' ZEC');
-    set('mining-gbp-day',  '£' + d.gross_gbp_day.toFixed(2));
-    set('mining-gbp-year', '£' + d.gross_gbp_year.toFixed(0));
-    set('mining-price',    '£' + d.zec_price_gbp.toFixed(0) + '/ZEC');
-  } catch(e) { console.warn('mining fetch failed', e); }
-}
-
-async function fetchMining() {
-  try {
-    const d = await fetch('/api/mining').then(r => r.json());
-    if (d.error) return;
-    const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
-    set('mining-zec-day',  d.zec_per_day.toFixed(4) + ' ZEC');
-    set('mining-gbp-day',  '£' + d.gross_gbp_day.toFixed(2));
-    set('mining-gbp-year', '£' + d.gross_gbp_year.toFixed(0));
-    set('mining-price',    '£' + d.zec_price_gbp.toFixed(0) + '/ZEC');
-  } catch(e) { console.warn('mining fetch failed', e); }
-}
-
 /** Render the forward schedule from Python /api/plan — single source of truth */
 function renderSchedule(planData) {
   const container = document.getElementById('fwd-schedule');
@@ -2643,8 +2687,6 @@ function renderSchedule(planData) {
   const annualG98      = summary ? summary.annual_g98        : null;   // £/yr projected from this window
   const annualG99      = summary ? summary.annual_g99        : null;   // G99 projected annual
   const annualDelta    = summary ? summary.annual_delta      : null;   // G99 − G98 annual uplift
-const annualSiteTotal = summary ? summary.annual_site_total : null; // owner P&L incl self-consumption
-const annualSiteTotal = summary ? summary.annual_site_total : null; // owner P&L incl self-consumption
   const arbitrageNet   = summary ? summary.arbitrage_net_g98 : netG98;
   const hostingCost    = summary ? summary.hosting_cost      : null;
   const houseLoadKwh   = summary ? summary.house_load_kwh    : null;
@@ -2654,21 +2696,7 @@ const annualSiteTotal = summary ? summary.annual_site_total : null; // owner P&L
   const exKwh    = exSlots.length * CFG.EXPORT_KWH * 0.88;
 
   // Push projections into G98/G99 tab elements if present
-  if (annualSiteTotal != null) {
-  const elSite = document.getElementById('annual-site-total');
-  if (elSite) {
-    elSite.textContent = (annualSiteTotal >= 0 ? '+' : '') + '£' + Math.round(annualSiteTotal) + '/yr';
-    elSite.style.color = annualSiteTotal >= 0 ? 'var(--green)' : 'var(--red,#f44)';
-  }
-}
-if (annualSiteTotal != null) {
-  const elSite = document.getElementById('annual-site-total');
-  if (elSite) {
-    elSite.textContent = (annualSiteTotal >= 0 ? '+' : '') + '£' + Math.round(annualSiteTotal) + '/yr';
-    elSite.style.color = annualSiteTotal >= 0 ? 'var(--green)' : 'var(--red,#f44)';
-  }
-}
-if (annualG98 != null) {
+  if (annualG98 != null) {
     const el98 = document.getElementById('g98-current-profit');
     const el98a = document.getElementById('g98-annual');
     if (el98)  el98.textContent  = (netG98 >= 0 ? '+' : '') + '£' + netG98.toFixed(3);
@@ -3413,8 +3441,6 @@ async function refresh() {
     // FORWARD SCHEDULE — fetch Python-computed plan (single source of truth)
     try {
       const planResp = await fetch('/api/plan', { signal: AbortSignal.timeout(10000) });
-      fetchMining();
-      fetchMining();
       if (planResp.ok) {
         const planData = await planResp.json();
         // Cache current slot action so renderStats can use it for the status badge
@@ -4380,6 +4406,7 @@ const TAB_COLORS = {
   hardware:   'active-cyan',
   homeowner:  'active-cyan',
   vpp:        'active-purple',
+  founderhq:  'active',
 };
 
 let g98Chart = null;
@@ -5041,5 +5068,101 @@ function msToNextSlot() {
   }, slotDelay);
 })();
 </script>
+<script>
+(function() {
+  var miningData = null;
+  var planData   = null;
+
+  function updateFounderHQ() {
+    if (!miningData && !planData) return;
+    var set = function(id, v, col) {
+      var e = document.getElementById(id);
+      if (!e) return;
+      e.textContent = v;
+      if (col) e.style.color = col;
+    };
+    if (miningData && !miningData.error) {
+      set('fhq-zec-day',      miningData.zec_per_day.toFixed(4) + ' ZEC');
+      set('fhq-zec-price',    '\u00a3' + miningData.zec_price_gbp.toFixed(0) + '/ZEC');
+      set('fhq-mining-day',   '\u00a3' + miningData.gross_gbp_day.toFixed(2));
+      set('fhq-mining-year',  '\u00a3' + miningData.gross_gbp_year.toFixed(0));
+      set('fhq-total-mining', '+\u00a3' + miningData.gross_gbp_year.toFixed(0) + '/yr');
+    }
+    if (planData) {
+      var s = planData.summary || planData;
+      var planDays   = s.plan_days || 1;
+      var exportYr   = s.annual_g98 != null ? s.annual_g98 + (s.annual_charge_cost || 0) : null;
+      var chargeYr   = s.annual_charge_cost != null ? s.annual_charge_cost : null;
+      var arbYr      = s.annual_g98 != null ? s.annual_g98 : null;
+      var scYr       = s.annual_site_total != null && s.annual_g98 != null
+                       ? (s.annual_site_total - s.annual_g98) : null;
+
+      if (s.total_rev_g98 != null && s.plan_days) {
+        exportYr  = Math.round(s.total_rev_g98  / s.plan_days * 365);
+        chargeYr  = Math.round(s.total_charge_cost / s.plan_days * 365);
+        arbYr     = Math.round(s.net_g98         / s.plan_days * 365);
+      }
+      if (s.annual_site_total != null && s.annual_g98 != null) {
+        scYr = s.annual_site_total - s.annual_g98;
+      } else if (s.self_consumption_value != null && s.plan_days) {
+        scYr = s.self_consumption_value / s.plan_days * 365;
+      }
+
+      if (exportYr != null) set('fhq-export-yr',  '+\u00a3' + exportYr + '/yr');
+      if (chargeYr != null) set('fhq-charge-yr',  '-\u00a3' + Math.abs(chargeYr) + '/yr');
+      if (arbYr    != null) {
+        set('fhq-arb-yr', (arbYr>=0?'+':'')+  '\u00a3' + arbYr + '/yr',
+            arbYr >= 0 ? 'var(--green,#4caf50)' : '#f44336');
+        set('fhq-total-arb', (arbYr>=0?'+':'')+  '\u00a3' + arbYr + '/yr',
+            arbYr >= 0 ? 'var(--green,#4caf50)' : '#f44336');
+      }
+      if (scYr != null) {
+        set('fhq-selfcon-yr', '+\u00a3' + scYr + '/yr');
+        set('fhq-total-sc',   '+\u00a3' + scYr + '/yr');
+      }
+
+      // Net total
+      var mYr = miningData && !miningData.error ? miningData.gross_gbp_year : 0;
+      var net = (arbYr || 0) + (scYr || 0) + (mYr || 0);
+      set('fhq-net-total', (net>=0?'+':'')+  '\u00a3' + Math.round(net) + '/yr',
+          net >= 0 ? 'var(--green,#4caf50)' : '#f44336');
+    }
+  }
+
+  function fetchAll() {
+    fetch('/api/mining').then(function(r){return r.json();}).then(function(d){
+      miningData = d; updateFounderHQ();
+    }).catch(function(){});
+    fetch('/api/history').then(function(r){return r.json();}).then(function(rows){
+      if (!rows || rows.length < 2) return;
+      // Sort by timestamp ascending
+      rows.sort(function(a,b){ return a.timestamp < b.timestamp ? -1 : 1; });
+      var first = rows[0], last = rows[rows.length-1];
+      var ms = new Date(last.timestamp) - new Date(first.timestamp);
+      var days = ms / 86400000;
+      if (days < 0.1) return;
+      var totalPnl = last.profit_gbp - first.profit_gbp;
+      var dailyArb = totalPnl / days;
+      var annualArb = dailyArb * 365;
+      // Avg import price for self-consumption calculation
+      var avgP = rows.reduce(function(s,r){ return s + r.price_p; }, 0) / rows.length;
+      var DAILY_LOAD_KWH = 48;
+      var selfConYear = DAILY_LOAD_KWH * (avgP / 100) * 365;
+      planData = {
+        _fromHistory: true,
+        annualArb: annualArb,
+        selfConYear: selfConYear,
+        days: days,
+        avgImportP: avgP
+      };
+      updateFounderHQ();
+    }).catch(function(){});
+  }
+
+  fetchAll();
+  setInterval(fetchAll, 120000);
+})();
+</script>
+
 </body>
 </html>

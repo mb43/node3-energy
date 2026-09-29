@@ -15,12 +15,11 @@
 
 services:
   node3:
-    devices:
-      - /dev/ttyUSB0:/dev/ttyUSB0   # JZK USB-RS485 → FoxESS RS485 com port (Modbus RTU)
-      - /dev/ttyACM0:/dev/ttyACM0   # LilyGo T-2CAN (Espressif USB JTAG/serial)
     environment:
       # Override the port to match what the Pi actually sees
       # Verify device assignment with:  ls -la /dev/ttyUSB*
       # then adjust to match (ttyUSB0 or ttyUSB1)
       - FOXESS_RS485_PORT=/dev/ttyUSB0
-      - LILYGO_IP=192.168.1.x        # ← replace with your LilyGo's actual IP
+      - LILYGO_IP=192.168.1.129        # ← replace with your LilyGo's actual IP
+    volumes:
+      - ./history.csv:/app/history.csv
