@@ -1939,7 +1939,6 @@ def _check_force_charge_autostop():
 # ─────────────────────────────────────────────
 # HARDWARE STATUS + MODE API
 # ─────────────────────────────────────────────
-@app.route("/api/fuse-status")
 def api_fuse_status():
     """Return last N entries from fuse_loop_log.json plus loop health."""
     import time as _time
@@ -1979,6 +1978,44 @@ def api_fuse_status():
         "last_error":   latest.get("error"),
         "recent":       entries[-20:],
     })
+
+
+@app.route("/api/house-profile")
+def api_house_profile():
+    """Return learned 48-slot house load profile + meta."""
+    import json as _json
+    profile_path = os.path.join(BASE_DIR, "house_profile.json")
+    meta_path    = os.path.join(BASE_DIR, "house_profile_meta.json")
+    profile, meta = [], {}
+    try:
+        if os.path.exists(profile_path):
+            profile = _json.loads(open(profile_path).read())
+    except Exception:
+        pass
+    try:
+        if os.path.exists(meta_path):
+            meta = _json.loads(open(meta_path).read())
+    except Exception:
+        pass
+    return jsonify({"profile": profile, "meta": meta, "ready": len(profile) == 48})
+
+
+@app.route("/api/grid-history")
+def api_grid_history():
+    """Return last N rows from grid_history.csv as JSON."""
+    import csv as _csv
+    rows_param = max(1, min(int(request.args.get("rows", 288)), 10000))
+    csv_path = os.path.join(BASE_DIR, "grid_history.csv")
+    rows = []
+    try:
+        if os.path.exists(csv_path):
+            with open(csv_path, newline="") as f:
+                for row in _csv.DictReader(f):
+                    rows.append(row)
+            rows = rows[-rows_param:]
+    except Exception as e:
+        return jsonify({"error": str(e), "rows": []}), 500
+    return jsonify({"rows": rows, "count": len(rows)})
 
 
 @app.route("/api/fuse-status")

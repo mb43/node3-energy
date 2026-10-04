@@ -1417,3 +1417,16 @@ if __name__ == '__main__':
         run_backfill()
     else:
         run_single()
+
+
+# ── Rebuild house load profile before each simulate run ──────────────────────
+def _rebuild_house_profile():
+    """Silently rebuild house_profile.json from grid_history.csv.
+    No-ops when less than 3 days of data collected.
+    """
+    try:
+        import house_profile as _hp
+        _hp.run()
+    except Exception:
+        pass
+
