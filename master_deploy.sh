@@ -52,7 +52,11 @@ ssh "$PI" "docker restart node3-portal"
 echo "      Waiting 5s for container to come up…"
 sleep 5
 echo "      Health check:"
-ssh "$PI" "curl -s http://localhost:5000/api/settings | python3 -c 'import sys,json; d=json.load(sys.stdin); print(f\"  export_kw={d.get(\\\"export_kw\\\")}, import_kw={d.get(\\\"import_kw\\\")}, SC_import={d.get(\\\"standing_charge_import_p_day\\\")}p\")'" || echo "      (health check skipped — container may still be starting)"
+ssh "$PI" 'curl -s http://localhost:5000/api/settings > /tmp/n3_health.json && python3 - <<EOF
+import json
+d = json.load(open("/tmp/n3_health.json"))
+print(f"  export_kw={d.get(\"export_kw\")}, import_kw={d.get(\"import_kw\")}, SC_import={d.get(\"standing_charge_import_p_day\")}p")
+EOF' || echo "      (health check skipped — container may still be starting)"
 
 # ── 4. SCP patched files back to Mac repo ────────────────────────────────────
 echo "[4/5] Syncing patched Pi files → Mac repo…"
