@@ -205,10 +205,70 @@ def _gather_can(interface):
 _DALA_PATHS = ["/status", "/api/status", "/data", "/api/data", "/api/battery"]
 
 
+def _parse_dala_html(html):
+    """
+    Scrape aggregate BMS data from DALA v12.x HTML dashboard.
+    DALA v12 has no JSON REST API — all data is rendered inline in HTML.
+    Returns partial dict (no per-cell voltages, only aggregates shown on page).
+    """
+    import re
+
+    def _find(pattern, text, group=1, cast=float, default=None):
+        m = re.search(pattern, text, re.IGNORECASE)
+        if m:
+            try:
+                return cast(m.group(group).replace(',', '.'))
+            except (ValueError, IndexError):
+                pass
+        return default
+
+    out = {}
+
+    # SOC — "real: 50.00%" (use real not scaled)
+    soc = _find(r'real:\s*([\d.]+)(?:&percnt;|%)', html)
+    if soc is not None:
+        out['soc_pct'] = soc
+
+    # SOH — "SOH: 99.00%"
+    soh = _find(r'SOH:\s*([\d.]+)(?:&percnt;|%)', html)
+    if soh is not None:
+        out['soh_pct'] = soh
+
+    # Voltage — "Voltage: 370.0 V"
+    v = _find(r'Voltage:\s*([\d.]+)\s*V', html)
+    if v is not None:
+        out['voltage_v'] = v
+
+    # Current — "Current: -5.5 A"
+    c = _find(r'Current:\s*(-?[\d.]+)\s*A', html)
+    if c is not None:
+        out['current_a'] = c
+
+    # Temperature — "Temperature min/max: 5.0 °C / 6.0 °C"
+    t_min = _find(r'Temperature min/max:\s*([\d.]+)\s*(?:&deg;|°|&#176;)C', html)
+    t_max = _find(r'Temperature min/max:[^/]+/\s*([\d.]+)\s*(?:&deg;|°|&#176;)C', html)
+    temps = [t for t in [t_min, t_max] if t is not None]
+    if temps:
+        out['temps_c'] = temps
+
+    # Cell min/max — "Cell min/max: 3700 mV / 3700 mV"
+    c_min = _find(r'Cell min/max:\s*(\d+)\s*mV', html, cast=int)
+    c_max = _find(r'Cell min/max:[^/]+/\s*(\d+)\s*mV', html, cast=int)
+    if c_min is not None:
+        out['min_cell_mv'] = c_min
+    if c_max is not None:
+        out['max_cell_mv'] = c_max
+    if c_min is not None and c_max is not None:
+        out['cell_mv_spread'] = c_max - c_min
+
+    return out
+
+
 def _poll_dala(ip):
     """
-    Fetch cell-level Pack 1 data from DALA Battery-Emulator HTTP endpoint.
-    DALA firmware version determines which path returns JSON — tries common ones.
+    Fetch Pack 1 data from DALA Battery-Emulator.
+    Tries JSON API paths first (future firmware), then falls back to HTML scraping
+    (DALA v12.x serves data embedded in the HTML dashboard, no REST JSON API).
     Returns normalised dict or None.
     """
     if not ip:
@@ -216,6 +276,7 @@ def _poll_dala(ip):
 
     import urllib.request, urllib.error
 
+    # Try JSON API paths first (may work in future DALA versions)
     for path in _DALA_PATHS:
         url = f"http://{ip}{path}"
         try:
@@ -232,16 +293,30 @@ def _poll_dala(ip):
                     log.debug(f"DALA Pack1 OK via {path}")
                     return norm
                 except json.JSONDecodeError:
-                    continue   # not JSON (HTML dashboard) — try next path
+                    continue   # HTML, not JSON — try next path
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                continue   # path not found, try next
+                continue
             log.debug(f"DALA {path}: HTTP {e.code}")
         except Exception as e:
             log.debug(f"DALA {path}: {e}")
-            break   # unreachable host — stop trying paths
+            break   # unreachable host — no point trying more paths
 
-    log.debug(f"DALA: no JSON endpoint found at {ip}")
+    # Fallback: scrape the HTML dashboard (DALA v12.x)
+    try:
+        req = urllib.request.Request(f"http://{ip}/", headers={"Accept": "text/html"})
+        with urllib.request.urlopen(req, timeout=4) as r:
+            html = r.read().decode("utf-8", errors="replace")
+        norm = _parse_dala_html(html)
+        if norm:
+            norm["source"]  = "DALA HTML"
+            norm["updated"] = _now()
+            log.debug(f"DALA Pack1 OK via HTML scrape")
+            return norm
+    except Exception as e:
+        log.debug(f"DALA HTML scrape: {e}")
+
+    log.debug(f"DALA: no data found at {ip}")
     return None
 
 
@@ -306,7 +381,11 @@ def poll_once():
     p1 = _poll_dala(LILYGO_IP)
     detail["packs"]["pack1"] = p1 if p1 else {
         "source": "DALA HTTP", "error": "unavailable",
-        "hint": f"Set LILYGO_IP env var (current: '{LILYGO_IP or 'not set'}')"
+        "hint": (
+            "Set LILYGO_IP env var in docker-compose.pi.yml"
+            if not LILYGO_IP
+            else f"LilyGo unreachable at {LILYGO_IP} — powered on and on network?"
+        )
     }
 
     # Pack 2 — Waveshare ch1 (can0)
