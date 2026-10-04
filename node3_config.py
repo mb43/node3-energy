@@ -31,10 +31,11 @@ CONFIG_FILE = os.path.join(BASE_DIR, "node3_config.json")
 
 DEFAULTS = {
     "battery_kwh":   72.0,  # usable pack capacity (3x Nissan e-NV200)
-    "import_kw":     10.0,  # charge rate — inverter/import limit
-    "export_kw":      6.0,  # discharge rate — export limit (self-imposed; must not exceed
-                             # the real DNO cap for whichever connection is active — 7.36kW
-                             # for G98/32A, 11.5kW for G99/50A)
+    "import_kw":      9.0,  # charge rate — Fox ESS KH10.5 (10.5 kW) minus Z15 miner
+                             # constant baseload 1.5 kW on inverter AC output = 9.0 kW effective
+    "export_kw":      5.5,  # discharge rate — SSEN G99 confirmed at 5.5 kW
+                             # (approval ref 260420-000198/FJJ907/1).
+                             # Override in settings if wiring changes.
     "min_soc_pct":   10.0,  # absolute floor, % of battery_kwh
     "baseload_kw":    0.0,  # constant background load (kW) added to the 12kWh/day house
                              # profile — e.g. 1.5 for a 36kWh/day ASIC miner running 24/7.
@@ -43,6 +44,15 @@ DEFAULTS = {
     "house_kwh_day": 12.0,  # profiled household consumption per day (Elexon PC1 shape)
     "svt_ref_p":     25.0,  # Ofgem SVT reference (p/kWh)
     "subscription_pcm": 29.0,  # monthly subscription per consumer site (£)
+    # ── Tariff mode (added Oct 2026) ──────────────────────────────────────────
+    "tariff_mode":           "agile",  # active tariff: 'agile' | 'split' | 'optimise'
+    "optimise_import_mod_p": 3.0,      # p/kWh import discount 00:00-06:00 (E.ON Optimise early-bird)
+    "optimise_export_mod_p": 3.0,      # p/kWh export bonus 16:00-19:00   (E.ON Optimise early-bird)
+    # ── Standing charges (added Oct 2026) ────────────────────────────────────
+    "standing_charge_import_p_day": 58.9,  # daily standing charge on import tariff (p/day)
+                                            # Octopus Agile H region ≈ 58.9p/day incl VAT
+    "standing_charge_export_p_day":  0.0,  # daily standing charge on export contract (p/day)
+                                            # Octopus Agile Outgoing = 0p/day
 }
 
 
@@ -56,7 +66,10 @@ def load_config():
             if isinstance(saved, dict):
                 for k in DEFAULTS:
                     if k in saved:
-                        cfg[k] = float(saved[k])
+                        if isinstance(DEFAULTS[k], str):
+                            cfg[k] = str(saved[k])
+                        else:
+                            cfg[k] = float(saved[k])
         except Exception:
             pass
     return cfg
@@ -66,18 +79,26 @@ def save_config(updates):
     """Merge `updates` onto the current saved config and persist. Returns the
     full merged config. Silently ignores unknown keys and non-numeric values.
     baseload_kw and house_kwh_day allow zero (>= 0); others require > 0."""
-    NON_NEGATIVE = {"baseload_kw", "house_kwh_day"}
+    NON_NEGATIVE = {"baseload_kw", "house_kwh_day",
+                    "standing_charge_import_p_day", "standing_charge_export_p_day"}
+    STRING_KEYS  = {"tariff_mode"}
+    VALID_MODES  = {"agile", "split", "optimise"}
     cfg = load_config()
     for k in DEFAULTS:
         if k in updates:
-            try:
-                v = float(updates[k])
-                if k in NON_NEGATIVE and v >= 0:
+            if k in STRING_KEYS:
+                v = str(updates[k]).lower().strip()
+                if v in VALID_MODES:
                     cfg[k] = v
-                elif k not in NON_NEGATIVE and v > 0:
-                    cfg[k] = v
-            except (TypeError, ValueError):
-                pass
+            else:
+                try:
+                    v = float(updates[k])
+                    if k in NON_NEGATIVE and v >= 0:
+                        cfg[k] = v
+                    elif k not in NON_NEGATIVE and v > 0:
+                        cfg[k] = v
+                except (TypeError, ValueError):
+                    pass
     with open(CONFIG_FILE, "w") as f:
         json.dump(cfg, f, indent=2)
     return cfg

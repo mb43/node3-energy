@@ -217,6 +217,8 @@ def normalize_state(state):
 # permanent, never revert to greedy/percentile" rule for the headline
 # "12-month backtest" figure the dashboard shows next to the live 24hr number.
 # Called by /api/backtest; result cached 24h in backtest_cache.json.
+_bt_lock = __import__("threading").Lock()
+_bt_running = {}
 # ─────────────────────────────────────────────
 import simulate as _sim   # reuse the real LP dispatch engine — do not re-implement it here
 
@@ -285,7 +287,7 @@ def _bt_discover(is_export=False):
     return products[0]['code']
 
 
-def _run_backtest(months=12, founder=False):
+def _run_backtest(months=12, founder=False, tariff_mode=None, imp_mod_p=3.0, exp_mod_p=3.0):
     """
     Fetch 12 months of Octopus Agile import + export prices and replay them
     through simulate.py's real LP-optimal plan_optimal_dispatch() (fixed 19
@@ -344,11 +346,19 @@ def _run_backtest(months=12, founder=False):
     _BT_MIN_SOC_KWH     = _BT_BATTERY_KWH * (_bt_cfg["min_soc_pct"] / 100.0)
     _BT_EXPORT_KWH      = _bt_cfg["export_kw"] * 0.5
     _BT_CHARGE_KWH_SLOT = _bt_cfg["import_kw"] * 0.5
+    # ── Standing charges ──────────────────────────────────────────────────
+    _SC_IMPORT_P    = float(_bt_cfg.get("standing_charge_import_p_day", 62.22))  # p/day
+    _SC_EXPORT_P    = float(_bt_cfg.get("standing_charge_export_p_day", 0.0))   # p/day
+    _SC_EON_P       = float(_bt_cfg.get("standing_charge_eon_p_day",   62.22))   # p/day
+    _SC_AGILE_TOTAL = _SC_IMPORT_P + _SC_EXPORT_P   # p/day (Agile import + Outgoing)
     _bt_house_kwh       = _bt_cfg.get("house_kwh_day", 12.0)
     _bt_baseload_kw     = _bt_cfg.get("baseload_kw", 0.0) if founder else _bt_cfg.get("baseload_kw_consumer", 0.0)
     _bt_baseload_slot   = _bt_baseload_kw * 0.5        # kWh/slot (constant, flat)
     _bt_total_load_day  = _bt_house_kwh + _bt_baseload_kw * 24.0  # for LP planning
 
+    # ── Active tariff for this run ────────────────────────────────────────
+    if tariff_mode is None:
+        tariff_mode = _bt_cfg.get("tariff_mode", "agile")
     n   = len(import_prices)
     soc = _BT_BATTERY_KWH * 0.5   # start at 50% SOC
 
@@ -369,12 +379,30 @@ def _run_backtest(months=12, founder=False):
         vf    = slot['valid_from'].replace('Z', '+00:00')
         dt    = datetime.fromisoformat(vf)
         key   = dt.strftime('%Y-%m')
+        # ── Effective buy/sell prices under active tariff ─────────────────
+        _h        = dt.hour
+        _buy_p    = price
+        _sell_adj = 0.0
+        if tariff_mode in ('split', 'optimise') and 0 <= _h < 6:
+            _buy_p = max(0.0, price - imp_mod_p)
+        if tariff_mode == 'optimise' and 16 <= _h < 19:
+            _sell_adj = exp_mod_p
 
         # Replan (real LP, not a heuristic) whenever we've run off the end of
         # the current plan — happens every 96 slots by construction (the window
         # requested below is 96 slots wide).
         if slot['valid_from'] not in dispatch_plan:
-            window = import_prices[idx: idx + 96]
+            if tariff_mode != 'agile':
+                # Buy-price-adjusted window so LP shifts charging to cheap 00-06 slots
+                window = []
+                for _ws in import_prices[idx: idx + 96]:
+                    _wh = datetime.fromisoformat(_ws['valid_from'].replace('Z', '+00:00')).hour
+                    _wp = float(_ws['value_inc_vat'])
+                    if tariff_mode in ('split', 'optimise') and 0 <= _wh < 6:
+                        _wp = max(0.0, _wp - imp_mod_p)
+                    window.append({**_ws, 'value_inc_vat': _wp})
+            else:
+                window = import_prices[idx: idx + 96]
             dispatch_plan.update(
                 _sim.plan_optimal_dispatch(window, soc, battery_kwh=_BT_BATTERY_KWH,
                                             min_soc_kwh=_BT_MIN_SOC_KWH,
@@ -414,7 +442,7 @@ def _run_backtest(months=12, founder=False):
             grid_disc = min(_BT_EXPORT_KWH, avail)
             if grid_disc > 0.01:
                 exp_p = get_exp(slot)
-                income = grid_disc * _BT_RTE * exp_p / 100.0
+                income = grid_disc * _BT_RTE * (exp_p + _sell_adj) / 100.0
                 soc                   -= grid_disc
                 slot_profit           += income
                 mo['exportIncome']    += income
@@ -430,11 +458,11 @@ def _run_backtest(months=12, founder=False):
             charge = min(_BT_CHARGE_KWH_SLOT, _BT_BATTERY_KWH - soc)
             if charge > 0.01:
                 soc               += charge
-                cost               = charge * price / 100.0
+                cost               = charge * _buy_p / 100.0
                 slot_profit       -= cost
                 mo['chargeCost']  += cost
                 mo['chargeSlots'] += 1
-                mo['buyPriceSum'] += price
+                mo['buyPriceSum'] += _buy_p
                 mo['chargeKwh']   += charge
                 total_charge_cost += cost
                 total_charge_kwh  += charge
@@ -444,7 +472,7 @@ def _run_backtest(months=12, founder=False):
             disc  = min(_BT_EXPORT_KWH, avail)
             if disc > 0.01:
                 exp_p = get_exp(slot)
-                income = disc * _BT_RTE * exp_p / 100.0
+                income = disc * _BT_RTE * (exp_p + _sell_adj) / 100.0
                 soc                  -= disc
                 slot_profit          += income
                 mo['exportIncome']   += income
@@ -516,6 +544,13 @@ def _run_backtest(months=12, founder=False):
         'totalDischargeKwh':    round(total_discharge_kwh, 4),
         'avgExportRateP':       round(avg_exp_rate, 4),
         'hasExportData':        has_export,
+        # ── Standing charges ──────────────────────────────────────────────────
+        'standing_charge_import_p_day':  _SC_IMPORT_P,
+        'standing_charge_export_p_day':  _SC_EXPORT_P,
+        'standing_charge_eon_p_day':     _SC_EON_P,
+        'standing_charge_annual_gbp':    round(_SC_AGILE_TOTAL * 365 / 100, 2),
+        'standing_charge_period_gbp':    round(_SC_AGILE_TOTAL * (n / 48) / 100, 2),
+        'lp_net_gbp':                    round(net - _SC_AGILE_TOTAL * (n / 48) / 100, 2),
     }
 
 
@@ -619,9 +654,11 @@ def api_settings():
 
     body = request.get_json(silent=True) or {}
     updates = {}
-    NON_NEGATIVE_KEYS = {"baseload_kw", "house_kwh_day"}
+    NON_NEGATIVE_KEYS = {"baseload_kw", "house_kwh_day",
+                         "standing_charge_import_p_day", "standing_charge_export_p_day"}
     for key in ("battery_kwh", "import_kw", "export_kw", "min_soc_pct",
-                "baseload_kw", "house_kwh_day", "svt_ref_p", "subscription_pcm"):
+                "baseload_kw", "house_kwh_day", "svt_ref_p", "subscription_pcm",
+                "standing_charge_import_p_day", "standing_charge_export_p_day"):
         if key in body:
             try:
                 v = float(body[key])
@@ -638,6 +675,29 @@ def api_settings():
     merged = _cfg.save_config(updates)
     print(f"[SETTINGS] Updated: {updates} -> {merged}")
     return jsonify(merged)
+
+
+@app.route("/api/tariff", methods=["GET", "POST"])
+def api_tariff():
+    """
+    GET  -> {tariff_mode, optimise_import_mod_p, optimise_export_mod_p}
+    POST -> {mode: "agile"|"split"|"optimise"}  — persists to node3_config.json.
+    Effect: next simulate.py run and next /api/plan call use the new mode.
+    """
+    cfg = _cfg.load_config()
+    if request.method == "GET":
+        return jsonify({
+            "tariff_mode":            cfg.get("tariff_mode", "agile"),
+            "optimise_import_mod_p":  cfg.get("optimise_import_mod_p", 3.0),
+            "optimise_export_mod_p":  cfg.get("optimise_export_mod_p", 3.0),
+        })
+    body = request.get_json(silent=True) or {}
+    mode = str(body.get("mode", "")).lower().strip()
+    if mode not in ("agile", "split", "optimise"):
+        return jsonify({"error": "mode must be agile | split | optimise"}), 400
+    merged = _cfg.save_config({"tariff_mode": mode})
+    print(f"[TARIFF] Mode set to: {mode}")
+    return jsonify({"tariff_mode": merged.get("tariff_mode", mode), "ok": True})
 
 
 # ─────────────────────────────────────────────
@@ -976,6 +1036,89 @@ def api_plan():
     })
 
 
+@app.route("/api/backtest-compare")
+def api_backtest_compare():
+    """
+    Run _run_backtest() for all three tariff modes and return a side-by-side
+    comparison dict.
+
+    ?months=N (default 12)  ?mode=founder  ?force=1 (bust 24h cache)
+
+    Response: {modes: {agile: {...}, split: {...}, optimise: {...}},
+               months, imp_mod_p, exp_mod_p, _ts}
+
+    Each mode dict: gross_gbp, net_gbp (after SC), annualised_net_gbp,
+                    vs_agile_net_gbp (split/optimise only), days,
+                    avg_buy_p, avg_sell_p, total_charge_kwh, total_discharge_kwh
+    """
+    months  = int(request.args.get("months", 12))
+    founder = request.args.get("mode") == "founder"
+    force   = request.args.get("force") == "1"
+    cache_p = os.path.join(BASE_DIR, "backtest_compare_cache.json")
+
+    if not force and os.path.exists(cache_p):
+        try:
+            with open(cache_p) as _f:
+                cached = json.load(_f)
+            age_h = (time.time() - cached.get("_ts", 0)) / 3600
+            if age_h < 24:
+                return jsonify(cached)
+        except Exception:
+            pass
+
+    cfg     = _cfg.load_config()
+    imp_mod = float(cfg.get("optimise_import_mod_p", 3.0))
+    exp_mod = float(cfg.get("optimise_export_mod_p", 3.0))
+    sc_agile = (float(cfg.get("standing_charge_import_p_day", 62.22)) +
+                float(cfg.get("standing_charge_export_p_day", 0.0)))
+    sc_eon   = float(cfg.get("standing_charge_eon_p_day", 62.22))
+
+    results = {}
+    for mode in ("agile", "split", "optimise"):
+        try:
+            r    = _run_backtest(months=months, founder=founder,
+                                 tariff_mode=mode,
+                                 imp_mod_p=imp_mod, exp_mod_p=exp_mod)
+            days = r.get("days", months * 30.5)
+            # Standing charges differ by tariff
+            sc_p_day = sc_agile if mode == "agile" else sc_eon
+            sc_total = sc_p_day * days / 100.0
+            gross    = r["total"]
+            net      = round(gross - sc_total, 2)
+            results[mode] = {
+                "gross_gbp":            round(gross, 2),
+                "standing_charge_gbp":  round(sc_total, 2),
+                "net_gbp":              net,
+                "annualised_gross_gbp": round(gross * 365 / max(1, days), 2),
+                "annualised_net_gbp":   round(net   * 365 / max(1, days), 2),
+                "days":                 round(days, 1),
+                "avg_buy_p":            r.get("buyThr", 0),
+                "avg_sell_p":           r.get("sellThr", 0),
+                "total_charge_kwh":     r.get("totalChargeKwh", 0),
+                "total_discharge_kwh":  r.get("totalDischargeKwh", 0),
+            }
+        except Exception as e:
+            results[mode] = {"error": str(e)}
+
+    # Deltas vs agile baseline
+    if "agile" in results and "net_gbp" in results["agile"]:
+        base = results["agile"]["net_gbp"]
+        for mode in ("split", "optimise"):
+            if mode in results and "net_gbp" in results[mode]:
+                results[mode]["vs_agile_net_gbp"] = round(results[mode]["net_gbp"] - base, 2)
+
+    payload = {"modes": results, "months": months, "founder": founder,
+               "imp_mod_p": imp_mod, "exp_mod_p": exp_mod,
+               "sc_agile_p_day": sc_agile, "sc_eon_p_day": sc_eon,
+               "_ts": time.time()}
+    try:
+        with open(cache_p, "w") as _f:
+            json.dump(payload, _f, indent=2)
+    except Exception:
+        pass
+    return jsonify(payload)
+
+
 @app.route("/api/backtest")
 def api_backtest():
     """12-month backtest. ?mode=founder uses baseload_kw; default uses baseload_kw_consumer."""
@@ -1002,20 +1145,25 @@ def api_backtest():
         except Exception as e:
             print(f'[BACKTEST] Cache read error: {e}')
 
-    try:
-        data = _run_backtest(founder=founder)
-        now_ts = time.time()
+    mode_key = "founder" if founder else "consumer"
+    def _bg(founder_flag, key, cpath):
+        print(f'[BACKTEST] bg thread start mode={key}')
         try:
-            with open(cache_path, 'w') as f:
-                json.dump({'_cached_at': now_ts, 'data': data}, f)
-        except Exception as e:
-            print(f'[BACKTEST] Cache write error: {e}')
-        data['_generated_at'] = datetime.fromtimestamp(now_ts, tz=timezone.utc).isoformat()
-        return jsonify(data)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+            d = _run_backtest(founder=founder_flag)
+            ts = time.time()
+            with open(cpath,'w') as f: json.dump({'_cached_at':ts,'data':d},f)
+            print(f'[BACKTEST] bg thread done mode={key}')
+        except Exception as ex:
+            print(f'[BACKTEST] bg thread error: {ex}')
+        finally:
+            with _bt_lock: _bt_running.pop(key,None)
+    with _bt_lock:
+        if not _bt_running.get(mode_key):
+            _bt_running[mode_key]=True
+            import threading as _th
+            _th.Thread(target=_bg,args=(founder,mode_key,cache_path),daemon=True).start()
+            print(f'[BACKTEST] spawned bg thread mode={mode_key}')
+    return jsonify({'status':'running','mode':mode_key,'message':'LP backtest running in background'}),202
 
 
 @app.route("/api/backtest-lp")
@@ -1062,6 +1210,9 @@ def api_backtest_lp_old():
     MIN_SOC        = BATTERY * (_lp_cfg["min_soc_pct"] / 100.0)
     CHARGE_KWH     = _lp_cfg["import_kw"] * 0.5   # configurable, both G98 & G99 (same inverter)
     EXPORT_G98     = _lp_cfg["export_kw"] * 0.5   # configurable G98 export rate
+    _SC_IMPORT_P   = _lp_cfg.get("standing_charge_import_p_day", 58.9)  # p/day
+    _SC_EXPORT_P   = _lp_cfg.get("standing_charge_export_p_day", 0.0)   # p/day
+    _SC_TOTAL_P_DAY = _SC_IMPORT_P + _SC_EXPORT_P  # total p/day standing charges
     EXPORT_G99     = 2.75    # fixed — SSEN-confirmed G99 limit: 5.5kW × 0.5h (ref 260420-000198)
     RTE            = 0.88
     VLP_P          = 40.0
@@ -1089,12 +1240,36 @@ def api_backtest_lp_old():
         by_day[day].sort(key=lambda s: s['valid_from'])
 
     # ── Per-day LP and greedy functions ───────────────────────────────────────
-    def lp_day(prices_p, init_soc, charge_kwh=CHARGE_KWH, export_kwh=EXPORT_G98):
+    def _slot_modifiers(slots, tariff_mode, imp_mod, exp_mod):
+        """(import_delta[], export_delta[]) — p/kWh adjustment per slot."""
+        n = len(slots)
+        id_ = [0.0] * n
+        ed_ = [0.0] * n
+        if tariff_mode == 'agile':
+            return id_, ed_
+        for i, s in enumerate(slots):
+            try:
+                h = datetime.fromisoformat(
+                    s['valid_from'].replace('Z', '+00:00')).hour
+            except Exception:
+                continue
+            if tariff_mode in ('split', 'optimise') and 0 <= h < 6:
+                id_[i] = -imp_mod
+            if tariff_mode == 'optimise' and 16 <= h < 19:
+                ed_[i] = exp_mod
+        return id_, ed_
+
+    def lp_day(prices_p, init_soc, charge_kwh=CHARGE_KWH, export_kwh=EXPORT_G98,
+               import_delta=None, export_delta=None):
         n = len(prices_p)
         if n < 10:
             return 0.0, init_soc
         p       = np.array(prices_p, dtype=float)
-        c_obj   = np.concatenate([p, -p * RTE])
+        id_arr  = np.array(import_delta, dtype=float) if import_delta is not None else np.zeros(n)
+        ed_arr  = np.array(export_delta, dtype=float) if export_delta is not None else np.zeros(n)
+        b_arr   = p + id_arr   # effective buy  prices
+        s_arr   = p + ed_arr   # effective sell prices
+        c_obj   = np.concatenate([b_arr, -s_arr * RTE])
         A_ub    = np.zeros((2 * n, 2 * n))
         b_ub    = np.zeros(2 * n)
         for t in range(1, n + 1):
@@ -1108,7 +1283,7 @@ def api_backtest_lp_old():
         if res.status != 0:
             return 0.0, init_soc
         c_v = res.x[:n]; d_v = res.x[n:]
-        rev_p = sum(d_v[i]*prices_p[i]*RTE - c_v[i]*prices_p[i] for i in range(n))
+        rev_p = sum(d_v[i]*s_arr[i]*RTE - c_v[i]*b_arr[i] for i in range(n))
         # Walk SOC to get end state
         soc = init_soc
         for i in range(n):
@@ -1231,6 +1406,11 @@ def api_backtest_lp_old():
         'rte':                 RTE,
         'battery_kwh':         BATTERY,
         'run_at':              datetime.now(timezone.utc).isoformat(),
+        # ── Net P&L after standing charges ───────────────────────────────────
+        'standing_charge_annual_gbp':  round((_SC_IMPORT_P + _SC_EXPORT_P) * 365 / 100, 2),
+        'standing_charge_period_gbp':  round(_SC_TOTAL_P_DAY * len(days_sorted) / 100, 2),
+        'lp_net_gbp':          round(lp_total  - _SC_TOTAL_P_DAY * len(days_sorted) / 100, 2),
+        'lp_g99_net_gbp':      round(g99_total - _SC_TOTAL_P_DAY * len(days_sorted) / 100, 2),
     }
 
     try:

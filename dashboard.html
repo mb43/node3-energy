@@ -860,6 +860,26 @@
       <a href="NODE3_Schematic.html" target="_blank" style="display:flex;align-items:center;gap:6px;background:rgba(88,166,255,0.10);border:1px solid rgba(88,166,255,0.35);border-radius:20px;padding:3px 10px;font-size:12px;color:var(--blue);text-decoration:none;letter-spacing:1px;" title="Full electrical schematic">⚡ SCHEMATIC</a>
     </div>
     <div class="header-right">
+      <!-- TARIFF MODE TOGGLE — AGILE | SPLIT | OPTIMISE -->
+      <span id="tariff-toggle"
+        style="display:inline-flex;border:1px solid rgba(88,166,255,0.35);border-radius:20px;
+               overflow:hidden;margin-right:8px;vertical-align:middle">
+        <button id="tt-agile" onclick="setTariffMode('agile')"
+          title="Octopus Agile only — symmetric LP, raw EPEX spot prices&#10;Agile Import + Agile Outgoing&#10;Standing charge: ~61p/day import + ~0p/day export"
+          style="padding:3px 11px;font-size:11px;letter-spacing:0.5px;border:none;
+                 cursor:pointer;font-family:inherit;background:rgba(88,166,255,0.25);
+                 color:var(--blue);font-weight:bold">AGILE</button>
+        <button id="tt-split" onclick="setTariffMode('split')"
+          title="Import E.ON Optimise (−3p 00-06 h) / Export Octopus Agile&#10;Split supplier — legal in UK&#10;Keeps Agile export spikes; E.ON import discount overnight"
+          style="padding:3px 11px;font-size:11px;letter-spacing:0.5px;border:none;
+                 border-left:1px solid rgba(88,166,255,0.35);cursor:pointer;
+                 font-family:inherit;background:transparent;color:#8b949e">SPLIT</button>
+        <button id="tt-opt" onclick="setTariffMode('optimise')"
+          title="E.ON Next Optimise — import −3p 00-06 h, export +3p 16-19 h&#10;Both import and export via E.ON&#10;12-month early-bird bonus (first 1,000 customers)"
+          style="padding:3px 11px;font-size:11px;letter-spacing:0.5px;border:none;
+                 border-left:1px solid rgba(88,166,255,0.35);cursor:pointer;
+                 font-family:inherit;background:transparent;color:#8b949e">OPTIMISE</button>
+      </span>
       <button onclick="openSettings()" title="Battery capacity / import / export rate settings" style="background:rgba(88,166,255,0.10);border:1px solid rgba(88,166,255,0.35);border-radius:20px;padding:3px 12px;font-size:12px;color:var(--blue);letter-spacing:1px;cursor:pointer;margin-right:4px">⚙ SETTINGS</button>
       <div class="clock" id="clock">--:--:--</div>
       <div class="clock-sub" id="clock-date">--- -- ----</div>
@@ -896,6 +916,13 @@
       <label style="display:block;font-size:11px;color:#8b949e;margin-bottom:3px">Constant baseload (kW) — ASIC miner / always-on load</label>
       <input type="number" id="set-baseload-kw" step="0.1" min="0" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;margin-bottom:4px;font-size:13px">
       <div id="set-baseload-hint" style="font-size:10px;color:#8b949e;margin-bottom:16px">Z15 miner ≈ 1.51 kW = 36 kWh/day. Total daily load shown above.</div>
+
+      <label style="display:block;font-size:11px;color:#8b949e;margin-bottom:3px">Import standing charge (p/day)</label>
+      <input type="number" id="set-standing-import" step="0.1" min="0" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;margin-bottom:12px;font-size:13px">
+
+      <label style="display:block;font-size:11px;color:#8b949e;margin-bottom:3px">Export standing charge (p/day)</label>
+      <input type="number" id="set-standing-export" step="0.1" min="0" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:7px 10px;margin-bottom:4px;font-size:13px">
+      <div style="font-size:10px;color:#8b949e;margin-bottom:16px">Deducted from backtest P&amp;L. Agile import ≈ 58.9p/day; Agile Outgoing = 0p/day.</div>
 
       <div id="settings-msg" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:10px"></div>
 
@@ -1315,6 +1342,15 @@
       <span style="color:var(--muted);font-size:10px;font-weight:normal">Real Octopus Agile prices · Single modelled home · LP greedy optimiser · context-adjusted dynamic thresholds (wind / weekday / season) · 88% round-trip efficiency (FoxESS + Nissan cell) · 12kWh/day home load (industry-standard hourly profile) · Home energy value tracked separately</span>
     </div>
     <button class="hist-btn" id="hist-btn" onclick="loadHistoricalData()">⚡ LOAD 12 MONTHS OF REAL DATA</button>
+    <button class="hist-btn" id="compare-btn" onclick="loadTariffCompare()" style="background:rgba(63,185,80,0.12);border-color:rgba(63,185,80,0.4);color:var(--green,#3fb950);margin-left:6px">📊 COMPARE TARIFFS</button>
+  </div>
+
+  <!-- TARIFF COMPARISON PANEL ─────────────────────────────────── -->
+  <div id="compare-panel" style="display:none;margin:0 0 18px;background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:16px 20px">
+    <div style="font-size:12px;font-weight:bold;letter-spacing:0.5px;color:#e6edf3;margin-bottom:12px">TARIFF COMPARISON — 12 MONTHS LP-OPTIMAL</div>
+    <div id="compare-status" style="font-size:11px;color:#8b949e;margin-bottom:10px"></div>
+    <div id="compare-table"></div>
+    <div style="font-size:10px;color:#8b949e;margin-top:10px">Standing charges deducted from net P&amp;L.<br>AGILE SC from config (default 62.22p/day). E.ON SC set via ⚙ SETTINGS → standing charge fields.<br>E.ON early-bird: −3p import 00:00-06:00 · +3p export 16:00-19:00. LP reoptimises for each tariff.</div>
   </div>
 
   <div class="hist-progress" id="hist-progress">
@@ -3544,6 +3580,11 @@ async function syncCfgFromSettings() {
   }
 }
 
+// Initialise tariff toggle UI on load
+document.addEventListener('DOMContentLoaded', function() {
+  loadTariffMode();
+});
+
 async function openSettings() {
   const modal = document.getElementById('settings-modal');
   const msg   = document.getElementById('settings-msg');
@@ -3558,6 +3599,8 @@ async function openSettings() {
     document.getElementById('set-min-soc-pct').value    = cfg.min_soc_pct;
     document.getElementById('set-house-kwh-day').value  = cfg.house_kwh_day ?? 12;
     document.getElementById('set-baseload-kw').value    = cfg.baseload_kw ?? 0;
+    document.getElementById('set-standing-import').value = cfg.standing_charge_import_p_day ?? 58.9;
+    document.getElementById('set-standing-export').value = cfg.standing_charge_export_p_day ?? 0;
     _updateBaseloadHint(cfg);
   } catch (e) {
     msg.textContent = 'Could not load current settings: ' + e.message;
@@ -3566,6 +3609,65 @@ async function openSettings() {
 
 function closeSettings() {
   document.getElementById('settings-modal').style.display = 'none';
+}
+
+async function loadTariffCompare(force) {
+  const panel  = document.getElementById('compare-panel');
+  const status = document.getElementById('compare-status');
+  const table  = document.getElementById('compare-table');
+  panel.style.display = 'block';
+  status.textContent  = 'Running comparison backtest… (LP optimise × 3 modes)';  
+  table.innerHTML     = '';
+  const btn = document.getElementById('compare-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ RUNNING…'; }
+  try {
+    const url  = '/api/backtest-compare' + (force ? '?force=1' : '');
+    const res  = await fetch(url, { signal: AbortSignal.timeout(120000) });
+    const data = await res.json();
+    if (!res.ok) { status.textContent = data.error || 'Compare failed.'; return; }
+    const modes  = data.modes || {};
+    const labels = { agile: 'Octopus Agile', split: 'E.ON Split', optimise: 'E.ON Optimise' };
+    const colors = { agile: 'var(--blue)', split: 'var(--yellow,#e3b341)', optimise: 'var(--green)' };
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:11px">';
+    html += '<tr><th style="text-align:left;padding:4px 8px;color:#8b949e">Metric</th>';
+    for (const m of ['agile','split','optimise']) {
+      html += `<th style="text-align:right;padding:4px 8px;color:${colors[m]}">${labels[m]}</th>`;
+    }
+    html += '</tr>';
+    const rows = [
+      { key: 'gross_gbp',            label: 'Gross P&L (£)',         fmt: v => '£' + v.toFixed(2) },
+      { key: 'standing_charge_gbp',  label: 'Standing charges (£)',  fmt: v => '£' + v.toFixed(2) },
+      { key: 'net_gbp',              label: 'Net P&L (£)',           fmt: v => '£' + v.toFixed(2) },
+      { key: 'annualised_net_gbp',   label: 'Annualised net (£/yr)', fmt: v => '£' + v.toFixed(2) },
+      { key: 'vs_agile_net_gbp',     label: 'vs Agile delta (£)',    fmt: v => (v >= 0 ? '+' : '') + '£' + v.toFixed(2) },
+      { key: 'avg_buy_p',            label: 'Avg buy price (p)',     fmt: v => v.toFixed(2) + 'p' },
+      { key: 'avg_sell_p',           label: 'Avg sell price (p)',    fmt: v => v.toFixed(2) + 'p' },
+    ];
+    let rowIdx = 0;
+    for (const row of rows) {
+      const bg = (rowIdx++ % 2 === 0) ? 'rgba(255,255,255,0.02)' : 'transparent';
+      html += `<tr style="background:${bg}">`;
+      html += `<td style="padding:4px 8px;color:#8b949e">${row.label}</td>`;
+      for (const m of ['agile','split','optimise']) {
+        const d = modes[m] || {};
+        if (d.error) { html += `<td style="text-align:right;padding:4px 8px;color:var(--red)">ERR</td>`; continue; }
+        const v = d[row.key];
+        const disp = (v !== undefined && v !== null) ? row.fmt(v) : '—';
+        let col = colors[m];
+        if (row.key === 'vs_agile_net_gbp' && v !== undefined) col = v >= 0 ? 'var(--green)' : 'var(--red)';
+        html += `<td style="text-align:right;padding:4px 8px;color:${col}">${disp}</td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</table>';
+    table.innerHTML = html;
+    const d = data.days || (data.months || 12) * 30.5;
+    status.textContent = `${Math.round(d)} days · imp_mod ${data.imp_mod_p}p · exp_mod ${data.exp_mod_p}p · cached 24h`;
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📊 COMPARE TARIFFS'; }
+  }
 }
 
 function _updateBaseloadHint(cfg) {
@@ -3624,6 +3726,48 @@ document.addEventListener('DOMContentLoaded', () => {
   }, true);
 });
 
+
+// ── TARIFF TOGGLE ──────────────────────────────────────────────────────────
+async function loadTariffMode() {
+  try {
+    const r = await fetch('/api/tariff');
+    const d = await r.json();
+    _applyTariffUI(d.tariff_mode || 'agile');
+  } catch (e) { /* server may not have restarted yet */ }
+}
+
+function _applyTariffUI(mode) {
+  const ids = {agile: 'tt-agile', split: 'tt-split', optimise: 'tt-opt'};
+  for (const [m, id] of Object.entries(ids)) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const active = m === mode;
+    el.style.background = active ? 'rgba(88,166,255,0.25)' : 'transparent';
+    el.style.color      = active ? 'var(--blue)' : '#8b949e';
+    el.style.fontWeight = active ? 'bold' : 'normal';
+  }
+  // Update SETTINGS button tooltip to show current tariff
+  const modeLabel = {agile:'Agile', split:'Split (E.ON import / Agile export)', optimise:'E.ON Optimise'}[mode] || mode;
+  const sb = document.querySelector('button[onclick="openSettings()"]');
+  if (sb) sb.title = 'Battery / rates settings  |  Tariff: ' + modeLabel;
+}
+
+async function setTariffMode(mode) {
+  try {
+    const r = await fetch('/api/tariff', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({mode}),
+    });
+    const d = await r.json();
+    if (d.error) { console.warn('[tariff]', d.error); return; }
+    _applyTariffUI(d.tariff_mode || mode);
+    console.log('[tariff] Mode set to:', d.tariff_mode);
+  } catch (e) {
+    console.error('[tariff] toggle failed', e);
+  }
+}
+
 async function saveSettings() {
   const msg = document.getElementById('settings-msg');
   msg.style.color = 'var(--red)';
@@ -3634,6 +3778,8 @@ async function saveSettings() {
     min_soc_pct:   parseFloat(document.getElementById('set-min-soc-pct').value),
     house_kwh_day: parseFloat(document.getElementById('set-house-kwh-day').value),
     baseload_kw:   parseFloat(document.getElementById('set-baseload-kw').value),
+    standing_charge_import_p_day: parseFloat(document.getElementById('set-standing-import').value),
+    standing_charge_export_p_day: parseFloat(document.getElementById('set-standing-export').value),
   };
   const mustBePositive = ['battery_kwh','import_kw','export_kw','min_soc_pct','house_kwh_day'];
   for (const k of mustBePositive) {
@@ -3641,6 +3787,9 @@ async function saveSettings() {
   }
   if (!isFinite(body.baseload_kw) || body.baseload_kw < 0) {
     msg.textContent = 'baseload_kw must be 0 or positive.'; return;
+  }
+  for (const k of ['standing_charge_import_p_day','standing_charge_export_p_day']) {
+    if (!isFinite(body[k]) || body[k] < 0) { msg.textContent = `${k} must be >= 0.`; return; }
   }
   try {
     const res = await fetch('/api/settings', {
@@ -3824,15 +3973,14 @@ async function loadHistoricalData(force) {
     const url = _btBase + (force ? (_founderMode ? '&force=1' : '?force=1') : '');
     updateHistProg(0, 10, 'REQUESTING 12-MONTH PYTHON BACKTEST FROM SERVER…');
 
-    const resp = await fetch(url, { signal: AbortSignal.timeout(180000) }); // 3 min max
-    if (!resp.ok) {
-      const body = await resp.json().catch(() => ({}));
-      throw new Error(body.error || `Server error HTTP ${resp.status}`);
+    const resp = await fetch(url, { signal: AbortSignal.timeout(60000) });
+    const results = await resp.json().catch(() => ({}));
+    if (resp.status === 202 || results.status === 'running') {
+      throw new Error('Backtest computing - click Refresh in ~2 min');
     }
-
-    updateHistProg(0, 90, 'RENDERING RESULTS…');
-    const results = await resp.json();
+    if (!resp.ok) throw new Error(results.error || 'Server error HTTP ' + resp.status);
     if (results.error) throw new Error(results.error);
+    updateHistProg(0, 90, 'RENDERING RESULTS...');
 
     histResultsCache = results;
     renderHistoricalResults(results);
@@ -4519,7 +4667,7 @@ function renderG98Tab() {
       <div class="scenario-metric"><span class="sm-lbl">Best month P&L</span><span class="sm-val" style="color:var(--green)">£${best.toFixed(2)}</span></div>
       <div class="scenario-metric"><span class="sm-lbl">Worst month P&L</span><span class="sm-val" style="color:var(--amber)">£${worst.toFixed(2)}</span></div>
       <div class="scenario-metric"><span class="sm-lbl">Monthly avg P&L</span><span class="sm-val">£${avg.toFixed(2)}</span></div>
-    \`;
+    `;
   } else if (monthEl && !histResultsCache) {
     monthEl.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:8px 0">Switch to Historical tab and load 12-month data to see backtest results here.</div>';
   }
@@ -5055,14 +5203,14 @@ function msToNextSlot() {
         bar.style.borderBottomColor = important.some(a => a.level === 'critical') ? '#c00' : '#a07000';
         bar.style.color = important.some(a => a.level === 'critical') ? '#ff6b6b' : '#e6c44a';
         bar.innerHTML = important.map(a =>
-          `<span style="margin-right:12px">${a.level === 'critical' ? '🔴' : '⚠️'} ${a.message}</span>`
+          '<span style="margin-right:12px">' + (a.level === 'critical' ? '🔴' : '⚠️') + ' ' + a.message + '</span>'
         ).join('');
       } else if (info.length > 0) {
         bar.style.display = 'block';
         bar.style.background = '#0d1117';
         bar.style.borderBottomColor = '#21262d';
         bar.style.color = '#8b949e';
-        bar.innerHTML = info.map(a => `<span style="margin-right:12px">ℹ️ ${a.message}</span>`).join('');
+        bar.innerHTML = info.map(a => '<span style="margin-right:12px">ℹ️ ' + a.message + '</span>').join('');
       } else {
         bar.style.display = 'none';
       }
