@@ -38,13 +38,16 @@ echo "  Repo: $NODE3_REPO"
 echo "══════════════════════════════════════════════════════"
 echo
 
-# ── 1. SCP deploy script to Pi ───────────────────────────────────────────────
-echo "[1/5] Copying master_deploy.py to Pi…"
+# ── 1. SCP deploy scripts to Pi ──────────────────────────────────────────────
+echo "[1/5] Copying deploy scripts + fox_modbus_loop.py to Pi…"
 scp "$DEPLOY_PY" "$PI:/tmp/master_deploy.py"
+scp "$SCRIPT_DIR/deploy_all_fixes.py" "$PI:/tmp/deploy_all_fixes.py"
+scp "$SCRIPT_DIR/fox_modbus_loop.py"  "$PI:$PI_NODE3/fox_modbus_loop.py"
 
 # ── 2. Run on Pi ─────────────────────────────────────────────────────────────
-echo "[2/5] Running master_deploy.py on Pi…"
+echo "[2/5] Running deploy scripts on Pi…"
 ssh "$PI" "python3 /tmp/master_deploy.py"
+ssh "$PI" "python3 /tmp/deploy_all_fixes.py"
 
 # ── 3. Restart docker ────────────────────────────────────────────────────────
 echo "[3/5] Restarting node3-portal docker container…"
@@ -72,7 +75,8 @@ else
     # Also copy the deploy scripts themselves so repo has them
     for f in master_deploy.py master_deploy.sh \
               deploy_tariff_toggle.py deploy_standing_charges.py \
-              deploy_backtest_compare.py fix_tariff_auth.py; do
+              deploy_backtest_compare.py fix_tariff_auth.py \
+              deploy_all_fixes.py fox_modbus_loop.py deploy_fuse_loop.sh; do
         [ -f "$SCRIPT_DIR/$f" ] && cp "$SCRIPT_DIR/$f" "$NODE3_REPO/$f" && echo "  ✓ $f"
     done
 fi
@@ -94,6 +98,9 @@ else
         deploy_standing_charges.py \
         deploy_backtest_compare.py \
         fix_tariff_auth.py \
+        deploy_all_fixes.py \
+        fox_modbus_loop.py \
+        deploy_fuse_loop.sh \
         2>/dev/null || true
 
     git diff --cached --stat

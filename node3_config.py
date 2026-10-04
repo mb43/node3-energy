@@ -53,6 +53,7 @@ DEFAULTS = {
                                             # Octopus Agile H region ≈ 58.9p/day incl VAT
     "standing_charge_export_p_day":  0.0,  # daily standing charge on export contract (p/day)
                                             # Octopus Agile Outgoing = 0p/day
+    "standing_charge_eon_p_day":    62.22,  # E.ON Next Optimise daily SC (p/day) — update once confirmed
 }
 
 
@@ -79,8 +80,9 @@ def save_config(updates):
     """Merge `updates` onto the current saved config and persist. Returns the
     full merged config. Silently ignores unknown keys and non-numeric values.
     baseload_kw and house_kwh_day allow zero (>= 0); others require > 0."""
-    NON_NEGATIVE = {"baseload_kw", "house_kwh_day",
-                    "standing_charge_import_p_day", "standing_charge_export_p_day"}
+    NON_NEGATIVE = {"baseload_kw", "house_kwh_day", "subscription_pcm",
+                    "standing_charge_import_p_day", "standing_charge_export_p_day",
+                    "standing_charge_eon_p_day"}
     STRING_KEYS  = {"tariff_mode"}
     VALID_MODES  = {"agile", "split", "optimise"}
     cfg = load_config()
