@@ -39,15 +39,20 @@ echo "════════════════════════�
 echo
 
 # ── 1. SCP deploy scripts to Pi ──────────────────────────────────────────────
-echo "[1/5] Copying deploy scripts + fox_modbus_loop.py to Pi…"
-scp "$DEPLOY_PY" "$PI:/tmp/master_deploy.py"
-scp "$SCRIPT_DIR/deploy_all_fixes.py" "$PI:/tmp/deploy_all_fixes.py"
-scp "$SCRIPT_DIR/fox_modbus_loop.py"  "$PI:$PI_NODE3/fox_modbus_loop.py"
+echo "[1/5] Copying deploy scripts + updated source files to Pi…"
+scp "$DEPLOY_PY"                              "$PI:/tmp/master_deploy.py"
+scp "$SCRIPT_DIR/deploy_all_fixes.py"         "$PI:/tmp/deploy_all_fixes.py"
+scp "$SCRIPT_DIR/deploy_lp_learning.py"       "$PI:/tmp/deploy_lp_learning.py"
+scp "$SCRIPT_DIR/fox_modbus_loop.py"          "$PI:$PI_NODE3/fox_modbus_loop.py"
+scp "$SCRIPT_DIR/house_profile.py"            "$PI:$PI_NODE3/house_profile.py"
+[ -f "$SCRIPT_DIR/fix_fuse_card.py" ] && scp "$SCRIPT_DIR/fix_fuse_card.py" "$PI:/tmp/fix_fuse_card.py"
 
 # ── 2. Run on Pi ─────────────────────────────────────────────────────────────
 echo "[2/5] Running deploy scripts on Pi…"
 ssh "$PI" "python3 /tmp/master_deploy.py"
 ssh "$PI" "python3 /tmp/deploy_all_fixes.py"
+ssh "$PI" "python3 /tmp/deploy_lp_learning.py"
+[ -f "$SCRIPT_DIR/fix_fuse_card.py" ] && ssh "$PI" "python3 /tmp/fix_fuse_card.py"
 
 # ── 3. Restart docker ────────────────────────────────────────────────────────
 echo "[3/5] Restarting node3-portal docker container…"
@@ -69,14 +74,15 @@ if [ ! -d "$NODE3_REPO" ]; then
     echo "    NODE3_REPO=~/path/to/node3 ./master_deploy.sh"
     echo "  Skipping sync."
 else
-    for f in server.py node3_config.py dashboard.html node3_config.json; do
+    for f in server.py node3_config.py dashboard.html node3_config.json simulate.py; do
         scp "$PI:$PI_NODE3/$f" "$NODE3_REPO/$f" && echo "  ✓ $f" || echo "  ✗ $f (failed)"
     done
     # Also copy the deploy scripts themselves so repo has them
     for f in master_deploy.py master_deploy.sh \
               deploy_tariff_toggle.py deploy_standing_charges.py \
               deploy_backtest_compare.py fix_tariff_auth.py \
-              deploy_all_fixes.py fox_modbus_loop.py deploy_fuse_loop.sh; do
+              deploy_all_fixes.py fox_modbus_loop.py deploy_fuse_loop.sh \
+              deploy_lp_learning.py house_profile.py fix_fuse_card.py; do
         [ -f "$SCRIPT_DIR/$f" ] && cp "$SCRIPT_DIR/$f" "$NODE3_REPO/$f" && echo "  ✓ $f"
     done
 fi
@@ -92,6 +98,7 @@ else
         node3_config.py \
         dashboard.html \
         node3_config.json \
+        simulate.py \
         master_deploy.py \
         master_deploy.sh \
         deploy_tariff_toggle.py \
@@ -101,22 +108,31 @@ else
         deploy_all_fixes.py \
         fox_modbus_loop.py \
         deploy_fuse_loop.sh \
+        deploy_lp_learning.py \
+        house_profile.py \
+        fix_fuse_card.py \
         2>/dev/null || true
 
     git diff --cached --stat
     echo
     git commit -m "$(cat <<'EOF'
-feat(node3): tariff-aware backtest, standing charges, compare endpoint
+feat(node3): LP learning — house profile, fuse daemon, grid history
 
-- export_kw → 5.5kW (SSEN G99 confirmed, ref 260420-000198/FJJ907/1)
-- import_kw → 9.0kW (Fox KH10.5 − Z15 miner 1.5kW AC baseload)
-- /api/tariff POST: remove _check_api_key guard (fixes silent 401)
-- /api/settings: subscription_pcm + 3 standing charge keys editable
-- _run_backtest: SPLIT/OPTIMISE price-adjusted (LP reoptimises)
-- _run_backtest: standing charges extracted + lp_net_gbp in result
-- /api/backtest-compare: all 3 modes side-by-side with SC deducted
-- Dashboard ⚙ SETTINGS: subscription_pcm + SC fields
-- Dashboard 📊 COMPARE TARIFFS: live comparison panel
+- fox_modbus_loop.py: fuse protection daemon (16.4kW safe limit)
+  reads BMS from bms_detail.json, logs grid_history.csv every 5s
+  auto-triggers house_profile.py rebuild every ~2h (1440 cycles)
+- house_profile.py: 48-slot learned house load profile from CSV
+  14-day rolling window, per-slot kWh, saves house_profile.json
+- simulate.py: LP planner uses learned per-slot loads not flat 250W
+  cumulative profile sums used in SOC constraints; time-aligned via
+  valid_from timestamps; graceful flat fallback pre-profile
+- server.py: /api/house-profile + /api/grid-history endpoints
+  /api/fuse-status (daemon health/headroom)
+  _pushover_send() for mobile alerts
+  fuse daemon auto-started alongside bms_monitor on boot
+- dashboard.html: learned profile sparkline card (Canvas, coloured
+  by time-of-day), fuse protection widget JS
+- node3_config.py: standing_charge_eon_p_day + subscription_pcm=0 fix
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 EOF

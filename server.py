@@ -356,11 +356,19 @@ def _run_backtest(months=12, founder=False, tariff_mode=None, imp_mod_p=3.0, exp
     _SC_EXPORT_P    = float(_bt_cfg.get("standing_charge_export_p_day", 0.0))   # p/day
     _SC_EON_P       = float(_bt_cfg.get("standing_charge_eon_p_day",   62.22))   # p/day
     _SC_AGILE_TOTAL = _SC_IMPORT_P + _SC_EXPORT_P   # p/day (Agile import + Outgoing)
+    # ── Standing charges ──────────────────────────────────────────────────
+    _SC_IMPORT_P    = float(_bt_cfg.get("standing_charge_import_p_day", 62.22))  # p/day
+    _SC_EXPORT_P    = float(_bt_cfg.get("standing_charge_export_p_day", 0.0))   # p/day
+    _SC_EON_P       = float(_bt_cfg.get("standing_charge_eon_p_day",   62.22))   # p/day
+    _SC_AGILE_TOTAL = _SC_IMPORT_P + _SC_EXPORT_P   # p/day (Agile import + Outgoing)
     _bt_house_kwh       = _bt_cfg.get("house_kwh_day", 12.0)
     _bt_baseload_kw     = _bt_cfg.get("baseload_kw", 0.0) if founder else _bt_cfg.get("baseload_kw_consumer", 0.0)
     _bt_baseload_slot   = _bt_baseload_kw * 0.5        # kWh/slot (constant, flat)
     _bt_total_load_day  = _bt_house_kwh + _bt_baseload_kw * 24.0  # for LP planning
 
+    # ── Active tariff for this run ────────────────────────────────────────
+    if tariff_mode is None:
+        tariff_mode = _bt_cfg.get("tariff_mode", "agile")
     # ── Active tariff for this run ────────────────────────────────────────
     if tariff_mode is None:
         tariff_mode = _bt_cfg.get("tariff_mode", "agile")
@@ -387,6 +395,14 @@ def _run_backtest(months=12, founder=False, tariff_mode=None, imp_mod_p=3.0, exp
         vf    = slot['valid_from'].replace('Z', '+00:00')
         dt    = datetime.fromisoformat(vf)
         key   = dt.strftime('%Y-%m')
+        # ── Effective buy/sell prices under active tariff ─────────────────
+        _h        = dt.hour
+        _buy_p    = price
+        _sell_adj = 0.0
+        if tariff_mode in ('split', 'optimise') and 0 <= _h < 6:
+            _buy_p = max(0.0, price - imp_mod_p)
+        if tariff_mode == 'optimise' and 16 <= _h < 19:
+            _sell_adj = exp_mod_p
         # ── Effective buy/sell prices under active tariff ─────────────────
         _h        = dt.hour
         _buy_p    = price
@@ -775,6 +791,38 @@ def api_alerts():
         except Exception as _fe:
             pass
 
+        # ── Fuse loop alerts ─────────────────────────────────────────────
+        import time as _time
+        fuse_log_path = os.path.join(BASE_DIR, "fuse_loop_log.json")
+        try:
+            fuse_entries = json.loads(open(fuse_log_path).read()) if os.path.exists(fuse_log_path) else []
+            fuse_latest  = fuse_entries[-1] if fuse_entries else {}
+            fuse_safe_w  = fuse_latest.get("safe_charge_w")
+            fuse_ts      = fuse_latest.get("ts", "")
+            fuse_age_s   = None
+            if fuse_ts:
+                try:
+                    fuse_age_s = _time.time() - __import__("datetime").datetime.fromisoformat(
+                        fuse_ts.replace("Z", "+00:00")).timestamp()
+                except Exception:
+                    pass
+            if fuse_age_s is not None and fuse_age_s > 60:
+                alerts.append({"level": "critical", "code": "fuse_loop_dead",
+                    "message": f"Fuse protection loop offline — last update {fuse_age_s:.0f}s ago"})
+                _pushover_send("NODE-3 FUSE LOOP OFFLINE",
+                    f"fuse_loop daemon not responding. Last update {fuse_age_s:.0f}s ago. Check docker logs.")
+            elif fuse_safe_w is not None:
+                if fuse_safe_w < 500:
+                    alerts.append({"level": "critical", "code": "fuse_critical",
+                        "message": f"FUSE CRITICAL — only {fuse_safe_w:.0f}W charge headroom remaining"})
+                    _pushover_send("⚡ NODE-3 FUSE CRITICAL",
+                        f"Only {fuse_safe_w:.0f}W headroom. Grid import near 18.4kW limit. Charge throttled.")
+                elif fuse_safe_w < 2000:
+                    alerts.append({"level": "warning", "code": "fuse_warning",
+                        "message": f"Fuse warning — {fuse_safe_w:.0f}W charge headroom (< 2kW)"})
+        except Exception as _fe:
+            pass
+
         battery_kwh   = cfg["battery_kwh"]
         min_soc_kwh   = battery_kwh * (cfg["min_soc_pct"] / 100.0)
         baseload_kw   = cfg.get("baseload_kw", 0.0)
@@ -1083,6 +1131,88 @@ def api_plan():
             "annual_site_total":      annual_site_total,
         }
     })
+
+
+def api_backtest_compare():
+    """
+    Run _run_backtest() for all three tariff modes and return a side-by-side
+    comparison dict.
+
+    ?months=N (default 12)  ?mode=founder  ?force=1 (bust 24h cache)
+
+    Response: {modes: {agile: {...}, split: {...}, optimise: {...}},
+               months, imp_mod_p, exp_mod_p, _ts}
+
+    Each mode dict: gross_gbp, net_gbp (after SC), annualised_net_gbp,
+                    vs_agile_net_gbp (split/optimise only), days,
+                    avg_buy_p, avg_sell_p, total_charge_kwh, total_discharge_kwh
+    """
+    months  = int(request.args.get("months", 12))
+    founder = request.args.get("mode") == "founder"
+    force   = request.args.get("force") == "1"
+    cache_p = os.path.join(BASE_DIR, "backtest_compare_cache.json")
+
+    if not force and os.path.exists(cache_p):
+        try:
+            with open(cache_p) as _f:
+                cached = json.load(_f)
+            age_h = (time.time() - cached.get("_ts", 0)) / 3600
+            if age_h < 24:
+                return jsonify(cached)
+        except Exception:
+            pass
+
+    cfg     = _cfg.load_config()
+    imp_mod = float(cfg.get("optimise_import_mod_p", 3.0))
+    exp_mod = float(cfg.get("optimise_export_mod_p", 3.0))
+    sc_agile = (float(cfg.get("standing_charge_import_p_day", 62.22)) +
+                float(cfg.get("standing_charge_export_p_day", 0.0)))
+    sc_eon   = float(cfg.get("standing_charge_eon_p_day", 62.22))
+
+    results = {}
+    for mode in ("agile", "split", "optimise"):
+        try:
+            r    = _run_backtest(months=months, founder=founder,
+                                 tariff_mode=mode,
+                                 imp_mod_p=imp_mod, exp_mod_p=exp_mod)
+            days = r.get("days", months * 30.5)
+            # Standing charges differ by tariff
+            sc_p_day = sc_agile if mode == "agile" else sc_eon
+            sc_total = sc_p_day * days / 100.0
+            gross    = r["total"]
+            net      = round(gross - sc_total, 2)
+            results[mode] = {
+                "gross_gbp":            round(gross, 2),
+                "standing_charge_gbp":  round(sc_total, 2),
+                "net_gbp":              net,
+                "annualised_gross_gbp": round(gross * 365 / max(1, days), 2),
+                "annualised_net_gbp":   round(net   * 365 / max(1, days), 2),
+                "days":                 round(days, 1),
+                "avg_buy_p":            r.get("buyThr", 0),
+                "avg_sell_p":           r.get("sellThr", 0),
+                "total_charge_kwh":     r.get("totalChargeKwh", 0),
+                "total_discharge_kwh":  r.get("totalDischargeKwh", 0),
+            }
+        except Exception as e:
+            results[mode] = {"error": str(e)}
+
+    # Deltas vs agile baseline
+    if "agile" in results and "net_gbp" in results["agile"]:
+        base = results["agile"]["net_gbp"]
+        for mode in ("split", "optimise"):
+            if mode in results and "net_gbp" in results[mode]:
+                results[mode]["vs_agile_net_gbp"] = round(results[mode]["net_gbp"] - base, 2)
+
+    payload = {"modes": results, "months": months, "founder": founder,
+               "imp_mod_p": imp_mod, "exp_mod_p": exp_mod,
+               "sc_agile_p_day": sc_agile, "sc_eon_p_day": sc_eon,
+               "_ts": time.time()}
+    try:
+        with open(cache_p, "w") as _f:
+            json.dump(payload, _f, indent=2)
+    except Exception:
+        pass
+    return jsonify(payload)
 
 
 @app.route("/api/backtest-compare")
@@ -1665,6 +1795,33 @@ def _pushover_send(title, message):
         print(f"[PUSHOVER] Failed: {e}", flush=True)
 
 
+def _pushover_send(title, message):
+    """Send a Pushover notification. Silently no-ops if env vars not set.
+    Set PUSHOVER_TOKEN (app token) and PUSHOVER_USER (user/group key).
+    """
+    token = os.environ.get("PUSHOVER_TOKEN", "")
+    user  = os.environ.get("PUSHOVER_USER", "")
+    if not token or not user:
+        return
+    try:
+        import urllib.request, urllib.parse
+        data = urllib.parse.urlencode({
+            "token":   token,
+            "user":    user,
+            "title":   title,
+            "message": message,
+            "priority": 1,
+        }).encode()
+        urllib.request.urlopen(
+            urllib.request.Request(
+                "https://api.pushover.net/1/messages.json",
+                data=data, method="POST"),
+            timeout=10)
+        print(f"[PUSHOVER] Sent: {title}", flush=True)
+    except Exception as e:
+        print(f"[PUSHOVER] Failed: {e}", flush=True)
+
+
 def _run_simulate():
     """Run simulate.py once and return (returncode, stderr)."""
     cmd = [sys.executable, os.path.join(BASE_DIR, "simulate.py")]
@@ -1782,6 +1939,48 @@ def _check_force_charge_autostop():
 # ─────────────────────────────────────────────
 # HARDWARE STATUS + MODE API
 # ─────────────────────────────────────────────
+@app.route("/api/fuse-status")
+def api_fuse_status():
+    """Return last N entries from fuse_loop_log.json plus loop health."""
+    import time as _time
+    log_path = os.path.join(BASE_DIR, "fuse_loop_log.json")
+    try:
+        entries = json.loads(open(log_path).read()) if os.path.exists(log_path) else []
+    except Exception:
+        entries = []
+    latest = entries[-1] if entries else {}
+    # Loop health: last entry within 30s = healthy
+    healthy = False
+    age_s   = None
+    if latest.get("ts"):
+        try:
+            from datetime import timezone as _tz
+            age_s = (_time.time() -
+                     __import__("datetime").datetime
+                     .fromisoformat(latest["ts"].replace("Z", "+00:00")).timestamp())
+            healthy = age_s < 30 and not latest.get("error")
+        except Exception:
+            pass
+    grid_w    = latest.get("grid_power_w")
+    safe_w    = latest.get("safe_charge_w")
+    fuse_safe = 16400
+    headroom_pct = round((safe_w / fuse_safe * 100)) if safe_w is not None else None
+    return jsonify({
+        "healthy":      healthy,
+        "age_s":        round(age_s) if age_s is not None else None,
+        "grid_power_w": grid_w,
+        "bat_charge_w": latest.get("bat_charge_w"),
+        "bat_volt_v":   latest.get("bat_volt_v"),
+        "soc_pct":      latest.get("soc_pct"),
+        "safe_charge_w":safe_w,
+        "headroom_pct": headroom_pct,
+        "reg_val":      latest.get("reg_val"),
+        "last_ts":      latest.get("ts"),
+        "last_error":   latest.get("error"),
+        "recent":       entries[-20:],
+    })
+
+
 @app.route("/api/fuse-status")
 def api_fuse_status():
     """Return last N entries from fuse_loop_log.json plus loop health."""
@@ -1991,6 +2190,21 @@ if __name__ == "__main__":
         print("[BMS-MON] Cell-level monitor started", flush=True)
     except Exception as e:
         print(f"[BMS-MON] Could not start: {e}", flush=True)
+
+    # Start fox_modbus_loop.py — dynamic fuse protection daemon (5s Modbus poll)
+    _fuse_loop_proc = None
+    try:
+        fuse_loop_path = os.path.join(BASE_DIR, "fox_modbus_loop.py")
+        if os.path.exists(fuse_loop_path):
+            _fuse_loop_proc = subprocess.Popen(
+                [sys.executable, fuse_loop_path],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+            )
+            print(f"[FUSE-LOOP] Dynamic fuse protection started (pid={_fuse_loop_proc.pid})", flush=True)
+        else:
+            print("[FUSE-LOOP] fox_modbus_loop.py not found — skipping", flush=True)
+    except Exception as e:
+        print(f"[FUSE-LOOP] Could not start: {e}", flush=True)
 
     # Start fox_modbus_loop.py — dynamic fuse protection daemon (5s Modbus poll)
     _fuse_loop_proc = None

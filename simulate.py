@@ -86,6 +86,23 @@ _HOUSE_KWH_DAY     = _CFG.get("house_kwh_day", 12.0)
 _BASELOAD_KW       = _CFG.get("baseload_kw",   0.0)
 DAILY_LOAD_KWH     = _HOUSE_KWH_DAY + _BASELOAD_KW * 24.0  # total kWh/day
 SOLAR_KWP          = 0.0     # no solar modelled (pure arbitrage)
+
+# ── Learned house load profile ──────────────────────────────────────────────
+_BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+_PROFILE_FILE = os.path.join(_BASE_DIR, "house_profile.json")
+
+def _load_house_profile():
+    """Return 48-slot kWh list from house_profile.json, or None.
+    Built by house_profile.py from grid_history.csv after ~3 days of data.
+    """
+    try:
+        import json as _json
+        p = _json.loads(open(_PROFILE_FILE).read())
+        if isinstance(p, list) and len(p) == 48 and all(isinstance(x, (int, float)) for x in p):
+            return [float(x) for x in p]
+    except Exception:
+        pass
+    return None
 SOLAR_EFFICIENCY   = 0.18    # panel efficiency
 ROUND_TRIP_EFF     = 0.88    # FoxESS + Nissan cell round-trip efficiency
 
@@ -600,10 +617,45 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
     # way export is. See CHARGE_KWH / asymmetric-rates note near the top of
     # this file for why this is intentional, not the earlier 5.25-vs-3.68 bug.
     charge_per_slot    = CHARGE_KWH
-    load_per_slot      = daily_load_kwh / 48.0
+
+    # ── Learned per-slot house load ───────────────────────────────────────
+    # If house_profile.json exists, use it for per-slot load instead of flat.
+    # The learned profile captures when consumption actually peaks, letting
+    # the LP charge before peaks and discharge during cheap overnight slots.
+    _profile_raw = _load_house_profile()
+    if _profile_raw:
+        _psum = sum(_profile_raw) or 1.0
+        _scale = daily_load_kwh / _psum   # honour operator kWh/day setting
+        _profile_scaled = [v * _scale for v in _profile_raw]
+        print("[PLAN] Learned profile: " + str(round(_psum, 2)) +
+              " kWh/day raw -> scaled to " + str(round(daily_load_kwh, 2)) + " kWh/day")
+    else:
+        _flat = daily_load_kwh / 48.0
+        _profile_scaled = [_flat] * 48
+    load_per_slot = daily_load_kwh / 48.0   # kept for any non-LP fallback path
 
     n           = len(price_slots)
     prices_vals = [s['value_inc_vat'] for s in price_slots]
+
+    # Map each LP slot index -> half-hour slot index (0..47) using valid_from timestamp.
+    def _halfhour_idx(iso_str):
+        try:
+            import datetime as _dt
+            d = _dt.datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+            d = d.astimezone(_dt.timezone.utc)
+            return d.hour * 2 + (1 if d.minute >= 30 else 0)
+        except Exception:
+            return 0
+
+    # Per-slot kWh for each LP slot, time-aligned to real time-of-day
+    _lp_slot_loads = [
+        _profile_scaled[_halfhour_idx(s['valid_from'])]
+        for s in price_slots
+    ]
+    # Cumulative sums: _cum_load[t] = total load for LP slots 0..t-1
+    _cum_load = [0.0]
+    for _v in _lp_slot_loads:
+        _cum_load.append(_cum_load[-1] + _v)
 
     print("[PLAN] LP optimiser | window=" + str(n) + " slots"
           + "  min=" + str(round(min(prices_vals), 2)) + "p"
@@ -616,10 +668,45 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
         import numpy as np
         from scipy.optimize import linprog
 
-        prices = np.array(prices_vals, dtype=float)
+        # ── Tariff-mode asymmetric price vectors ─────────────────────────────
+        # Re-read config each call so a toggle takes effect on the next slot
+        _t_cfg   = _cfg.load_config()
+        _tariff  = _t_cfg.get("tariff_mode", "agile")
+        _imp_mod = float(_t_cfg.get("optimise_import_mod_p", 3.0))
+        _exp_mod = float(_t_cfg.get("optimise_export_mod_p", 3.0))
+        buy_vals  = list(prices_vals)   # effective buy  price per slot (p/kWh)
+        sell_vals = list(prices_vals)   # effective sell price per slot (p/kWh)
+        if _tariff in ('split', 'optimise'):
+            # E.ON import discount 00:00-06:00 UK time (Agile slots are UTC)
+            for _i, _s in enumerate(price_slots):
+                try:
+                    _h = datetime.fromisoformat(
+                        _s['valid_from'].replace('Z', '+00:00')).hour
+                    if 0 <= _h < 6:
+                        buy_vals[_i] = max(0.0, prices_vals[_i] - _imp_mod)
+                except Exception:
+                    pass
+        if _tariff == 'optimise':
+            # E.ON export bonus 16:00-19:00 UK time
+            for _i, _s in enumerate(price_slots):
+                try:
+                    _h = datetime.fromisoformat(
+                        _s['valid_from'].replace('Z', '+00:00')).hour
+                    if 16 <= _h < 19:
+                        sell_vals[_i] = prices_vals[_i] + _exp_mod
+                except Exception:
+                    pass
+        if _tariff != 'agile':
+            print("[PLAN] Tariff: " + _tariff
+                  + "  buy_mod=" + str(-_imp_mod) + "p 00-06"
+                  + ("  sell_mod=+" + str(_exp_mod) + "p 16-19"
+                     if _tariff == 'optimise' else ""))
+        prices  = np.array(prices_vals, dtype=float)
+        buy_p   = np.array(buy_vals,    dtype=float)
+        sell_p  = np.array(sell_vals,   dtype=float)
 
-        # Objective vector: minimise [p, −p*RTE] @ [c, d]
-        c_obj = np.concatenate([prices, -prices * ROUND_TRIP_EFF])
+        # Objective: minimise [buy_p, −sell_p*RTE] @ [c, d]
+        c_obj = np.concatenate([buy_p, -sell_p * ROUND_TRIP_EFF])
 
         # SOC constraints for t = 1..n (before each slot and after the last):
         #   Lower: −Σ_{k<t}c[k] + Σ_{k<t}d[k]  ≤  initial_soc − t*load − min_soc
@@ -629,9 +716,9 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
         for t in range(1, n + 1):
             rl = t - 1;       ru = n + (t - 1)
             A_ub[rl, :t]      = -1;  A_ub[rl, n:n + t] =  1
-            b_ub[rl]          = initial_soc_kwh - t * load_per_slot - min_soc_kwh
+            b_ub[rl]          = initial_soc_kwh - _cum_load[t] - min_soc_kwh
             A_ub[ru, :t]      =  1;  A_ub[ru, n:n + t] = -1
-            b_ub[ru]          = battery_kwh - initial_soc_kwh + t * load_per_slot
+            b_ub[ru]          = battery_kwh - initial_soc_kwh + _cum_load[t]
 
         bounds  = [(0, charge_per_slot)] * n + [(0, discharge_per_slot)] * n
         result  = linprog(c_obj, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method='highs')
@@ -640,7 +727,7 @@ def plan_optimal_dispatch(price_slots, initial_soc_kwh, battery_kwh=BATTERY_KWH,
             c_vals = result.x[:n]
             d_vals = result.x[n:]
             rev_p  = float(sum(
-                d_vals[i] * prices_vals[i] * ROUND_TRIP_EFF - c_vals[i] * prices_vals[i]
+                d_vals[i] * sell_vals[i] * ROUND_TRIP_EFF - c_vals[i] * buy_vals[i]
                 for i in range(n)
             ))
             print("[PLAN] LP optimal: projected revenue = £" + str(round(rev_p / 100, 4)))
@@ -869,7 +956,14 @@ def simulate_slot(state, price_p, slot_dt, weather, buy_thr, sell_thr,
     load_kwh_day = state.get("daily_load_kwh", DAILY_LOAD_KWH)
     min_soc      = MIN_SOC_KWH
 
-    slot_load_kwh = load_kwh_day / 48.0
+    # Use learned profile if available, else flat (same fallback as LP planner)
+    _sim_profile = _load_house_profile()
+    if _sim_profile:
+        _sp_sum = sum(_sim_profile) or 1.0
+        _hh_idx = slot_dt.hour * 2 + (1 if slot_dt.minute >= 30 else 0)
+        slot_load_kwh = _sim_profile[_hh_idx] * (load_kwh_day / _sp_sum)
+    else:
+        slot_load_kwh = load_kwh_day / 48.0
     solar_kwh     = get_solar_kwh_for_slot(weather, slot_dt, kwp=solar_kwp)
     soc = state['soc_kwh']
 

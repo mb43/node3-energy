@@ -67,7 +67,8 @@ import os, sys, time, json, logging, signal
 from datetime import datetime, timezone
 from pathlib import Path
 
-BMS_DETAIL_FILE = Path(__file__).parent / "bms_detail.json"
+BMS_DETAIL_FILE  = Path(__file__).parent / "bms_detail.json"
+GRID_HISTORY_CSV = Path(__file__).parent / "grid_history.csv"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 FUSE_HARD_W      = 18_400   # 80A × 230V  — NEVER exceed this
@@ -234,7 +235,7 @@ def power_to_current_register(power_w, bat_volt_v):
     return int(round((power_w / bat_volt_v) * 10.0))   # A × 0.1
 
 
-# ── Log helper ────────────────────────────────────────────────────────────────
+# ── Log helpers ───────────────────────────────────────────────────────────────
 def _log_entry(entry):
     try:
         data = json.loads(LOG_FILE.read_text()) if LOG_FILE.exists() else []
@@ -242,6 +243,39 @@ def _log_entry(entry):
         LOG_FILE.write_text(json.dumps(data[-_MAX_LOG_ENTRIES:], indent=2))
     except Exception as e:
         log.warning(f"log: {e}")
+
+
+_GRID_CSV_HEADER = 'ts,grid_power_w,bat_charge_w,bat_volt_v,soc_pct,safe_charge_w\n'
+_grid_csv_write_count = 0   # write every N cycles to reduce I/O (still ~every 5s but flush 1/min)
+
+def _log_grid_history(entry):
+    """Append one row to grid_history.csv for house load profile learning."""
+    global _grid_csv_write_count
+    if entry.get('error') or entry.get('grid_power_w') is None:
+        return
+    try:
+        write_header = not GRID_HISTORY_CSV.exists()
+        with open(GRID_HISTORY_CSV, 'a', newline='') as f:
+            if write_header:
+                f.write(_GRID_CSV_HEADER)
+            f.write(
+                f"{entry.get('ts','')},"
+                f"{entry.get('grid_power_w','')},"
+                f"{entry.get('bat_charge_w','')},"
+                f"{entry.get('bat_volt_v','')},"
+                f"{entry.get('soc_pct','')},"
+                f"{entry.get('safe_charge_w','')}\n"
+            )
+        _grid_csv_write_count += 1
+        # Rebuild house profile every 1440 cycles (~2h at 5s poll) if enough data
+        if _grid_csv_write_count % 1440 == 0:
+            try:
+                import house_profile as _hp
+                _hp.run()
+            except Exception as _hpe:
+                log.warning(f"house_profile rebuild: {_hpe}")
+    except Exception as e:
+        log.warning(f"grid_history: {e}")
 
 
 # ── Single poll cycle ─────────────────────────────────────────────────────────
@@ -299,6 +333,7 @@ def run_once(dry_run=False):
             pass
 
     _log_entry(entry)
+    _log_grid_history(entry)
     return entry
 
 

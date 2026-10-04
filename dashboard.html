@@ -1629,6 +1629,56 @@
       <button onclick="startForceCharge()" style="background:transparent;border:1px solid var(--amber);color:var(--amber);border-radius:6px;padding:7px 18px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.05em">⚡ FORCE CHARGE ALL PACKS</button>
     </div>
 
+        <div class="chart-card" style="margin-bottom:16px" id="house-profile-card">
+      <div class="chart-title" style="margin-bottom:6px;display:flex;align-items:center;gap:8px">
+        LEARNED HOUSE LOAD PROFILE
+        <span id="hp-status" style="font-size:11px;color:var(--muted);font-weight:400;margin-left:auto">building...</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">
+        Actual consumption shape from live grid readings &mdash; LP planner charges before your peaks
+      </div>
+      <canvas id="hp-chart" height="80" style="width:100%;display:block"></canvas>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px;font-size:12px">
+        <div><span style="color:var(--muted)">Daily total</span><br><b id="hp-daily">&mdash;</b></div>
+        <div><span style="color:var(--muted)">Peak slot</span><br><b id="hp-peak">&mdash;</b></div>
+        <div><span style="color:var(--muted)">Data age</span><br><b id="hp-updated">&mdash;</b></div>
+      </div>
+    </div>
+
+    
+    <div class="chart-card" style="margin-bottom:16px" id="fuse-card">
+      <div class="chart-title" style="margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        FUSE PROTECTION
+        <span id="fuse-health-dot" style="width:8px;height:8px;border-radius:50%;background:#6e7681;flex-shrink:0;display:inline-block"></span>
+        <span id="fuse-health-label" style="font-size:11px;color:var(--muted);font-weight:400;margin-left:2px">—</span>
+      </div>
+      <div class="homeowner-savings-grid">
+        <div class="stat-card">
+          <div class="stat-label">Grid Import</div>
+          <div class="stat-value" id="fuse-grid">—</div>
+          <div class="stat-sub">Site total from meter</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-label">Bat Charging</div>
+          <div class="stat-value amber" id="fuse-bat">—</div>
+          <div class="stat-sub">From bms_monitor packs</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">Charge Headroom</div>
+          <div class="stat-value green" id="fuse-headroom">—</div>
+          <div class="stat-sub">Before 18.4 kW fuse</div>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:4px">
+          <span>0 kW</span><span id="fuse-bar-label">Safe limit: 16.4 kW</span><span>18.4 kW</span>
+        </div>
+        <div style="height:8px;background:#21262d;border-radius:4px;overflow:hidden">
+          <div id="fuse-bar" style="height:100%;width:0%;background:#3fb950;border-radius:4px;transition:width 0.6s,background 0.6s"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="chart-card" style="margin-bottom:16px">
       <div class="chart-title" style="margin-bottom:10px">LIVE PACK TELEMETRY</div>
       <div class="homeowner-savings-grid">
@@ -3741,6 +3791,65 @@ async function loadTariffCompare(force) {
   }
 }
 
+async function loadTariffCompare(force) {
+  const panel  = document.getElementById('compare-panel');
+  const status = document.getElementById('compare-status');
+  const table  = document.getElementById('compare-table');
+  panel.style.display = 'block';
+  status.textContent  = 'Running comparison backtest… (LP optimise × 3 modes)';  
+  table.innerHTML     = '';
+  const btn = document.getElementById('compare-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ RUNNING…'; }
+  try {
+    const url  = '/api/backtest-compare' + (force ? '?force=1' : '');
+    const res  = await fetch(url, { signal: AbortSignal.timeout(120000) });
+    const data = await res.json();
+    if (!res.ok) { status.textContent = data.error || 'Compare failed.'; return; }
+    const modes  = data.modes || {};
+    const labels = { agile: 'Octopus Agile', split: 'E.ON Split', optimise: 'E.ON Optimise' };
+    const colors = { agile: 'var(--blue)', split: 'var(--yellow,#e3b341)', optimise: 'var(--green)' };
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:11px">';
+    html += '<tr><th style="text-align:left;padding:4px 8px;color:#8b949e">Metric</th>';
+    for (const m of ['agile','split','optimise']) {
+      html += `<th style="text-align:right;padding:4px 8px;color:${colors[m]}">${labels[m]}</th>`;
+    }
+    html += '</tr>';
+    const rows = [
+      { key: 'gross_gbp',            label: 'Gross P&L (£)',         fmt: v => '£' + v.toFixed(2) },
+      { key: 'standing_charge_gbp',  label: 'Standing charges (£)',  fmt: v => '£' + v.toFixed(2) },
+      { key: 'net_gbp',              label: 'Net P&L (£)',           fmt: v => '£' + v.toFixed(2) },
+      { key: 'annualised_net_gbp',   label: 'Annualised net (£/yr)', fmt: v => '£' + v.toFixed(2) },
+      { key: 'vs_agile_net_gbp',     label: 'vs Agile delta (£)',    fmt: v => (v >= 0 ? '+' : '') + '£' + v.toFixed(2) },
+      { key: 'avg_buy_p',            label: 'Avg buy price (p)',     fmt: v => v.toFixed(2) + 'p' },
+      { key: 'avg_sell_p',           label: 'Avg sell price (p)',    fmt: v => v.toFixed(2) + 'p' },
+    ];
+    let rowIdx = 0;
+    for (const row of rows) {
+      const bg = (rowIdx++ % 2 === 0) ? 'rgba(255,255,255,0.02)' : 'transparent';
+      html += `<tr style="background:${bg}">`;
+      html += `<td style="padding:4px 8px;color:#8b949e">${row.label}</td>`;
+      for (const m of ['agile','split','optimise']) {
+        const d = modes[m] || {};
+        if (d.error) { html += `<td style="text-align:right;padding:4px 8px;color:var(--red)">ERR</td>`; continue; }
+        const v = d[row.key];
+        const disp = (v !== undefined && v !== null) ? row.fmt(v) : '—';
+        let col = colors[m];
+        if (row.key === 'vs_agile_net_gbp' && v !== undefined) col = v >= 0 ? 'var(--green)' : 'var(--red)';
+        html += `<td style="text-align:right;padding:4px 8px;color:${col}">${disp}</td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</table>';
+    table.innerHTML = html;
+    const d = data.days || (data.months || 12) * 30.5;
+    status.textContent = `${Math.round(d)} days · imp_mod ${data.imp_mod_p}p · exp_mod ${data.exp_mod_p}p · cached 24h`;
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📊 COMPARE TARIFFS'; }
+  }
+}
+
 function _updateBaseloadHint(cfg) {
   const bl = parseFloat(document.getElementById('set-baseload-kw')?.value ?? cfg?.baseload_kw ?? 0);
   const h  = parseFloat(document.getElementById('set-house-kwh-day')?.value ?? cfg?.house_kwh_day ?? 12);
@@ -5450,5 +5559,47 @@ function msToNextSlot() {
     }
     loadFuseStatus();
     setInterval(loadFuseStatus, 6000);</script>
+  <script>
+    // -- Learned house load profile sparkline ---------------------------------
+    async function loadHouseProfile() {
+      try {
+        const r = await fetch('/api/house-profile');
+        if (!r.ok) return;
+        const d = await r.json();
+        const st = document.getElementById('hp-status');
+        if (!d.ready) { st.textContent = 'Collecting data (need 3+ days)...'; return; }
+        const m = d.meta || {};
+        st.textContent = (m.days_of_data || '?') + ' days of data';
+        document.getElementById('hp-daily').textContent =
+          m.total_daily_kwh ? m.total_daily_kwh.toFixed(1) + ' kWh/day' : '--';
+        const slotLabel = i => ('0'+Math.floor(i/2)).slice(-2) + (i%2===0?':00':':30');
+        document.getElementById('hp-peak').textContent =
+          m.peak_slot != null ? slotLabel(m.peak_slot) + ' (' + (m.peak_kwh||0).toFixed(3) + ' kWh)' : '--';
+        document.getElementById('hp-updated').textContent =
+          m.updated ? m.updated.slice(0,10) : '--';
+        const canvas = document.getElementById('hp-chart');
+        const ctx = canvas.getContext('2d');
+        canvas.width  = canvas.offsetWidth * devicePixelRatio;
+        canvas.height = 80 * devicePixelRatio;
+        ctx.scale(devicePixelRatio, devicePixelRatio);
+        const W = canvas.offsetWidth, H = 80;
+        const profile = d.profile;
+        const maxV = Math.max(...profile, 0.001);
+        const bW = W / 48;
+        ctx.clearRect(0, 0, W, H);
+        profile.forEach((v, i) => {
+          const bH = (v / maxV) * (H - 10);
+          const hr = Math.floor(i/2);
+          const col = hr < 6 ? '#1f6feb' : hr < 9 ? '#d29922' : hr < 18 ? '#3fb950' : hr < 22 ? '#d29922' : '#1f6feb';
+          ctx.fillStyle = col + 'aa';
+          ctx.fillRect(i * bW + 1, H - bH - 2, bW - 2, bH);
+        });
+        ctx.fillStyle = '#6e7681'; ctx.font = '9px monospace';
+        [0, 6, 12, 18, 23].forEach(hr => ctx.fillText(('0'+hr).slice(-2)+':00', hr*2*bW, H));
+      } catch(e) {}
+    }
+    loadHouseProfile();
+    setInterval(loadHouseProfile, 120000);
+  </script>
 </body>
 </html>
