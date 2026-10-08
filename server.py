@@ -1217,7 +1217,6 @@ def api_backtest_compare():
     return jsonify(payload)
 
 
-@app.route("/api/backtest-compare")
 def api_backtest_compare():
     """
     Run _run_backtest() for all three tariff modes and return a side-by-side
