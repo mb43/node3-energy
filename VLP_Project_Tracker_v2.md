@@ -1,6 +1,6 @@
 # Node-3 VLP / G99 / ElectronConnect Project Tracker
-**Version:** 3.4  
-**Updated:** 28 September 2026 (weekly review run)  
+**Version:** 3.6  
+**Updated:** 8 October 2026 (post-agreement update)  
 **Property:** 179 King Georges Avenue, Southampton SO15 4LD  
 **MPAN:** 2000022678841  
 **Entity:** Dovecote Systems Ltd (Co. No. 17160178)  
@@ -13,16 +13,19 @@
 | # | Action | Owner | Deadline | Notes |
 |---|--------|-------|----------|-------|
 | 1 | ~~Check email for SSEN reply re FJJ907/1 expiry~~ | Matt | ✅ **RESOLVED 26 Aug** | Robert Smith (SSEN) replied 09:38 26 Aug: **"FJJ907 has already been accepted so has secured the export."** No further action needed — 27 Aug expiry does not apply. |
-| 2 | **ElectronConnect mini-competition** | Matt | 🔴 **WINDOW OPEN — closes 5 Oct 5pm (7 days as of 28 Sep)** | ✅ **28 Sep review:** window is open; SSEN reminder (Ronke Ajadi, 24 Sep) received and unread. No response form has been submitted per Gmail. Log in to ssen.electronconnect.io, download form, submit now — don't wait for asset fields. ✅ **Reminder received 14 Sep** from stakeholder.engagement@ssen.co.uk restating the process: as a pre-qualified party, ElectronConnect emails Matt on 21 Sep when the window opens; download, complete and upload the "mini-competition response form" before 5pm 5 Oct; contract issued for signature after due diligence. Questions → flexibilityprocurement@sse.com. Platform issues → support@electron.net. PQQ already approved — no re-registration needed. |
+| 2 | ~~ElectronConnect mini-competition~~ | Matt | ✅ **DONE 5 Oct / SIGNED 8 Oct** | Mini-competition form submitted 5 Oct (before 5pm). Ronke Ajadi (SSE) replied 5 Oct 15:59: can proceed and sign the overarching agreement while connection registration is pending; **no dispatch until an active connection agreement is in place.** Susan Beveridge (SSE) confirmed 7 Oct they will proceed; Adobe Sign agreement issued 7 Oct and **fully executed 8 Oct** ("FW Services - Overarching Agreement Flexibility Services - Multisite 1034 Dovecote"). |
+| 2b | **Complete SSE supplier onboarding** | Matt | 🟡 **Awaiting emails (promised by Susan Beveridge 7 Oct)** | (a) **Jaggaer** registration link — records signed agreement, one-off. (b) **Supplier set-up questionnaire** (ordering & payment system) — company details + insurance; only **Employer's Liability and Public Liability** required for flexibility services. Have certificates ready. Neither email in Gmail as of 8 Oct evening. |
+| 2c | **Flexible Power platform onboarding** | SSE Flexibility Markets/Services | 🟡 **Awaiting contact** | SSE teams to guide Dovecote through Flexible Power platform per Service Terms. Not yet contacted as of 8 Oct. |
+| 2d | **Review SSEN October Long-Term Tender** | Matt | 🟡 Window opens **12 Oct 2026** | support@electron.net notice 8 Oct. Check eligibility/requirements for a 5.5kW-export asset. |
 | 3 | ~~Reply to Flexitricity (Jamie Hillis)~~ | Matt | ✅ **CLOSED 4 Sep** | Jamie Hillis replied 16:27 4 Sep: FlexGO needs **300–500kW dispatchable**; BM needs 1MW aggregated in a GSP group; **Flexitricity does not participate in DSO local flexibility platforms at all** ("difficult for us to automate dispatch"), though they are in cross-DSO streamlining workshops. **Flexitricity is a NO for Node-3 and for the 10-node (~105kW) stage.** Revisit at ~300kW+ (≈30 nodes). |
 | 3b | **Find aggregators that DO take domestic-scale / DSO flex** | Matt | 🔴 **NOW** | Flexitricity's exit leaves Octopus (Kraken Flex) as the only live aggregator thread. Need 2–3 more: Social Energy, Axle Energy, Cuckoo/Loop, GivEnergy, Tesla/Octopus VPPs, or ElectronConnect-registered VLPs willing to route small assets. |
 | 4 | **Octopus VPP — chase correct team** | Matt | 🔴 **OVERDUE — chase now** | Matt replied 09:52 26 Aug pointing out Octopus's 24 Jun reply was about export tariffs (already on Agile Outgoing), not VPP/Kraken Flex enrolment. **33 days, no reply (as of 28 Sep).** Only Octopus traffic since is billing (energy statement 15 Sep, balance −£303.99). Now the only live aggregator route — escalate by phone or web form, email is not working. |
 | 5 | ~~Provide updated SLD to SSEN~~ | Matt | ✅ **Rev C BUILT 11 Sep** | Rev B was **not fit to send** — audit found: (a) title block stated **"Export capacity: 10.5 kW"**, contradicting accepted FJJ907/1 at **5.5kW**; (b) header/footer "Rev B" but REVISION field said **"Rev A"**; (c) issue date still 29 Apr 2026; (d) signature/date/NAPIT reg blank; (e) Sonny's address mis-typed `.com`. **All corrected in `NODE3_G99_SLD_DSL-SLD-001_RevC.pdf`** (in project folder). Revision note added to the drawing recording exactly what changed. No electrical/topological changes. |
 | 5b | **Get Rev C signed by Sonny** | Sonny | Before commissioning | ✅ **SENT 11 Sep 09:47** — Rev C + change summary emailed to sonny@solentrenewables.co.uk requesting signature, date and NAPIT/MCS reg number. ⏳ **17 days, no reply (as of 28 Sep).** Sonny has a history of not replying (21 Aug ICP query never answered) — chase by phone. |
 | 5c | **Issue signed SLD to SSEN** | Matt | Before energisation | After 5b. Send signed Rev C to Andrea Keith / Gemma Overall for the connection record. |
-| 8 | **Chase Andrea Keith — connection refs + export limitation** | Matt | 🔴 **OVERDUE — phone today** | ✅ **SENT 11 Sep 09:44** (cc Gemma Overall, Sonny). Asked for (a) Network Location / DNO Reference / Connection Reference Number — needed to complete the ElectronConnect asset record; (b) confirmation that export limitation is 5.5kW via inverter built-in function with CT at supply intercept, and whether G99 Form A3-3 is required. ⏳ **17 days, no reply (as of 28 Sep).** The 16 Sep escalation trigger has passed with no action. These three fields gate the ElectronConnect asset record and the window is now OPEN — phone 01738 342440 today, and in parallel email flexibilityprocurement@sse.com to confirm whether the response form can be submitted with the asset record incomplete. |
+| 8 | **Export meter info / connection refs — via Sonny at install** | Matt (as homeowner) | 🟡 **Phone call with Andrea Keith (8 Oct)** | Andrea advised: when Sonny (Solent Renewables) installs, Matt should ask him **as the homeowner, not as Dovecote director**, to provide the export meter info. This replaces further chasing of Andrea for Network Location / DNO Ref / Connection Ref Number / export-limit confirmation; fields still needed for the ElectronConnect asset record once received. Original 11 Sep email + 5 Oct follow-up left those unanswered. |
 | 6 | **Book electrician** | Matt | When HV ready | Inverter wiring and commissioning. Matt has electrician ready once paid. |
-| 7 | **Arrange public liability insurance** | Matt | Before OA executed | Min £2M cover required. |
+| 7 | **Arrange public liability insurance** | Matt | 🔴 **Now needed for SSE supplier questionnaire** | OA now executed (8 Oct). Min £2M cover required; SSE questionnaire wants Employer's Liability + Public Liability details. |
 
 ---
 
@@ -67,6 +70,14 @@
 | 15–21 Sep 2026 | **No project correspondence this week.** Nothing from Andrea Keith, Gemma Overall, Robert Smith, Ronke Ajadi, Sonny, Flexitricity or Octopus VPP. Only Octopus billing (energy statement 15 Sep). All three chases (Andrea 11 Sep, Sonny 11 Sep, Octopus 26 Aug) remain unanswered. | ⏳ Quiet |
 | 21 Sep 2026 | **ElectronConnect contracting window OPENS 11am** — response form due by 5pm 5 Oct | 🔴 **LIVE NOW** |
 | 22–28 Sep 2026 | **No replies** from Andrea Keith, Gemma Overall, Robert Smith, Sonny, Octopus VPP or Flexitricity. Only ElectronConnect newsletter (22 Sep) and SSEN contracting-window reminder (24 Sep). All chases remain unanswered: Andrea 17 days, Sonny 17 days, Octopus 33 days. | ⏳ Quiet |
+| 29 Sep–5 Oct 2026 | **No replies** from Andrea Keith, Gemma Overall, Robert Smith, Sonny, Octopus VPP or Flexitricity (Andrea 24d, Sonny 24d, Octopus VPP 40d silent). **2 Oct:** 2nd ElectronConnect reminder (notifications@electron.net) — mini-competition closes 5 Oct 17:00, unread, no submission seen in Gmail/Sent. **2 Oct:** Octopus (acct A-27020CC0) Direct Debit declined; £200.91 re-collection due 8 Oct. **3 Oct:** Octopus referral FYI (not VPP). SSEN RISE/HF-PQ webinar reminders only (8 & 9 Oct). | 🔴 Deadline day |
+
+| 5 Oct 2026 | **Matt submitted ElectronConnect mini-competition form** (emailed Ronke, cc support@electron.net) before 5pm deadline. Ronke replied 15:59: OK to proceed/sign; no dispatch until active connection agreement. | ✅ Done |
+| 5 Oct 2026 | **Andrea Keith replied** with commissioning address only: notifications.southmicrogen@sse.com. Did **not** answer Network Location / DNO Ref / Connection Ref / export-limit questions. | ⚠️ Partial |
+| 7 Oct 2026 | **Susan Beveridge (SSE Senior Category Manager)** confirmed SSE will proceed; Adobe Sign agreement issued; Jaggaer + supplier set-up emails to follow; Flexible Power platform teams to be in touch. | ✅ Received |
+| 8 Oct 2026 | **Overarching Agreement – Flexibility Services (Multisite 1034 Dovecote) fully executed** (Adobe Sign completion 20:07). Matt acknowledged to Susan 20:05. | ✅ **SIGNED** |
+| 8 Oct 2026 | **Phone call, Andrea Keith:** ask Sonny (as homeowner, not Dovecote director) for export meter info at installation. | ✅ Guidance received |
+| 8 Oct 2026 | ElectronConnect notice: SSEN October Long-Term Tender window opens 12 Oct. | ℹ️ Info |
 
 ### Offer: FJJ907/1 (Active — accepted 2 Jun 2026)
 
@@ -115,7 +126,11 @@
 | 14 Sep 2026 | SSEN reminder email received confirming window dates and process | ✅ Received |
 | 22 Sep 2026 | ElectronConnect (support@electron.net) newsletter: from 28 Sep SSEN markets become persistent/reusable with rolling requirements; technical qualification needed only once per asset/market | ✅ Received (info only) |
 | 24 Sep 2026 | **Ronke Ajadi / flexibilityprocurement@sse.com REMINDER**: Sept contracting window closes **Mon 5 Oct 5pm**. Steps: download, complete, upload "mini-competition response form" on ssen.electronconnect.io; submitting = accepting overarching agreement T&Cs; not bound until due diligence done + agreement awarded. Missed window = next date TBA. Email still UNREAD in inbox. | 🔴 Received — no action yet |
-| **21 Sep – 5 Oct 2026** | **Mini-competition window — OPEN (window-opening email of 21 Sep not found in Gmail; 24 Sep reminder is the live instruction)** | 🔴 **DO NOT MISS** — submit before 5 Oct 5pm (7 days left as of 28 Sep) |
+| 2 Oct 2026 | **ElectronConnect (notifications@electron.net) 2nd reminder**: mini-competition closes 17:00 5 Oct; submit "Responding to the Overarching Agreement – Mini-Competition Form". No submission found in Gmail as of 5 Oct. | 🔴 Received — unactioned |
+| 5 Oct 2026 | Mini-competition form submitted before 5pm close | ✅ **DONE** |
+| 5 Oct 2026 | Ronke Ajadi: may sign overarching agreement while connection registration pending; no dispatch until active connection agreement | ✅ Received |
+| 7–8 Oct 2026 | Overarching agreement issued (Susan Beveridge) and **fully signed via Adobe Sign 8 Oct** | ✅ **SIGNED** |
+| 12 Oct 2026 | SSEN October Long-Term bidding window opens | 📅 Upcoming — review |
 
 ### Outstanding Asset Fields (need SSEN post-G99)
 - Network Location (feeder/substation)
@@ -182,7 +197,9 @@
     ↓
 📋  Update ElectronConnect asset (feeder/DNO ref from SSEN)
     ↓
-📅  ElectronConnect mini-competition: 21 Sep – 5 Oct 2026 — submit Service Agreement
+✅  ElectronConnect mini-competition submitted 5 Oct; Overarching Agreement SIGNED 8 Oct
+    ↓
+📋  SSE onboarding: Jaggaer + supplier questionnaire (EL/PL insurance) + Flexible Power platform
     ↓
 🤝  Engage aggregator — Flexitricity CLOSED (4 Sep). Octopus + new names needed.
     ↓
@@ -200,6 +217,8 @@
 | Gemma Overall | SSEN Construction/Delivery Manager (scheduling & build through to energisation) | Gemma.overall@sse.com |
 | Madeleine Pain | SSEN Wayleaves Officer (land rights) | madeleine.pain@sse.com / 02380 817327 |
 | Ronke Ajadi | SSEN ElectronConnect | Ronke.Ajadi@sse.com |
+| Susan Beveridge | SSE Senior Category Manager (flexibility agreement, Jaggaer/supplier onboarding) | Susan.E.Beveridge@sse.com / 01738 342 260 |
+| SSE Flexibility Procurement | Agreement queries | flexibilityprocurement@sse.com |
 | Jamie Hillis | Flexitricity | (via info@flexitricity.com) |
 | Stuart Hadley | SSEN (called 19 Aug re: FKA552) | via SSEN portal |
 | Sonny | Solent Renewables (ICP query) | No reply received |
