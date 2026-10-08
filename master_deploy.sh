@@ -46,6 +46,8 @@ scp "$SCRIPT_DIR/deploy_lp_learning.py"       "$PI:/tmp/deploy_lp_learning.py"
 scp "$SCRIPT_DIR/fox_modbus_loop.py"          "$PI:$PI_NODE3/fox_modbus_loop.py"
 scp "$SCRIPT_DIR/house_profile.py"            "$PI:$PI_NODE3/house_profile.py"
 [ -f "$SCRIPT_DIR/fix_fuse_card.py" ] && scp "$SCRIPT_DIR/fix_fuse_card.py" "$PI:/tmp/fix_fuse_card.py"
+scp "$SCRIPT_DIR/fix_eon_sc.py"            "$PI:/tmp/fix_eon_sc.py"
+scp "$SCRIPT_DIR/fix_smart_alerts.py"     "$PI:/tmp/fix_smart_alerts.py"
 
 # ── 2. Run on Pi ─────────────────────────────────────────────────────────────
 echo "[2/5] Running deploy scripts on Pi…"
@@ -53,6 +55,8 @@ ssh "$PI" "python3 /tmp/master_deploy.py"
 ssh "$PI" "python3 /tmp/deploy_all_fixes.py"
 ssh "$PI" "python3 /tmp/deploy_lp_learning.py"
 [ -f "$SCRIPT_DIR/fix_fuse_card.py" ] && ssh "$PI" "python3 /tmp/fix_fuse_card.py"
+ssh "$PI" "python3 /tmp/fix_eon_sc.py"
+ssh "$PI" "python3 /tmp/fix_smart_alerts.py"
 
 # ── 3. Restart docker ────────────────────────────────────────────────────────
 echo "[3/5] Restarting node3-portal docker container…"
@@ -82,7 +86,8 @@ else
               deploy_tariff_toggle.py deploy_standing_charges.py \
               deploy_backtest_compare.py fix_tariff_auth.py \
               deploy_all_fixes.py fox_modbus_loop.py deploy_fuse_loop.sh \
-              deploy_lp_learning.py house_profile.py fix_fuse_card.py; do
+              deploy_lp_learning.py house_profile.py fix_fuse_card.py \
+              fix_eon_sc.py fix_smart_alerts.py; do
         [ -f "$SCRIPT_DIR/$f" ] && cp "$SCRIPT_DIR/$f" "$NODE3_REPO/$f" && echo "  ✓ $f"
     done
 fi
@@ -111,28 +116,28 @@ else
         deploy_lp_learning.py \
         house_profile.py \
         fix_fuse_card.py \
+        fix_eon_sc.py \
+        fix_smart_alerts.py \
         2>/dev/null || true
 
     git diff --cached --stat
     echo
     git commit -m "$(cat <<'EOF'
-feat(node3): LP learning — house profile, fuse daemon, grid history
+fix(node3): E.ON SC saveable + LP tariff-mode per-backtest + dedup
 
-- fox_modbus_loop.py: fuse protection daemon (16.4kW safe limit)
-  reads BMS from bms_detail.json, logs grid_history.csv every 5s
-  auto-triggers house_profile.py rebuild every ~2h (1440 cycles)
-- house_profile.py: 48-slot learned house load profile from CSV
-  14-day rolling window, per-slot kWh, saves house_profile.json
-- simulate.py: LP planner uses learned per-slot loads not flat 250W
-  cumulative profile sums used in SOC constraints; time-aligned via
-  valid_from timestamps; graceful flat fallback pre-profile
-- server.py: /api/house-profile + /api/grid-history endpoints
-  /api/fuse-status (daemon health/headroom)
-  _pushover_send() for mobile alerts
-  fuse daemon auto-started alongside bms_monitor on boot
-- dashboard.html: learned profile sparkline card (Canvas, coloured
-  by time-of-day), fuse protection widget JS
-- node3_config.py: standing_charge_eon_p_day + subscription_pcm=0 fix
+- fix_eon_sc.py: standing_charge_eon_p_day added to settings save
+  endpoint accepted keys (was silently rejected, defaulting to 62.22p;
+  user's 48.9p/day now persists to node3_config.json)
+- simulate.py: plan_optimal_dispatch() gains tariff_mode=None override
+  param — uses it when provided, else falls back to live config.
+  This means backtest-compare LP uses the correct mode for each
+  scenario (agile/split/optimise) rather than whatever's live in config.
+- server.py: backtest LP window pre-adjustment removed (was causing
+  double-application of import discount when LP also adjusts internally).
+  LP now correctly applies 00-06 import discount AND 16-19 export bonus
+  per mode, so tariff-compare numbers reflect true optimal scheduling.
+- server.py: cleaned up 3× duplicate SC vars, tariff_mode check, and
+  buy_p/sell_adj blocks left by repeated deploy runs.
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 EOF

@@ -688,10 +688,12 @@ def api_settings():
     body = request.get_json(silent=True) or {}
     updates = {}
     NON_NEGATIVE_KEYS = {"baseload_kw", "house_kwh_day",
-                         "standing_charge_import_p_day", "standing_charge_export_p_day"}
+                         "standing_charge_import_p_day", "standing_charge_export_p_day",
+                         "standing_charge_eon_p_day", "subscription_pcm"}
     for key in ("battery_kwh", "import_kw", "export_kw", "min_soc_pct",
                 "baseload_kw", "house_kwh_day", "svt_ref_p", "subscription_pcm",
-                "standing_charge_import_p_day", "standing_charge_export_p_day"):
+                "standing_charge_import_p_day", "standing_charge_export_p_day",
+                "standing_charge_eon_p_day"):
         if key in body:
             try:
                 v = float(body[key])
